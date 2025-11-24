@@ -1,0 +1,25 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@linaria/core": "^6.3.0",
+    "@solidjs/router": "^0.15.3",
+    "@wyw-in-js/vite": "^0.7.0",
+    "solid-js": "^1.9.5"
+  },
+  "devDependencies": {
+    "@babel/preset-typescript": "^7.27.1",
+    "@biomejs/biome": "2.0.6",
+    "@wyw-in-js/babel-preset": "^0.7.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-solid": "^2.11.6"
+  }
+}
