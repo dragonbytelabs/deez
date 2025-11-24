@@ -8,5 +8,4 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at    TEXT
 );
 
--- Helpful index (email already unique, but this is illustrative)
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
