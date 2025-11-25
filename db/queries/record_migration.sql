@@ -1,1 +1,1 @@
-INSERT INTO schema_migrations (version) VALUES (:version)
+INSERT INTO schema_migrations (version) VALUES (?)
