@@ -1,0 +1,1 @@
+SELECT COUNT(*) FROM schema_migrations WHERE version = :version
