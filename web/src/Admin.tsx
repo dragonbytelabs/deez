@@ -1,51 +1,34 @@
 import { css } from "@linaria/core";
-import { api } from "./server/api";
 
-const content = css`
-  background-color: #red;
+const mainContent = css`
+  margin-left: 250px;
+  padding: 40px;
+  min-height: 100vh;
+  transition: margin-left 0.3s ease;
+  
+  @media (max-width: 768px) {
+    margin-left: 0;
+    padding: 80px 20px 20px;
+  }
 `;
 
-const menu = css`
-  display: flex;
-  justify-content: space-between;
-  width: 300px;
-  font-size: 20px;
+const title = css`
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: var(--white);
+`;
+
+const subtitle = css`
+  font-size: 18px;
+  color: var(--gray500);
 `;
 
 export const Admin = () => {
-	const logout = async () => {
-		try {
-			const response = await api.logout();
-
-			if (response.ok) {
-				const data = await response.json();
-				console.log("Logout successful:", data);
-				if (data.redirect) {
-					window.location.href = data.redirect;
-				} else {
-					// Fallback if no redirect provided
-					window.location.href = "/login";
-				}
-			} else {
-				const error = await response.text();
-				console.error("Logout failed:", error);
-				alert("Failed to logout. Please try again.");
-			}
-		} catch (error) {
-			console.error("Logout error:", error);
-			alert("Network error during logout.");
-		}
-	};
 	return (
-		<div class={content}>
-			<h1>Admin</h1>
-			<div class={menu}>
-				<button onClick={logout}>Logout</button>
-			</div>
-			<p>This is the admin page</p>
-			<p>This is the admin page</p>
-			<p>This is the admin page</p>
-			<p>This is the admin page</p>
-		</div>
+		<main class={mainContent}>
+			<h1 class={title}>Welcome to the Admin page</h1>
+			<p class={subtitle}>This is your data</p>
+		</main>
 	);
 };
