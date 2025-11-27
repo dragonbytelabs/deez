@@ -219,9 +219,12 @@ func (m *SessionManager) Handle(next http.Handler) http.Handler {
 		// Call next handler
 		next.ServeHTTP(sw, r)
 
-		// Save session
-		if err := m.save(session); err != nil {
-			log.Printf("failed to save session: %v", err)
+		// Make sure session is written after request
+		if session != nil {
+			log.Printf("SessionManager: Writing session after request, id=%s", session.id)
+			if err := m.store.Write(session); err != nil {
+				log.Printf("SessionManager: Failed to write session: %v", err)
+			}
 		}
 
 		// Ensure cookie is written

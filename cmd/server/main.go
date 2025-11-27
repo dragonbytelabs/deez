@@ -19,7 +19,7 @@ func main() {
 	defer db.Close()
 	// Create session manager
 	sessionManager := session.NewSessionManager(
-		session.NewInMemoryStore(),
+		session.NewSQLiteStore(db),
 		cfg.Session.GCInterval,
 		cfg.Session.IdleExpiration,
 		cfg.Session.AbsoluteExpiration,

@@ -3,6 +3,7 @@ package dbx
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -53,6 +54,9 @@ func (d *DB) CreateSession(ctx context.Context, id string, data map[string]any, 
 		return err
 	}
 
+	log.Printf("WriteSession: id=%s, data=%s, created=%v, lastActivity=%v",
+		id, string(dataJSON), createdAt, lastActivityAt) // Add logging
+
 	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
 	if err != nil {
 		return err
@@ -66,8 +70,15 @@ func (d *DB) CreateSession(ctx context.Context, id string, data map[string]any, 
 		"last_activity_at": lastActivityAt,
 	}
 
-	_, err = stmt.ExecContext(ctx, args)
-	return err
+	result, err := stmt.ExecContext(ctx, args)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("WriteSession: affected %d rows", rowsAffected) // Add logging
+
+	return nil
 }
 
 // DeleteSession removes a session by ID
