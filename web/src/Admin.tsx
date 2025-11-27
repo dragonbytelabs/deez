@@ -12,7 +12,7 @@ const menu = css`
   font-size: 20px;
 `;
 
-export const Game = () => {
+export const Admin = () => {
 	const logout = async () => {
 		try {
 			const response = await api.logout();
@@ -38,11 +38,14 @@ export const Game = () => {
 	};
 	return (
 		<div class={content}>
-			<h1>Another</h1>
+			<h1>Admin</h1>
 			<div class={menu}>
 				<button onClick={logout}>Logout</button>
 			</div>
-			<p>This is the game page</p>
+			<p>This is the admin page</p>
+			<p>This is the admin page</p>
+			<p>This is the admin page</p>
+			<p>This is the admin page</p>
 		</div>
 	);
 };

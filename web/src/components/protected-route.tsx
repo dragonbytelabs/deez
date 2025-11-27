@@ -1,6 +1,14 @@
 import { useNavigate } from "@solidjs/router";
 import { createSignal, onMount, Show, type Component } from "solid-js";
 import { api } from "../server/api";
+import { css } from "@linaria/core";
+
+const menu = css`
+  display: flex;
+  justify-content: space-between;
+  width: 300px;
+  font-size: 20px;
+`;
 
 export const ProtectedRoute: Component<{ component: Component }> = (props) => {
   const navigate = useNavigate();
@@ -17,6 +25,12 @@ export const ProtectedRoute: Component<{ component: Component }> = (props) => {
   return (
     <Show when={isAuthenticated() !== null} fallback={<div>Loading...</div>}>
       <Show when={isAuthenticated()} fallback={null}>
+			<div class={menu}>
+				<a href="/">home</a>
+				<a href="/register">register</a>
+				<a href="/login">login</a>
+				<a href="/admin">game</a>
+			</div>
         {props.component({})}
       </Show>
     </Show>
