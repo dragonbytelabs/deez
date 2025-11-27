@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { Show, type Component } from "solid-js";
+import { For, Show, type Component } from "solid-js";
 
 const sidebar = css`
   position: fixed;
@@ -104,6 +104,15 @@ interface SidebarProps {
 }
 
 export const Sidebar: Component<SidebarProps> = (props) => {
+  const sidebarMenuLinks = [
+    { title: "🏠 Home", link: "/_/admin" },
+    { title: "🏠 database", link: "/_/admin/tables" },
+  ];
+
+  const isActive = (link: string) => {
+    return window.location.pathname === link;
+  }
+
   return (
     <>
       {/* Toggle button */}
@@ -117,33 +126,26 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       </Show>
 
       {/* Sidebar */}
-      <div class={`${sidebar} ${!props.isOpen ? "closed" : ""}`}>
+      <div class={sidebar} classList={{ closed: !props.isOpen }}>
+
         <div class={menuHeader}>
-          <div class={logo}>Game</div>
+          <div class={logo}>Admin</div>
         </div>
 
         <nav>
           <ul class={menuList}>
-            <li class={menuItem}>
-              <a href="/" class={menuLink}>
-                🏠 Home
-              </a>
-            </li>
-            <li class={menuItem}>
-              <a href="/game" class={menuLink}>
-                🎮 Play
-              </a>
-            </li>
-            <li class={menuItem}>
-              <a href="/profile" class={menuLink}>
-                👤 Profile
-              </a>
-            </li>
-            <li class={menuItem}>
-              <a href="/settings" class={menuLink}>
-                ⚙️ Settings
-              </a>
-            </li>
+            <For each={sidebarMenuLinks}>{(menu) =>
+              <li class={menuItem}>
+                <a href={menu.link}
+                  class={menuLink}
+                  classList={{
+                    active: isActive(menu.link)
+                  }}
+                >
+                  {menu.title}
+                </a>
+              </li>}
+            </For>
           </ul>
         </nav>
       </div>
