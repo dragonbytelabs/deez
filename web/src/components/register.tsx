@@ -8,7 +8,6 @@ const container = css`
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background-color: #f8f9fa;
   font-family: Arial, sans-serif;
 `;
 
@@ -68,8 +67,8 @@ export default function RegisterForm() {
 	const [password, setPassword] = createSignal("");
 	const [confirmPassword, setConfirmPassword] = createSignal("");
 
-	const postForm = async () => {
-		// Build body the same way <form> would
+	const handleSubmit = async (e: Event) => {
+		e.preventDefault();
 		console.log("Username signal:", email());
 		console.log("Password signal:", password());
 		const response = await api.register(email(), password(), confirmPassword());
@@ -90,6 +89,7 @@ export default function RegisterForm() {
 		<div class={container}>
 			<div class={card}>
 				<h1 class={title}>Register</h1>
+				<form onSubmit={handleSubmit}>
 				<input
 					type="text"
 					placeholder="Email or Username"
@@ -111,9 +111,10 @@ export default function RegisterForm() {
 					value={confirmPassword()}
 					onInput={(e) => setConfirmPassword(e.currentTarget.value)}
 				/>
-				<button type="button" class={buttonPrimary} onClick={postForm}>
-					Register In
+				<button type="submit" class={buttonPrimary}>
+					Create Account
 				</button>
+				</form>
 				<p class={signupText}>
 					Already Have An Account? <a href="/login">Login instead</a>
 				</p>

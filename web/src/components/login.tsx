@@ -8,7 +8,6 @@ const container = css`
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background-color: #f8f9fa;
   font-family: Arial, sans-serif;
 `;
 
@@ -67,7 +66,8 @@ export default function LoginWithSocials() {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
 
-  const postForm = async () => {
+  const handleSubmit = async (e: Event) => {
+    e.preventDefault();
     // Build body the same way <form> would
     console.log("Username signal:", email());
     console.log("Password signal:", password());
@@ -91,6 +91,7 @@ export default function LoginWithSocials() {
     <div class={container}>
       <div class={card}>
         <h1 class={title}>Login</h1>
+        <form onSubmit={handleSubmit}>
         <input
           type="text"
           placeholder="Email or Username"
@@ -105,12 +106,13 @@ export default function LoginWithSocials() {
           value={password()}
           onInput={(e) => setPassword(e.currentTarget.value)}
         />
-        <button type="button" class={buttonPrimary} onClick={postForm}>
+        <button type="submit" class={buttonPrimary}>
           Sign In
         </button>
         <p class={signupText}>
           Don’t Have An Account? <a href="/register">Create a new account</a>
         </p>
+        </form>
       </div>
     </div>
   );

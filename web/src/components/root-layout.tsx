@@ -2,8 +2,7 @@ import type { ParentProps } from "solid-js";
 import { css } from "@linaria/core";
 
 const layout = css`
-  :global() {
-  :root {
+  :global(html) {
     --bg: #09090b;
     --primary: #cd80ed;
     --primaryDark: #b368d8;
@@ -15,26 +14,35 @@ const layout = css`
     --yellow400: #facc15;
     --white: #f4f4f5;
   }
-  *, 
-  *::before, 
-  *::after { 
+  
+  :global(*), 
+  :global(*::before), 
+  :global(*::after) { 
     box-sizing: border-box; 
-    margin:0; 
-    padding:0; 
+    margin: 0; 
+    padding: 0; 
   }
-  html, body, #root { 
-    min-height:100%; 
-    font-family:Inter,system-ui,sans-serif; 
-    background:var(--bg);
+  
+  :global(html),
+  :global(body),
+  :global(#root) { 
+    min-height: 100vh; 
+    font-family: Inter, system-ui, sans-serif; 
+    background: var(--bg);
     color: var(--white);
   }
-  img {
-    max-width:100%; 
-    height:auto; 
-    display:block;
+  
+  :global(img) {
+    max-width: 100%; 
+    height: auto; 
+    display: block;
   }
-}`;
+`;
 
 export const Layout = (props: ParentProps) => {
-	return <div class={layout}>{props.children}</div>;
+	return (
+  <div class={layout}>
+    { props.children }
+    </div>
+  )
 };
