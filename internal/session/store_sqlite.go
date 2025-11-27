@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	"dragonbytelabs/dz/internal/dbx"
@@ -55,6 +56,8 @@ func (s *SQLiteStore) Write(session *Session) error {
 	lastActivityAt := session.lastActivityAt
 	id := session.id
 	session.mu.RUnlock()
+
+	log.Printf("SQLiteStore.Write: id=%s, data=%+v", id, data)
 
 	return s.db.CreateSession(ctx, id, data, createdAt, lastActivityAt)
 }
