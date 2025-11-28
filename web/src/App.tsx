@@ -1,5 +1,5 @@
 import { Route, Router } from "@solidjs/router";
-import { Admin } from "./Admin";
+import { Admin } from "./admin";
 import { AdminSettings } from "./admin-settings";
 import { AdminTables } from "./admin-tables";
 import { AdminUserProfile } from "./admin-user-profile";
