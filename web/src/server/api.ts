@@ -16,6 +16,8 @@ const routes: Route = {
 	register: "/api/register",
 	logout: "/api/logout",
 	me: "/api/me",
+	getCollections: "/api/admin/tables",
+	getCollectionByName: "/api/admin/table",
 };
 
 type MeFuncData = {
@@ -37,6 +39,20 @@ const meFunc = async () => {
 		console.error("Auth check failed:", error);
 		return false;
 	}
+};
+
+const getCollectionsFunc = async () => {
+	const response = await fetch(routes.getCollections, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const getCollectionByNameFunc = async (tableName: string) => {
+	const response = await fetch(`${routes.getCollectionByName}/${tableName}`, {
+		credentials: "include",
+	});
+	return response;
 };
 
 const loginFunc = async (email: string, password: string) => {
@@ -91,6 +107,8 @@ type ApiRoutes = {
 	) => Promise<Response>;
 	logout: () => Promise<Response>;
 	me: () => Promise<boolean>;
+	getCollections: () => Promise<Response>;
+	getCollectionByName: (tableName: string) => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -98,4 +116,6 @@ export const api: ApiRoutes = {
 	register: registerFunc,
 	logout: logoutFunc,
 	me: meFunc,
+	getCollections: getCollectionsFunc,
+	getCollectionByName: getCollectionByNameFunc,
 };

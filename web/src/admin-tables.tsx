@@ -1,12 +1,29 @@
 import { css } from "@linaria/core";
 import { createSignal, For, onMount, Show } from "solid-js";
+import { api } from "./server/api";
+import { ShowCollections } from "./components/admin-tables.show-collections";
+
+const layout = css`
+  display: flex;
+  height: 100vh; 
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
 
 const mainContent = css`
+  flex: 1;
   padding: 40px;
+  overflow-y: auto;
   
   @media (max-width: 768px) {
     padding: 20px;
   }
+`;
+
+const header = css`
+  margin-bottom: 30px;
 `;
 
 const title = css`
@@ -19,45 +36,6 @@ const title = css`
 const subtitle = css`
   font-size: 18px;
   color: var(--gray500);
-  margin-bottom: 30px;
-`;
-
-const tablesGrid = css`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 40px;
-`;
-
-const tableCard = css`
-  background: var(--gray800);
-  border: 1px solid var(--gray700);
-  border-radius: 8px;
-  padding: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    border-color: var(--primary);
-    transform: translateY(-2px);
-  }
-  
-  &.active {
-    border-color: var(--primary);
-    background: var(--gray700);
-  }
-`;
-
-const tableName = css`
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--white);
-  margin-bottom: 8px;
-`;
-
-const tableInfo = css`
-  font-size: 14px;
-  color: var(--gray500);
 `;
 
 const dataSection = css`
@@ -66,13 +44,6 @@ const dataSection = css`
   border-radius: 8px;
   padding: 20px;
   overflow-x: auto;
-`;
-
-const dataTitle = css`
-  font-size: 24px;
-  font-weight: bold;
-  color: var(--white);
-  margin-bottom: 20px;
 `;
 
 const table = css`
@@ -117,157 +88,172 @@ const error = css`
   margin-bottom: 20px;
 `;
 
-interface TableInfo {
-	name: string;
-	rowCount?: number;
-}
+const emptyState = css`
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray500);
+`;
+
+const emptyStateIcon = css`
+  font-size: 48px;
+  margin-bottom: 16px;
+`;
+
+const emptyStateText = css`
+  font-size: 18px;
+  margin-bottom: 8px;
+`;
+
+const emptyStateSubtext = css`
+  font-size: 14px;
+  color: var(--gray600);
+`;
 
 interface TableData {
-	table: string;
-	data: Record<string, any>[];
+    table: string;
+    data: Record<string, any>[];
 }
 
 export const AdminTables = () => {
-	const [tables, setTables] = createSignal<TableInfo[]>([]);
-	const [selectedTable, setSelectedTable] = createSignal<string | null>(null);
-	const [tableData, setTableData] = createSignal<TableData | null>(null);
-	const [isLoading, setIsLoading] = createSignal(true);
-	const [errorMsg, setErrorMsg] = createSignal<string | null>(null);
+    const [collections, setCollections] = createSignal<string[]>([]);
+    const [selectedCollection, setSelectedCollection] = createSignal<string | null>(null);
+    const [tableData, setTableData] = createSignal<TableData | null>(null);
+    const [isLoadingCollections, setIsLoadingCollections] = createSignal(true);
+    const [isLoadingData, setIsLoadingData] = createSignal(false);
+    const [errorMsg, setErrorMsg] = createSignal<string | null>(null);
 
-	onMount(async () => {
-		await loadTables();
-	});
+    onMount(async () => {
+        await loadCollections();
+    });
 
-	const loadTables = async () => {
-		try {
-			setIsLoading(true);
-			setErrorMsg(null);
+    const loadCollections = async () => {
+        try {
+            setIsLoadingCollections(true);
+            setErrorMsg(null);
 
-			const response = await fetch("/api/admin/tables", {
-				credentials: "include",
-			});
+            const response = await api.getCollections();
+            if (!response.ok) {
+                throw new Error("Failed to load collections");
+            }
 
-			if (!response.ok) {
-				throw new Error("Failed to load tables");
-			}
+            const data = await response.json();
+            setCollections(data.tables || []);
+        } catch (err) {
+            console.error("Error loading collections:", err);
+            setErrorMsg("Failed to load database collections");
+        } finally {
+            setIsLoadingCollections(false);
+        }
+    };
 
-			const data = await response.json();
-			setTables(data.tables.map((name: string) => ({ name })));
-		} catch (err) {
-			console.error("Error loading tables:", err);
-			setErrorMsg("Failed to load database tables");
-		} finally {
-			setIsLoading(false);
-		}
-	};
+    const handleSelectCollection = async (collectionName: string) => {
+        try {
+            setIsLoadingData(true);
+            setErrorMsg(null);
+            setSelectedCollection(collectionName);
 
-	const loadTableData = async (tableName: string) => {
-		try {
-			setIsLoading(true);
-			setErrorMsg(null);
-			setSelectedTable(tableName);
+            const response = await api.getCollectionByName(collectionName);
 
-			const response = await fetch(`/api/admin/table/${tableName}`, {
-				credentials: "include",
-			});
+            if (!response.ok) {
+                throw new Error("Failed to load collection data");
+            }
 
-			if (!response.ok) {
-				throw new Error("Failed to load table data");
-			}
+            const data = await response.json();
+            setTableData(data);
+        } catch (err) {
+            console.error("Error loading collection data:", err);
+            setErrorMsg(`Failed to load data for collection: ${collectionName}`);
+        } finally {
+            setIsLoadingData(false);
+        }
+    };
 
-			const data = await response.json();
-			setTableData(data);
-		} catch (err) {
-			console.error("Error loading table data:", err);
-			setErrorMsg(`Failed to load data for table: ${tableName}`);
-		} finally {
-			setIsLoading(false);
-		}
-	};
+    return (
+        <div class={layout}>
+            <ShowCollections
+                collections={collections()}
+                selectedCollection={selectedCollection()}
+                isLoading={isLoadingCollections()}
+                onSelectCollection={handleSelectCollection}
+            />
 
-	return (
-		<main class={mainContent}>
-			<h1 class={title}>Database Admin</h1>
-			<p class={subtitle}>View and manage database tables</p>
+            <main class={mainContent}>
+                <Show when={errorMsg()}>
+                    <div class={error}>{errorMsg()}</div>
+                </Show>
 
-			<Show when={errorMsg()}>
-				<div class={error}>{errorMsg()}</div>
-			</Show>
+                <Show when={!selectedCollection()}>
+                    <div class={emptyState}>
+                        <div class={emptyStateIcon}>📋</div>
+                        <div class={emptyStateText}>Select a collection</div>
+                        <div class={emptyStateSubtext}>
+                            Choose a collection from the sidebar to view its data
+                        </div>
+                    </div>
+                </Show>
 
-			<Show when={isLoading() && tables().length === 0}>
-				<div class={loading}>Loading tables...</div>
-			</Show>
+                <Show when={selectedCollection() && tableData()}>
+                    <div class={header}>
+                        <h1 class={title}>{selectedCollection()}</h1>
+                        <p class={subtitle}>
+                            {tableData()?.data.length || 0} record(s)
+                        </p>
+                    </div>
 
-			<Show when={!isLoading() || tables().length > 0}>
-				<div class={tablesGrid}>
-					<For each={tables()}>
-						{(table) => (
-							<div
-								class={`${tableCard} ${selectedTable() === table.name ? "active" : ""}`}
-								onClick={() => loadTableData(table.name)}
-							>
-								<div class={tableName}>📋 {table.name}</div>
-								<div class={tableInfo}>Click to view data</div>
-							</div>
-						)}
-					</For>
-				</div>
-			</Show>
+                    <div class={dataSection}>
+                        <Show when={isLoadingData()}>
+                            <div class={loading}>Loading data...</div>
+                        </Show>
 
-			<Show when={tableData()}>
-				<div class={dataSection}>
-					<div class={dataTitle}>{tableData()?.table}</div>
+                        <Show
+                            when={
+                                !isLoadingData() &&
+                                tableData()?.data &&
+                                tableData()!.data.length > 0
+                            }
+                        >
+                            <table class={table}>
+                                <thead>
+                                    <tr>
+                                        <For each={Object.keys(tableData()!.data[0])}>
+                                            {(column) => <th>{column}</th>}
+                                        </For>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <For each={tableData()!.data}>
+                                        {(row) => (
+                                            <tr>
+                                                <For each={Object.values(row)}>
+                                                    {(value) => (
+                                                        <td>
+                                                            {value === null
+                                                                ? "NULL"
+                                                                : typeof value === "object"
+                                                                    ? JSON.stringify(value)
+                                                                    : String(value)}
+                                                        </td>
+                                                    )}
+                                                </For>
+                                            </tr>
+                                        )}
+                                    </For>
+                                </tbody>
+                            </table>
+                        </Show>
 
-					<Show when={isLoading()}>
-						<div class={loading}>Loading data...</div>
-					</Show>
-
-					<Show
-						when={
-							!isLoading() && tableData()?.data && tableData()!.data.length > 0
-						}
-					>
-						<table class={table}>
-							<thead>
-								<tr>
-									<For each={Object.keys(tableData()!.data[0])}>
-										{(column) => <th>{column}</th>}
-									</For>
-								</tr>
-							</thead>
-							<tbody>
-								<For each={tableData()!.data}>
-									{(row) => (
-										<tr>
-											<For each={Object.values(row)}>
-												{(value) => (
-													<td>
-														{value === null
-															? "NULL"
-															: typeof value === "object"
-																? JSON.stringify(value)
-																: String(value)}
-													</td>
-												)}
-											</For>
-										</tr>
-									)}
-								</For>
-							</tbody>
-						</table>
-					</Show>
-
-					<Show
-						when={
-							!isLoading() &&
-							tableData()?.data &&
-							tableData()!.data.length === 0
-						}
-					>
-						<div class={loading}>No data in this table</div>
-					</Show>
-				</div>
-			</Show>
-		</main>
-	);
+                        <Show
+                            when={
+                                !isLoadingData() &&
+                                tableData()?.data &&
+                                tableData()!.data.length === 0
+                            }
+                        >
+                            <div class={loading}>No data in this collection</div>
+                        </Show>
+                    </div>
+                </Show>
+            </main>
+        </div>
+    );
 };

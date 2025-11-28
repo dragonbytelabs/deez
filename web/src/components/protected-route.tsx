@@ -65,7 +65,6 @@ const mainContent = css`
 
 const pageContent = css`
   flex: 1;
-  padding: 40px;
   
   @media (max-width: 768px) {
     padding: 20px;
