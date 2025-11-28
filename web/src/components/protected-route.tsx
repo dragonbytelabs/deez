@@ -8,7 +8,7 @@ import {
 } from "solid-js";
 import { api } from "../server/api";
 import { Sidebar } from "./sidebar";
-import { useDzUser } from "../dz-context";
+import { useDz } from "../dz-context";
 import { SidebarToggleButton } from "./sidebar.toggle-button";
 import { ProtectedRouteMain } from "./protected-route.main";
 
@@ -21,14 +21,14 @@ const layout = css`
 
 export const ProtectedRoute: ParentComponent = (props) => {
 	const navigate = useNavigate();
-	const { updateUser } = useDzUser();
+	const { actions} = useDz();
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
 
 	onMount(async () => {
 		const result = await api.me();
 		setIsAuthenticated(result.authenticated);
 		if (result.authenticated && result.user) {
-			updateUser(result.user);
+			actions.setUser(result.user);
 		}
 		if (!result.authenticated) {
 			navigate("/login", { replace: true });

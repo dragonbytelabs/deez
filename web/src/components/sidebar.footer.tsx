@@ -1,9 +1,8 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
 import { type Component, Show, createSignal } from "solid-js";
-import type { UserInfo } from "../server/api";
 import { api } from "../server/api";
-import { useDzSettings, useDzUser } from "../dz-context";
+import { useDz } from "../dz-context";
 
 const menuIcon = css`
   font-size: 20px;
@@ -146,8 +145,7 @@ const popupMenuItem = css`
 `;
 
 export const SidebarFooter: Component = () => {
-  const {settings } = useDzSettings();
-  const { user } = useDzUser();
+  const { store } = useDz();
   const [showUserMenu, setShowUserMenu] = createSignal(false);
   const navigate = useNavigate();
 
@@ -211,7 +209,7 @@ export const SidebarFooter: Component = () => {
       </Show>
 
       <div class={sidebarFooter}>
-        <Show when={user}>
+        <Show when={store.user}>
           {(user) => (
             <>
               <Show when={showUserMenu()}>
@@ -235,7 +233,7 @@ export const SidebarFooter: Component = () => {
               <button
                 class={userSection}
                 onClick={toggleMenu}
-                title={!settings.sidebarOpen? user().display_name : undefined}
+                title={!store.settings.sidebarOpen? user().display_name : undefined}
               >
                 <div class={userAvatar}>
                   <Show

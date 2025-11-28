@@ -1,9 +1,8 @@
 import { css } from "@linaria/core";
 import { useLocation } from "@solidjs/router";
 import { type Component, For, Show } from "solid-js";
-import type { UserInfo } from "../server/api";
 import { SidebarFooter } from "./sidebar.footer";
-import { useDzSettings } from "../dz-context";
+import { useDz } from "../dz-context";
 
 const sidebar = css`
   position: fixed;
@@ -192,7 +191,7 @@ const overlay = css`
 `;
 
 export const Sidebar: Component = () => {
-  const {settings, toggleSidebar } = useDzSettings();
+  const {store, actions} = useDz();
   const location = useLocation();
 
   const sidebarMenuLinks = [
@@ -210,19 +209,19 @@ export const Sidebar: Component = () => {
       {/* Mobile Toggle button - moves to the right when sidebar is open */}
       <button
         class={mobileToggleButton}
-        classList={{ "sidebar-open": settings.sidebarOpen}}
-        onClick={() => toggleSidebar()}
+        classList={{ "sidebar-open": store.settings.sidebarOpen}}
+        onClick={() => actions.toggleSidebar()}
       >
-        {settings.sidebarOpen ? "✕" : "☰"}
+        {store.settings.sidebarOpen ? "✕" : "☰"}
       </button>
 
       {/* Overlay for mobile */}
-      <Show when={settings.sidebarOpen}>
-        <div class={overlay} onClick={() => toggleSidebar()} />
+      <Show when={store.settings.sidebarOpen}>
+        <div class={overlay} onClick={() => actions.toggleSidebar()} />
       </Show>
 
       {/* Sidebar */}
-      <div class={sidebar} classList={{ closed: !settings.sidebarOpen }}>
+      <div class={sidebar} classList={{ closed: !store.settings.sidebarOpen }}>
         <div class={menuHeader}>
           <span class={logoIcon}>🎮</span>
           <span class={logoText}>Deez</span>
@@ -239,7 +238,7 @@ export const Sidebar: Component = () => {
                     classList={{
                       active: isActive(menu.link),
                     }}
-                    title={!settings.sidebarOpen ? menu.title : undefined}
+                    title={!store.settings.sidebarOpen ? menu.title : undefined}
                   >
                     <span class={menuIcon}>{menu.icon}</span>
                     <span class={menuText}>{menu.title}</span>

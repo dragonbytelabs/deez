@@ -2,7 +2,7 @@ import { css } from "@linaria/core";
 import {
     type ParentComponent,
 } from "solid-js";
-import { useDzSettings } from "../dz-context";
+import { useDz} from "../dz-context";
 
 const mainContent = css`
   flex: 1;
@@ -32,13 +32,13 @@ const pageContent = css`
 
 
 export const ProtectedRouteMain: ParentComponent = (props) => {
-    const { settings } = useDzSettings();
+    const { store} = useDz();
     return (
         <div
             class={mainContent}
             classList={{
-                "sidebar-closed": !settings.sidebarOpen,
-                "sidebar-open": settings.sidebarOpen,
+                "sidebar-closed": !store.settings.sidebarOpen,
+                "sidebar-open": store.settings.sidebarOpen,
             }}
         >
             <div class={pageContent}>

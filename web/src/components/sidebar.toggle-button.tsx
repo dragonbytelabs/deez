@@ -1,6 +1,6 @@
 import { css } from "@linaria/core";
 import { type Component } from "solid-js";
-import { useDzSettings } from "../dz-context";
+import { useDz} from "../dz-context";
 
 const sideToggleButton = css`
   position: fixed;
@@ -39,18 +39,18 @@ const sideToggleButton = css`
 `;
 
 export const SidebarToggleButton: Component = () => {
-    const { settings, toggleSidebar} = useDzSettings();
+    const { store, actions} = useDz();
 
     return (
         <button
             class={sideToggleButton}
             classList={{
-                "sidebar-open": settings.sidebarOpen,
-                "sidebar-closed": !settings.sidebarOpen,
+                "sidebar-open": store.settings.sidebarOpen,
+                "sidebar-closed": !store.settings.sidebarOpen,
             }}
-            onClick={() => toggleSidebar()}
+            onClick={() => actions.toggleSidebar()}
         >
-            {settings.sidebarOpen ? "◀" : "▶"}
+            {store.settings.sidebarOpen ? "◀" : "▶"}
         </button>
 
     );

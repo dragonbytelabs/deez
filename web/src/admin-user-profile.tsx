@@ -1,7 +1,6 @@
 import { css } from "@linaria/core";
 import { createSignal } from "solid-js";
 import { AvatarPicker } from "./components/user-profile-avatar-picker";
-import { api } from "./server/api";
 
 const mainContent = css`
   padding: 40px;
