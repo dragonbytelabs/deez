@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { createSignal } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { api } from "../server/api";
 
 const container = css`
@@ -62,12 +62,25 @@ const signupText = css`
   }
 `;
 
+const errorMessage = css`
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  text-align: center;
+`;
+
 export default function LoginWithSocials() {
 	const [email, setEmail] = createSignal("");
 	const [password, setPassword] = createSignal("");
+	const [error, setError] = createSignal("");
 
 	const handleSubmit = async (e: Event) => {
 		e.preventDefault();
+		setError(""); // Clear any previous errors
 		// Build body the same way <form> would
 		console.log("Username signal:", email());
 		console.log("Password signal:", password());
@@ -81,9 +94,9 @@ export default function LoginWithSocials() {
 				window.location.href = data.redirect; // Redirect to home page
 			}
 		} else {
-			const error = await response.text();
-			console.error("Login failed:", error);
-			// Show error message to user
+			const errorText = await response.text();
+			console.error("Login failed:", errorText);
+			setError(errorText || "Login failed. Please try again.");
 		}
 	};
 
@@ -92,6 +105,9 @@ export default function LoginWithSocials() {
 			<div class={card}>
 				<h1 class={title}>Login</h1>
 				<form onSubmit={handleSubmit}>
+					<Show when={error()}>
+						<div class={errorMessage}>{error()}</div>
+					</Show>
 					<input
 						type="text"
 						placeholder="Email or Username"
