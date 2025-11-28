@@ -2,26 +2,18 @@ package dbx
 
 import (
 	"context"
+	"dragonbytelabs/dz/internal/models"
 	"log"
 
 	_ "modernc.org/sqlite"
 )
 
-type User struct {
-	ID           int64   `db:"id" json:"id"`
-	Email        string  `db:"email" json:"email"`
-	PasswordHash string  `db:"password_hash" json:"-"`
-	DisplayName  *string `db:"display_name" json:"display_name,omitempty"`
-	CreatedAt    string  `db:"created_at" json:"created_at"`
-	UpdatedAt    *string `db:"updated_at" json:"updated_at,omitempty"`
-}
-
 // CreateUser (sqlx + named params)
-func (d *DB) CreateUser(ctx context.Context, email, passwordHash, display string) (*User, error) {
+func (d *DB) CreateUser(ctx context.Context, email, passwordHash, display string) (*models.User, error) {
 	log.Printf("CreateUser called with email=%s, display=%s", email, display)
 	q := MustQuery("create_user.sql")
 
-	var u User
+	var u models.User
 	// Use NamedExec or prepare a named statement for INSERT...RETURNING
 	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
 	if err != nil {
@@ -42,10 +34,10 @@ func (d *DB) CreateUser(ctx context.Context, email, passwordHash, display string
 }
 
 // GetUserByEmail (sqlx + named params)
-func (d *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	q := MustQuery("get_user_by_email.sql")
 
-	var u User
+	var u models.User
 	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
 	if err != nil {
 		return nil, err
