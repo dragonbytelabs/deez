@@ -3,6 +3,7 @@ import { useLocation } from "@solidjs/router";
 import { type Component, For, Show } from "solid-js";
 import type { UserInfo } from "../server/api";
 import { SidebarFooter } from "./sidebar.footer";
+import { useDzSettings } from "../dz-context";
 
 const sidebar = css`
   position: fixed;
@@ -190,13 +191,8 @@ const overlay = css`
   }
 `;
 
-interface SidebarProps {
-  isOpen: boolean;
-  onToggle: (open: boolean) => void;
-  user: UserInfo | null;
-}
-
-export const Sidebar: Component<SidebarProps> = (props) => {
+export const Sidebar: Component = () => {
+  const {settings, toggleSidebar } = useDzSettings();
   const location = useLocation();
 
   const sidebarMenuLinks = [
@@ -214,19 +210,19 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Mobile Toggle button - moves to the right when sidebar is open */}
       <button
         class={mobileToggleButton}
-        classList={{ "sidebar-open": props.isOpen }}
-        onClick={() => props.onToggle(!props.isOpen)}
+        classList={{ "sidebar-open": settings.sidebarOpen}}
+        onClick={() => toggleSidebar()}
       >
-        {props.isOpen ? "✕" : "☰"}
+        {settings.sidebarOpen ? "✕" : "☰"}
       </button>
 
       {/* Overlay for mobile */}
-      <Show when={props.isOpen}>
-        <div class={overlay} onClick={() => props.onToggle(false)} />
+      <Show when={settings.sidebarOpen}>
+        <div class={overlay} onClick={() => toggleSidebar()} />
       </Show>
 
       {/* Sidebar */}
-      <div class={sidebar} classList={{ closed: !props.isOpen }}>
+      <div class={sidebar} classList={{ closed: !settings.sidebarOpen }}>
         <div class={menuHeader}>
           <span class={logoIcon}>🎮</span>
           <span class={logoText}>Deez</span>
@@ -243,7 +239,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
                     classList={{
                       active: isActive(menu.link),
                     }}
-                    title={!props.isOpen ? menu.title : undefined}
+                    title={!settings.sidebarOpen ? menu.title : undefined}
                   >
                     <span class={menuIcon}>{menu.icon}</span>
                     <span class={menuText}>{menu.title}</span>
@@ -255,7 +251,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         </nav>
 
         {/* User section at bottom */}
-        <SidebarFooter isOpen={props.isOpen} user={props.user} />
+        <SidebarFooter />
       </div>
     </>
   );

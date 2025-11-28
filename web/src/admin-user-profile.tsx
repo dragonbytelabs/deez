@@ -61,22 +61,6 @@ export const AdminUserProfile = () => {
 		setIsAvatarPickerOpen(true);
 	};
 
-	const handleAvatarSave = async (avatarUrl: string) => {
-		try {
-			const response = await api.updateAvatar(avatarUrl);
-			if (response.ok) {
-				console.log("Avatar updated successfully");
-			} else {
-				const error = await response.text();
-				console.error("Failed to update avatar:", error);
-				throw new Error(error);
-			}
-		} catch (error) {
-			console.error("Error updating avatar:", error);
-			throw error;
-		}
-	};
-
 	return (
 		<main class={mainContent}>
 			<h1 class={title}>User Profile</h1>
@@ -95,7 +79,6 @@ export const AdminUserProfile = () => {
 			<AvatarPicker
 				isOpen={isAvatarPickerOpen}
 				setIsOpen={setIsAvatarPickerOpen}
-				onAvatarSave={handleAvatarSave}
 			/>
 		</main>
 	);

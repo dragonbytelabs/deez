@@ -1,16 +1,17 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
 import {
-	type Component,
-	createEffect,
 	createSignal,
 	onMount,
+	type ParentComponent,
 	Show,
 } from "solid-js";
-import { api, type UserInfo } from "../server/api";
+import { api } from "../server/api";
 import { Sidebar } from "./sidebar";
+import { useDzUser } from "../dz-context";
+import { SidebarToggleButton } from "./sidebar.toggle-button";
+import { ProtectedRouteMain } from "./protected-route.main";
 
-const SIDEBAR_STORAGE_KEY = "deez-sidebar-open";
 
 const layout = css`
   display: flex;
@@ -18,97 +19,16 @@ const layout = css`
   position: relative;
 `;
 
-const sideToggleButton = css`
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
-  background: var(--gray800);
-  border: 1px solid var(--gray700);
-  border-radius: 50%;
-  color: var(--gray500);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  z-index: 101;
-  
-  &:hover {
-    background: var(--gray700);
-    border-color: var(--primary);
-    color: var(--white);
-  }
-  
-  &.sidebar-open {
-    left: 234px; /* 250px - 16px to sit on edge */
-  }
-  
-  &.sidebar-closed {
-    left: 64px; /* 80px - 16px to sit on edge */
-  }
-  
-  @media (max-width: 768px) {
-    display: none;
-  }
-`;
-
-const mainContent = css`
-  flex: 1;
-  margin-left: 250px;
-  transition: margin-left 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  
-  &.sidebar-closed {
-    margin-left: 80px;
-  }
-  
-  @media (max-width: 768px) {
-    margin-left: 0;
-    transition: margin-left 0.3s ease;
-  }
-`;
-
-const pageContent = css`
-  flex: 1;
-  
-  @media (max-width: 768px) {
-    padding: 20px;
-    padding-top: 80px; /
-  }
-`;
-
-export const ProtectedRoute: Component<{ component: Component }> = (props) => {
+export const ProtectedRoute: ParentComponent = (props) => {
 	const navigate = useNavigate();
+	const { updateUser } = useDzUser();
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
-	const [userInfo, setUserInfo] = createSignal<UserInfo | null>(null);
-
-	const getInitialSidebarState = (): boolean => {
-		try {
-			const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-			return stored === null ? true : stored === "true";
-		} catch {
-			return true;
-		}
-	};
-
-	const [sidebarOpen, setSidebarOpen] = createSignal(getInitialSidebarState());
-
-	createEffect(() => {
-		try {
-			localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen()));
-		} catch {
-			// Ignore localStorage errors (e.g., quota exceeded, private browsing)
-		}
-	});
 
 	onMount(async () => {
 		const result = await api.me();
 		setIsAuthenticated(result.authenticated);
 		if (result.authenticated && result.user) {
-			setUserInfo(result.user);
+			updateUser(result.user);
 		}
 		if (!result.authenticated) {
 			navigate("/login", { replace: true });
@@ -119,33 +39,12 @@ export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 		<Show when={isAuthenticated() !== null} fallback={<div>Loading...</div>}>
 			<Show when={isAuthenticated()} fallback={null}>
 				<div class={layout}>
-					<Sidebar
-						isOpen={sidebarOpen()}
-						onToggle={setSidebarOpen}
-						user={userInfo()}
-					/>
-
+					<Sidebar />
 					{/* Desktop toggle button - outside sidebar */}
-					<button
-						class={sideToggleButton}
-						classList={{
-							"sidebar-open": sidebarOpen(),
-							"sidebar-closed": !sidebarOpen(),
-						}}
-						onClick={() => setSidebarOpen(!sidebarOpen())}
-					>
-						{sidebarOpen() ? "◀" : "▶"}
-					</button>
-
-					<div
-						class={mainContent}
-						classList={{
-							"sidebar-closed": !sidebarOpen(),
-							"sidebar-open": sidebarOpen(),
-						}}
-					>
-						<div class={pageContent}>{props.component({})}</div>
-					</div>
+					<SidebarToggleButton />
+					<ProtectedRouteMain>
+						{props.children}
+					</ProtectedRouteMain>
 				</div>
 			</Show>
 		</Show>
