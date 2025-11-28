@@ -2,12 +2,14 @@ package routes
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
+	"dragonbytelabs/dz/internal/dbx"
 	"dragonbytelabs/dz/internal/session"
 )
 
-func RegisterAPI(mux *http.ServeMux) {
+func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
 	mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
 		sess := session.GetSession(r)
 
@@ -23,21 +25,18 @@ func RegisterAPI(mux *http.ServeMux) {
 			return
 		}
 
+		userAvatar, err := db.GetUserByEmail(r.Context(), email.(string))
+		if err != nil {
+			log.Fatalf("error fetching user avatar: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
 		// Authenticated
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"authenticated": true,
-			"user_id":       userID,
 			"email":         email,
+			"avatar_url":    userAvatar.AvatarURL,
 		})
 	})
-
-	mux.Handle("GET /api/game", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sess := session.GetSession(r)
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": "TODO: This is protected data",
-			"user_id": sess.Get("user_id"),
-		})
-	})))
 }

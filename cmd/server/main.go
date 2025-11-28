@@ -48,7 +48,7 @@ func setupDB(cfg config.DatabaseConfig) *dbx.DB {
 
 func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 	routes.RegisterStatic(mux)
-	routes.RegisterAPI(mux)
+	routes.RegisterAPI(mux, db)
 	routes.RegisterAuth(mux, db, sm)
 	routes.RegisterAdmin(mux, db)
 	routes.RegisterAdminUserProfile(mux, db)
