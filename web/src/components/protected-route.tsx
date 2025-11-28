@@ -1,8 +1,16 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
-import { type Component, createSignal, onMount, Show } from "solid-js";
+import {
+	type Component,
+	createEffect,
+	createSignal,
+	onMount,
+	Show,
+} from "solid-js";
 import { api } from "../server/api";
 import { Sidebar } from "./sidebar";
+
+const SIDEBAR_STORAGE_KEY = "deez-sidebar-open";
 
 const layout = css`
   display: flex;
@@ -75,7 +83,17 @@ const pageContent = css`
 export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 	const navigate = useNavigate();
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
-	const [sidebarOpen, setSidebarOpen] = createSignal(true);
+
+	const getInitialSidebarState = (): boolean => {
+		const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+		return stored === null ? true : stored === "true";
+	};
+
+	const [sidebarOpen, setSidebarOpen] = createSignal(getInitialSidebarState());
+
+	createEffect(() => {
+		localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen()));
+	});
 
 	onMount(async () => {
 		const authenticated = await api.me();
