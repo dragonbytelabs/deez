@@ -10,9 +10,12 @@ const escapeXml = (unsafe: string): string => {
 		.replace(/'/g, "&apos;");
 };
 
-// Helper to convert string to base64 (handles unicode characters)
+/**
+ * Helper to convert string to base64, handling unicode characters.
+ * Uses TextEncoder to properly encode unicode characters to UTF-8 bytes,
+ * which is the standard approach for base64 encoding strings with unicode.
+ */
 const toBase64 = (str: string): string => {
-	// Use TextEncoder to handle unicode characters
 	const encoder = new TextEncoder();
 	const bytes = encoder.encode(str);
 	let binary = "";
