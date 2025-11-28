@@ -13,6 +13,7 @@ const routes = {
 	getCollections: "/api/admin/tables",
 	getCollectionByName: "/api/admin/table",
 	updateAvatar: "/api/admin/user/avatar",
+	updateDisplayName: "/api/admin/user/display-name",
 };
 
 describe("API Module", () => {
@@ -51,6 +52,10 @@ describe("API Module", () => {
 
 		it("should have correct updateAvatar route", () => {
 			expect(routes.updateAvatar).toBe("/api/admin/user/avatar");
+		});
+
+		it("should have correct updateDisplayName route", () => {
+			expect(routes.updateDisplayName).toBe("/api/admin/user/display-name");
 		});
 	});
 
@@ -218,6 +223,34 @@ describe("API Module", () => {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({ avatar_url: avatarUrl }),
+				credentials: "include",
+			});
+		});
+	});
+
+	describe("UpdateDisplayName Function", () => {
+		it("should call fetch with PUT method and display name", async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+			});
+
+			const displayName = "John Doe";
+
+			await fetch(routes.updateDisplayName, {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ display_name: displayName }),
+				credentials: "include",
+			});
+
+			expect(mockFetch).toHaveBeenCalledWith(routes.updateDisplayName, {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ display_name: displayName }),
 				credentials: "include",
 			});
 		});

@@ -128,6 +128,28 @@ func (d *DB) UpdateUserAvatar(ctx context.Context, userID, avatarURL string) (*m
 	return &u, nil
 }
 
+// UpdateUserDisplayName updates the display_name for a user
+func (d *DB) UpdateUserDisplayName(ctx context.Context, userID, displayName string) (*models.User, error) {
+	q := MustQuery("update_user_display_name.sql")
+
+	var u models.User
+	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	args := map[string]any{
+		"user_id":      userID,
+		"display_name": displayName,
+	}
+
+	if err := stmt.GetContext(ctx, &u, args); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 // GetUserByHash retrieves a user by their user_hash (sqlx + named params)
 func (d *DB) GetUserByHash(ctx context.Context, userHash string) (*models.User, error) {
 	q := MustQuery("get_user_by_hash.sql")

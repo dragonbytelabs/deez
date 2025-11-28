@@ -22,6 +22,7 @@ const routes: Route = {
 	getCollectionByName: "/api/admin/table",
 	updateAvatar: "/api/admin/user/avatar",
 	updateEmail: "/api/admin/user/email",
+	updateDisplayName: "/api/admin/user/display-name",
 };
 
 export type UserInfo = {
@@ -143,6 +144,20 @@ const updateEmailFunc = async (email: string) => {
 	return r;
 };
 
+const updateDisplayNameFunc = async (displayName: string) => {
+	const body = JSON.stringify({ display_name: displayName });
+	console.log("API updateDisplayName called with body:", body);
+	const r = await fetch(routes.updateDisplayName, {
+		method: methods.PUT,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
+		credentials: "include",
+	});
+	return r;
+};
+
 type ApiRoutes = {
 	login: (email: string, password: string) => Promise<Response>;
 	register: (
@@ -156,6 +171,7 @@ type ApiRoutes = {
 	getCollectionByName: (tableName: string) => Promise<Response>;
 	updateAvatar: (avatarUrl: string) => Promise<Response>;
 	updateEmail: (email: string) => Promise<Response>;
+	updateDisplayName: (displayName: string) => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -167,4 +183,5 @@ export const api: ApiRoutes = {
 	getCollectionByName: getCollectionByNameFunc,
 	updateAvatar: updateAvatarFunc,
 	updateEmail: updateEmailFunc,
+	updateDisplayName: updateDisplayNameFunc,
 };
