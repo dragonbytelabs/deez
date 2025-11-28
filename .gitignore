@@ -26,3 +26,6 @@ dist-ssr
 tmp
 *.db*
 .env
+
+# Go binary
+server
