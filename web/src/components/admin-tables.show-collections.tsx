@@ -1,6 +1,6 @@
 import { css } from "@linaria/core";
 import { createSignal, For, Show, type Component } from "solid-js";
-import { CreateCollection } from "./admin-tables.create-collections";
+import { CreateCollection } from "./admin-tables.create-collection";
 
 const sidebar = css`
   width: 270px;

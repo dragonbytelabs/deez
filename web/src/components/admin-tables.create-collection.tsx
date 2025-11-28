@@ -1,4 +1,6 @@
 import { css } from "@linaria/core";
+import { createSignal, Show, type Component } from "solid-js";
+import { CreateCollectionModal } from "./admin-tables.create-collection.modal";
 
 const footer = css`
   padding: 16px;
@@ -26,14 +28,25 @@ const newCollectionButton = css`
   }
 `;
 
-export const CreateCollection = () => {
+export const CreateCollection: Component = () => {
+  const [isOpen, setIsOpen] = createSignal(false);
+
+  const handleOpen = () => {
+    setIsOpen(true);
+  }
 
   return (
+    <>
       <div class={footer}>
-        <button class={newCollectionButton}>
+        <button class={newCollectionButton} onClick={handleOpen}>
           <span>+</span>
           <span>New collection</span>
         </button>
       </div>
+
+      <Show when={isOpen()}>
+        <CreateCollectionModal isOpen={isOpen} setIsOpen={setIsOpen} />
+      </Show>
+    </>
   );
 };
