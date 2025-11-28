@@ -1,4 +1,7 @@
 import { css } from "@linaria/core";
+import { createSignal } from "solid-js";
+import { AvatarPicker } from "./components/user-profile-avatar-picker";
+import { api } from "./server/api";
 
 const mainContent = css`
   padding: 40px;
@@ -44,6 +47,8 @@ const button = css`
 `;
 
 export const AdminUserProfile = () => {
+	const [isAvatarPickerOpen, setIsAvatarPickerOpen] = createSignal(false);
+
 	const handleUpdateEmail = () => {
 		console.log("Update email clicked");
 	};
@@ -53,7 +58,23 @@ export const AdminUserProfile = () => {
 	};
 
 	const handleUpdateAvatar = () => {
-		console.log("Update avatar clicked");
+		setIsAvatarPickerOpen(true);
+	};
+
+	const handleAvatarSave = async (avatarUrl: string) => {
+		try {
+			const response = await api.updateAvatar(avatarUrl);
+			if (response.ok) {
+				console.log("Avatar updated successfully");
+			} else {
+				const error = await response.text();
+				console.error("Failed to update avatar:", error);
+				throw new Error(error);
+			}
+		} catch (error) {
+			console.error("Error updating avatar:", error);
+			throw error;
+		}
 	};
 
 	return (
@@ -61,16 +82,21 @@ export const AdminUserProfile = () => {
 			<h1 class={title}>User Profile</h1>
 			<p class={subtitle}>Manage your profile settings</p>
 			<div class={buttonGroup}>
-				<button class={button} onClick={handleUpdateEmail}>
+				<button class={button} onClick={handleUpdateEmail} type="button">
 					Update Email
 				</button>
-				<button class={button} onClick={handleUpdateDisplayName}>
+				<button class={button} onClick={handleUpdateDisplayName} type="button">
 					Update Display Name
 				</button>
-				<button class={button} onClick={handleUpdateAvatar}>
+				<button class={button} onClick={handleUpdateAvatar} type="button">
 					Update Avatar
 				</button>
 			</div>
+			<AvatarPicker
+				isOpen={isAvatarPickerOpen}
+				setIsOpen={setIsAvatarPickerOpen}
+				onAvatarSave={handleAvatarSave}
+			/>
 		</main>
 	);
 };

@@ -2,13 +2,15 @@ type Route = {
 	[key: string]: string;
 };
 
-type Method = "GET" | "POST";
+type Method = "GET" | "POST" | "PUT";
 const MethodGET: Method = "GET";
 const MethodPOST: Method = "POST";
+const MethodPUT: Method = "PUT";
 
 const methods = {
 	GET: MethodGET,
 	POST: MethodPOST,
+	PUT: MethodPUT,
 };
 
 const routes: Route = {
@@ -18,6 +20,7 @@ const routes: Route = {
 	me: "/api/me",
 	getCollections: "/api/admin/tables",
 	getCollectionByName: "/api/admin/table",
+	updateAvatar: "/api/admin/user/avatar",
 };
 
 export type UserInfo = {
@@ -114,6 +117,19 @@ const logoutFunc = async () => {
 	return r;
 };
 
+const updateAvatarFunc = async (avatarUrl: string) => {
+	const body = JSON.stringify({ avatar_url: avatarUrl });
+	const r = await fetch(routes.updateAvatar, {
+		method: methods.PUT,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
+		credentials: "include",
+	});
+	return r;
+};
+
 type ApiRoutes = {
 	login: (email: string, password: string) => Promise<Response>;
 	register: (
@@ -125,6 +141,7 @@ type ApiRoutes = {
 	me: () => Promise<{ authenticated: boolean; user?: UserInfo }>;
 	getCollections: () => Promise<Response>;
 	getCollectionByName: (tableName: string) => Promise<Response>;
+	updateAvatar: (avatarUrl: string) => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -134,4 +151,5 @@ export const api: ApiRoutes = {
 	me: meFunc,
 	getCollections: getCollectionsFunc,
 	getCollectionByName: getCollectionByNameFunc,
+	updateAvatar: updateAvatarFunc,
 };

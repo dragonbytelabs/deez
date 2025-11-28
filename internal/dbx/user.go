@@ -92,3 +92,25 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, er
 	}
 	return &u, nil
 }
+
+// UpdateUserAvatar updates the avatar_url for a user
+func (d *DB) UpdateUserAvatar(ctx context.Context, userID int64, avatarURL string) (*models.User, error) {
+	q := MustQuery("update_user_avatar.sql")
+
+	var u models.User
+	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	args := map[string]any{
+		"id":         userID,
+		"avatar_url": avatarURL,
+	}
+
+	if err := stmt.GetContext(ctx, &u, args); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
