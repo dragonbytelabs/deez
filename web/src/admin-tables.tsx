@@ -137,7 +137,11 @@ export const AdminTables = () => {
             }
 
             const data = await response.json();
-            setCollections(data.tables || []);
+            // Filter out the "collections" table from the list
+            const filteredTables = (data.tables || []).filter(
+                (table: string) => table !== "collections"
+            );
+            setCollections(filteredTables);
         } catch (err) {
             console.error("Error loading collections:", err);
             setErrorMsg("Failed to load database collections");

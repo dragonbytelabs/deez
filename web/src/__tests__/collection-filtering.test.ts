@@ -7,6 +7,40 @@ const filterCollections = (collections: string[], searchTerm: string): string[] 
 	return collections.filter((name) => name.toLowerCase().includes(term));
 };
 
+// Test the logic that filters out the "collections" table from admin-tables.tsx
+const filterOutCollectionsTable = (tables: string[]): string[] => {
+	return tables.filter((table) => table !== "collections");
+};
+
+describe("Collections Table Exclusion", () => {
+	it("should filter out the collections table from the list", () => {
+		const tables = ["users", "sessions", "collections", "schema_migrations"];
+		expect(filterOutCollectionsTable(tables)).toEqual([
+			"users",
+			"sessions",
+			"schema_migrations",
+		]);
+	});
+
+	it("should return unchanged array when collections table is not present", () => {
+		const tables = ["users", "sessions", "schema_migrations"];
+		expect(filterOutCollectionsTable(tables)).toEqual(tables);
+	});
+
+	it("should handle empty array", () => {
+		expect(filterOutCollectionsTable([])).toEqual([]);
+	});
+
+	it("should only remove exact match of collections", () => {
+		const tables = ["users", "my_collections", "collections", "collections_history"];
+		expect(filterOutCollectionsTable(tables)).toEqual([
+			"users",
+			"my_collections",
+			"collections_history",
+		]);
+	});
+});
+
 describe("Collection Filtering", () => {
 	const testCollections = ["users", "posts", "comments", "Products", "user_sessions"];
 
