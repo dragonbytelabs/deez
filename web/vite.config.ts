@@ -19,4 +19,18 @@ export default defineConfig(() => ({
 			},
 		},
 	},
+	test: {
+		environment: "jsdom",
+		globals: true,
+		transformMode: {
+			web: [/\.[jt]sx?$/],
+		},
+		deps: {
+			optimizer: {
+				web: {
+					include: ["solid-js"],
+				},
+			},
+		},
+	},
 }));
