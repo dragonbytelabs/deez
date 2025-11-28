@@ -25,10 +25,15 @@ export default defineConfig(() => ({
 		transformMode: {
 			web: [/\.[jt]sx?$/],
 		},
+		server: {
+			deps: {
+				inline: [/@solidjs\/router/],
+			},
+		},
 		deps: {
 			optimizer: {
 				web: {
-					include: ["solid-js"],
+					include: ["solid-js", "@solidjs/router"],
 				},
 			},
 		},
