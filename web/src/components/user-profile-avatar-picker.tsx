@@ -297,15 +297,15 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 	};
 
 	return (
-        <Show when={props.isOpen()}>
-            {/* Overlay */}
-<div
-    role="button"
-    tabIndex={0}
-    class={`${modalOverlay} ${props.isOpen() ? "open" : ""}`}
-    onClick={handleClose}
-    onKeyDown={(e) => e.key === "Escape" && handleClose()}
-/>
+		<Show when={props.isOpen()}>
+			{/* Overlay */}
+			<div
+				role="button"
+				tabIndex={0}
+				class={`${modalOverlay} ${props.isOpen() ? "open" : ""}`}
+				onClick={handleClose}
+				onKeyDown={(e) => e.key === "Escape" && handleClose()}
+			/>
 
 			{/* Slide-in Panel */}
 			<div class={`${modalPanel} open`}>

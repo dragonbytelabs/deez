@@ -107,7 +107,7 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, er
 }
 
 // UpdateUserAvatar updates the avatar_url for a user
-func (d *DB) UpdateUserAvatar(ctx context.Context, userID int64, avatarURL string) (*models.User, error) {
+func (d *DB) UpdateUserAvatar(ctx context.Context, userID, avatarURL string) (*models.User, error) {
 	q := MustQuery("update_user_avatar.sql")
 
 	var u models.User
@@ -118,7 +118,7 @@ func (d *DB) UpdateUserAvatar(ctx context.Context, userID int64, avatarURL strin
 	defer stmt.Close()
 
 	args := map[string]any{
-		"id":         userID,
+		"user_id":    userID,
 		"avatar_url": avatarURL,
 	}
 

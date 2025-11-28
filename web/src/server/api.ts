@@ -26,12 +26,13 @@ const routes: Route = {
 export type UserInfo = {
 	email: string;
 	avatar_url: string;
+	user_id: string;
+	display_name: string;
 };
 
 type MeFuncData = {
 	authenticated: boolean;
-	email?: string;
-	avatar_url?: string;
+	user?: UserInfo;
 };
 
 const meFunc = async (): Promise<{ authenticated: boolean; user?: UserInfo }> => {
@@ -45,13 +46,10 @@ const meFunc = async (): Promise<{ authenticated: boolean; user?: UserInfo }> =>
 		});
 		const data: MeFuncData = await response.json();
 		console.log("meFunc response data:", data);
-		if (data.authenticated && data.email && data.avatar_url) {
+		if (data.authenticated) {
 			return {
 				authenticated: true,
-				user: {
-					avatar_url: data.avatar_url,
-					email: data.email,
-				},
+				user: data.user,
 			};
 		}
 		return { authenticated: false };

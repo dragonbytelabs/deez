@@ -43,8 +43,12 @@ func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
 		// Authenticated
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"authenticated": true,
-			"email":         email,
-			"avatar_url":    user.AvatarURL,
+			"user": map[string]interface{}{
+				"email":        email,
+				"avatar_url":   user.AvatarURL,
+				"user_id":      user.UserHash,
+				"display_name": user.DisplayName,
+			},
 		})
 	})
 }

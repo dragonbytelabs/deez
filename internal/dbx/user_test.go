@@ -153,7 +153,7 @@ func TestDB_UpdateUserAvatar(t *testing.T) {
 
 	t.Run("updates avatar successfully", func(t *testing.T) {
 		newAvatarURL := "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="
-		updatedUser, err := db.UpdateUserAvatar(ctx, user.ID, newAvatarURL)
+		updatedUser, err := db.UpdateUserAvatar(ctx, user.UserHash, newAvatarURL)
 		if err != nil {
 			t.Fatalf("UpdateUserAvatar() returned error: %v", err)
 		}

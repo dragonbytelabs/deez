@@ -93,21 +93,7 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		// Convert userID to int64
-		var uid int64
-		switch v := userID.(type) {
-		case int64:
-			uid = v
-		case float64:
-			uid = int64(v)
-		case int:
-			uid = int64(v)
-		default:
-			http.Error(w, "invalid user id type", http.StatusInternalServerError)
-			return
-		}
-
-		user, err := db.UpdateUserAvatar(r.Context(), uid, in.AvatarURL)
+		user, err := db.UpdateUserAvatar(r.Context(), userID.(string), in.AvatarURL)
 		if err != nil {
 			http.Error(w, "failed to update avatar", http.StatusInternalServerError)
 			return

@@ -1,6 +1,6 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
-import { type Component, Show, createSignal, onCleanup } from "solid-js";
+import { type Component, Show, createSignal } from "solid-js";
 import type { UserInfo } from "../server/api";
 import { api } from "../server/api";
 
@@ -63,6 +63,13 @@ const userAvatar = css`
   font-weight: bold;
   font-size: 16px;
   text-transform: uppercase;
+  overflow: hidden;
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 `;
 
 const userName = css`
@@ -138,112 +145,117 @@ const popupMenuItem = css`
 `;
 
 interface SidebarFooterProps {
-    isOpen: boolean;
-    user: UserInfo | null;
+  isOpen: boolean;
+  user: UserInfo | null;
 }
 
 export const SidebarFooter: Component<SidebarFooterProps> = (props) => {
-    const [showUserMenu, setShowUserMenu] = createSignal(false);
-    const navigate = useNavigate();
+  const [showUserMenu, setShowUserMenu] = createSignal(false);
+  const navigate = useNavigate();
 
-    const toggleMenu = (event: MouseEvent) => {
-        event.stopPropagation();
-        setShowUserMenu(!showUserMenu());
-    };
+  const toggleMenu = (event: MouseEvent) => {
+    event.stopPropagation();
+    setShowUserMenu(!showUserMenu());
+  };
 
-    const closeMenu = () => {
-        setShowUserMenu(false);
-    };
+  const closeMenu = () => {
+    setShowUserMenu(false);
+  };
 
-    const logout = async () => {
-        try {
-            const response = await api.logout();
+  const logout = async () => {
+    try {
+      const response = await api.logout();
 
-            if (response.ok) {
-                const data = await response.json();
-                console.log("Logout successful:", data);
-                if (data.redirect) {
-                    navigate(data.redirect);
-                } else {
-                    navigate("/login");
-                }
-            } else {
-                const error = await response.text();
-                console.error("Logout failed:", error);
-                alert("Failed to logout. Please try again.");
-            }
-        } catch (error) {
-            console.error("Logout error:", error);
-            alert("Network error during logout.");
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Logout successful:", data);
+        if (data.redirect) {
+          navigate(data.redirect);
+        } else {
+          navigate("/login");
         }
-    };
+      } else {
+        const error = await response.text();
+        console.error("Logout failed:", error);
+        alert("Failed to logout. Please try again.");
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+      alert("Network error during logout.");
+    }
+  };
 
-    const handleProfileClick = (event: MouseEvent) => {
-        event.stopPropagation();
-        closeMenu();
-        navigate("/_/admin/user/profile");
-    };
+  const handleProfileClick = (event: MouseEvent) => {
+    event.stopPropagation();
+    closeMenu();
+    navigate("/_/admin/user/profile");
+  };
 
-    const handleLogoutClick = (event: MouseEvent) => {
-        event.stopPropagation();
-        closeMenu();
-        logout();
-    };
+  const handleLogoutClick = (event: MouseEvent) => {
+    event.stopPropagation();
+    closeMenu();
+    logout();
+  };
 
-    const getInitials = (email: string) => {
-        const parts = email.split("@")[0];
-        if (parts.length >= 2) {
-            return parts.substring(0, 2).toUpperCase();
-        }
-        return parts.toUpperCase();
-    };
+  const getInitials = (displayName: string) => {
+    if (!displayName) return "?";
+    const parts = displayName.split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return displayName.substring(0, 2).toUpperCase();
+  };
 
-    const getDisplayName = (email: string) => {
-        return email.split("@")[0];
-    };
+  return (
+    <>
+      <Show when={showUserMenu()}>
+        <div class={menuOverlay} onClick={closeMenu} />
+      </Show>
 
-    return (
-        <>
-            <Show when={showUserMenu()}>
-                <div class={menuOverlay} onClick={closeMenu} />
-            </Show>
-            
-            <div class={sidebarFooter}>
-                <Show when={props.user}>
-                    {(user) => (
-                        <>
-                            <Show when={showUserMenu()}>
-                                <div class={popupMenu}>
-                                    <button
-                                        class={popupMenuItem}
-                                        onClick={handleProfileClick}
-                                    >
-                                        <span class={menuIcon}>👤</span>
-                                        <span>Profile</span>
-                                    </button>
-                                    <button
-                                        class={popupMenuItem}
-                                        onClick={handleLogoutClick}
-                                    >
-                                        <span class={menuIcon}>🚪</span>
-                                        <span>Logout</span>
-                                    </button>
-                                </div>
-                            </Show>
-                            <button
-                                class={userSection}
-                                onClick={toggleMenu}
-                                title={!props.isOpen ? getDisplayName(user().email) : undefined}
-                            >
-                                <div class={userAvatar}>
-                                    {getInitials(user().email)}
-                                </div>
-                                <span class={userName}>{getDisplayName(user().email)}</span>
-                            </button>
-                        </>
-                    )}
-                </Show>
-            </div>
-        </>
-    );
+      <div class={sidebarFooter}>
+        <Show when={props.user}>
+          {(user) => (
+            <>
+              <Show when={showUserMenu()}>
+                <div class={popupMenu}>
+                  <button
+                    class={popupMenuItem}
+                    onClick={handleProfileClick}
+                  >
+                    <span class={menuIcon}>👤</span>
+                    <span>Profile</span>
+                  </button>
+                  <button
+                    class={popupMenuItem}
+                    onClick={handleLogoutClick}
+                  >
+                    <span class={menuIcon}>🚪</span>
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </Show>
+              <button
+                class={userSection}
+                onClick={toggleMenu}
+                title={!props.isOpen ? user().display_name : undefined}
+              >
+                <div class={userAvatar}>
+                  <Show
+                    when={user().avatar_url}
+                    fallback={getInitials(user().display_name || user().email)}
+                  >
+                    <img
+                      src={user().avatar_url}
+                      alt={`${user().display_name}'s avatar`}
+                    />
+                  </Show>
+                </div>
+                <span class={userName}>{user().display_name}</span>
+              </button>
+            </>
+          )}
+        </Show>
+      </div>
+    </>
+  );
 };
