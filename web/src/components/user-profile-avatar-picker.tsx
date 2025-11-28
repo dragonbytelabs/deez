@@ -6,6 +6,7 @@ import {
 	For,
 	type Setter,
 } from "solid-js";
+import { UserUploadAvatar } from "./user-avatar.upload";
 
 const modalOverlay = css`
   position: fixed;
@@ -132,6 +133,13 @@ const previewAvatar = css`
   font-size: 56px;
 `;
 
+const previewAvatarImage = css`
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+`;
+
 const modalFooter = css`
   display: flex;
   justify-content: flex-end;
@@ -197,6 +205,7 @@ interface AvatarPickerProps {
 
 export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 	const [selectedIndex, setSelectedIndex] = createSignal<number | null>(null);
+	const [customImageUrl, setCustomImageUrl] = createSignal<string | null>(null);
 	const [isSaving, setIsSaving] = createSignal(false);
 
 	const handleClose = () => {
@@ -204,7 +213,13 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 		// Reset selection after animation completes
 		setTimeout(() => {
 			setSelectedIndex(null);
+			setCustomImageUrl(null);
 		}, 300);
+	};
+
+	const handleCustomImageSelected = (dataUrl: string) => {
+		setCustomImageUrl(dataUrl);
+		setSelectedIndex(null); // Deselect any premade avatar
 	};
 
 	// Escape XML special characters for safe SVG generation
@@ -234,13 +249,21 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 	const handleSubmit = async (e: Event) => {
 		e.preventDefault();
 
+		const customUrl = customImageUrl();
 		const selected = selectedIndex();
-		if (selected === null) return;
+
+		// Need either a custom image or a selected premade avatar
+		if (customUrl === null && selected === null) return;
 
 		setIsSaving(true);
 
-		const option = avatarOptions[selected];
-		const avatarUrl = generateAvatarSvg(option.emoji, option.backgroundColor);
+		let avatarUrl: string;
+		if (customUrl !== null) {
+			avatarUrl = customUrl;
+		} else {
+			const option = avatarOptions[selected as number];
+			avatarUrl = generateAvatarSvg(option.emoji, option.backgroundColor);
+		}
 
 		try {
 			await props.onAvatarSave(avatarUrl);
@@ -255,6 +278,10 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 	const selectedOption = () => {
 		const idx = selectedIndex();
 		return idx !== null ? avatarOptions[idx] : null;
+	};
+
+	const hasSelection = () => {
+		return customImageUrl() !== null || selectedIndex() !== null;
 	};
 
 	return (
@@ -282,15 +309,23 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 						{/* Preview Section */}
 						<div class={previewSection}>
 							<span class={previewLabel}>Preview</span>
-							<div
-								class={previewAvatar}
-								style={{
-									"background-color":
-										selectedOption()?.backgroundColor ?? "#4a1e79",
-								}}
-							>
-								{selectedOption()?.emoji ?? "?"}
-							</div>
+							{customImageUrl() ? (
+								<img
+									src={customImageUrl() ?? ""}
+									alt="Custom avatar preview"
+									class={previewAvatarImage}
+								/>
+							) : (
+								<div
+									class={previewAvatar}
+									style={{
+										"background-color":
+											selectedOption()?.backgroundColor ?? "#4a1e79",
+									}}
+								>
+									{selectedOption()?.emoji ?? "?"}
+								</div>
+							)}
 						</div>
 
 						{/* Avatar Grid */}
@@ -301,13 +336,19 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 										type="button"
 										class={`${avatarOption} ${selectedIndex() === index() ? "selected" : ""}`}
 										style={{ "background-color": option.backgroundColor }}
-										onClick={() => setSelectedIndex(index())}
+										onClick={() => {
+											setSelectedIndex(index());
+											setCustomImageUrl(null);
+										}}
 									>
 										{option.emoji}
 									</button>
 								)}
 							</For>
 						</div>
+
+						{/* Upload Custom Avatar */}
+						<UserUploadAvatar onImageSelected={handleCustomImageSelected} />
 					</div>
 
 					<div class={modalFooter}>
@@ -317,7 +358,7 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 						<button
 							type="submit"
 							class={submitButton}
-							disabled={selectedIndex() === null || isSaving()}
+							disabled={!hasSelection() || isSaving()}
 						>
 							{isSaving() ? "Saving..." : "Save Avatar"}
 						</button>

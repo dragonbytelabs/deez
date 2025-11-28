@@ -73,9 +73,23 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		// Validate that avatar URL is a valid SVG data URI
-		if !strings.HasPrefix(in.AvatarURL, "data:image/svg+xml;base64,") {
-			http.Error(w, "avatar_url must be a valid SVG data URI", http.StatusBadRequest)
+		// Validate that avatar URL is a valid image data URI
+		validPrefixes := []string{
+			"data:image/svg+xml;base64,",
+			"data:image/png;base64,",
+			"data:image/jpeg;base64,",
+			"data:image/gif;base64,",
+			"data:image/webp;base64,",
+		}
+		isValidPrefix := false
+		for _, prefix := range validPrefixes {
+			if strings.HasPrefix(in.AvatarURL, prefix) {
+				isValidPrefix = true
+				break
+			}
+		}
+		if !isValidPrefix {
+			http.Error(w, "avatar_url must be a valid image data URI", http.StatusBadRequest)
 			return
 		}
 
