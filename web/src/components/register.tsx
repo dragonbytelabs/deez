@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { api } from "../server/api";
 
 const container = css`
@@ -62,13 +62,38 @@ const signupText = css`
   }
 `;
 
+const errorMessage = css`
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  text-align: center;
+`;
+
 export default function RegisterForm() {
 	const [email, setEmail] = createSignal("");
 	const [password, setPassword] = createSignal("");
 	const [confirmPassword, setConfirmPassword] = createSignal("");
+	const [error, setError] = createSignal("");
+
+	const isValidEmail = (email: string): boolean => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	};
 
 	const handleSubmit = async (e: Event) => {
 		e.preventDefault();
+		setError(""); // Clear any previous errors
+
+		// Validate email format
+		if (!isValidEmail(email())) {
+			setError("Please enter a valid email address");
+			return;
+		}
+
 		console.log("Username signal:", email());
 		console.log("Password signal:", password());
 		const response = await api.register(email(), password(), confirmPassword());
@@ -79,9 +104,9 @@ export default function RegisterForm() {
 				window.location.href = data.redirect;
 			}
 		} else {
-			const error = await response.text();
-			console.error("Registration failed:", error);
-			// Show error message to user
+			const errorText = await response.text();
+			console.error("Registration failed:", errorText);
+			setError(errorText || "Registration failed. Please try again.");
 		}
 	};
 
@@ -90,12 +115,16 @@ export default function RegisterForm() {
 			<div class={card}>
 				<h1 class={title}>Register</h1>
 				<form onSubmit={handleSubmit}>
+					<Show when={error()}>
+						<div class={errorMessage}>{error()}</div>
+					</Show>
 					<input
-						type="text"
-						placeholder="Email or Username"
+						type="email"
+						placeholder="Email"
 						class={inputField}
 						value={email()}
 						onInput={(e) => setEmail(e.currentTarget.value)}
+						required
 					/>
 					<input
 						type="password"

@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { Show, createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { api } from "../server/api";
 
 const container = css`
@@ -78,9 +78,21 @@ export default function LoginWithSocials() {
 	const [password, setPassword] = createSignal("");
 	const [error, setError] = createSignal("");
 
+	const isValidEmail = (email: string): boolean => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	};
+
 	const handleSubmit = async (e: Event) => {
 		e.preventDefault();
 		setError(""); // Clear any previous errors
+
+		// Validate email format
+		if (!isValidEmail(email())) {
+			setError("Please enter a valid email address");
+			return;
+		}
+
 		// Build body the same way <form> would
 		console.log("Username signal:", email());
 		console.log("Password signal:", password());
@@ -109,11 +121,12 @@ export default function LoginWithSocials() {
 						<div class={errorMessage}>{error()}</div>
 					</Show>
 					<input
-						type="text"
-						placeholder="Email or Username"
+						type="email"
+						placeholder="Email"
 						class={inputField}
 						value={email()}
 						onInput={(e) => setEmail(e.currentTarget.value)}
+						required
 					/>
 					<input
 						type="password"
