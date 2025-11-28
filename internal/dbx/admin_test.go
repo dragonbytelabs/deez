@@ -68,6 +68,22 @@ func TestDB_GetTableData(t *testing.T) {
 			t.Error("GetTableData() should return error for non-existent table")
 		}
 	})
+
+	t.Run("returns empty slice for empty table", func(t *testing.T) {
+		// collections table exists but should be empty in a fresh test DB
+		data, err := db.GetTableData(ctx, "collections")
+		if err != nil {
+			t.Fatalf("GetTableData() returned error: %v", err)
+		}
+
+		if data == nil {
+			t.Fatal("GetTableData() returned nil for empty table, expected empty slice")
+		}
+		// Should return an empty slice, not nil
+		if len(data) != 0 {
+			t.Errorf("GetTableData() expected empty slice for empty table, got %d records", len(data))
+		}
+	})
 }
 
 func TestDB_checkTableExists(t *testing.T) {
