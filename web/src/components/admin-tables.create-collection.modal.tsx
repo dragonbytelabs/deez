@@ -1,5 +1,13 @@
 import { css } from "@linaria/core";
-import { createSignal, type Accessor, type Component, type Setter } from "solid-js";
+import { createSignal, For, type Accessor, type Component, type Setter } from "solid-js";
+
+export interface CollectionField {
+    name: string;
+    type: string;
+}
+
+export const FIELD_TYPES = ["TEXT", "INTEGER", "REAL", "BLOB"] as const;
+export type FieldType = typeof FIELD_TYPES[number];
 
 const modalOverlay = css`
   position: fixed;
@@ -133,6 +141,104 @@ const helpText = css`
   margin-top: 6px;
 `;
 
+const fieldsSection = css`
+  margin-bottom: 24px;
+`;
+
+const fieldsSectionHeader = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+`;
+
+const addFieldButton = css`
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--gray600);
+  border-radius: 6px;
+  color: var(--white);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: var(--gray700);
+    border-color: var(--primary);
+  }
+`;
+
+const fieldRow = css`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+`;
+
+const fieldInput = css`
+  flex: 1;
+  padding: 10px;
+  background: var(--gray700);
+  border: 1px solid var(--gray600);
+  border-radius: 6px;
+  color: var(--white);
+  font-size: 13px;
+  
+  &::placeholder {
+    color: var(--gray500);
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+`;
+
+const fieldSelect = css`
+  width: 120px;
+  padding: 10px;
+  background: var(--gray700);
+  border: 1px solid var(--gray600);
+  border-radius: 6px;
+  color: var(--white);
+  font-size: 13px;
+  cursor: pointer;
+  
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+`;
+
+const removeFieldButton = css`
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--gray500);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: var(--gray700);
+    color: var(--danger, #ef4444);
+  }
+`;
+
+const emptyFieldsMessage = css`
+  padding: 16px;
+  text-align: center;
+  color: var(--gray500);
+  font-size: 13px;
+  background: var(--gray700);
+  border-radius: 8px;
+  border: 1px dashed var(--gray600);
+`;
+
 const modalFooter = css`
   display: flex;
   justify-content: flex-end;
@@ -185,6 +291,21 @@ interface CreateCollectionModalProps {
 export const CreateCollectionModal: Component<CreateCollectionModalProps> = (props) => {
     const [collectionName, setCollectionName] = createSignal("");
     const [description, setDescription] = createSignal("");
+    const [fields, setFields] = createSignal<CollectionField[]>([]);
+
+    const addField = () => {
+        setFields([...fields(), { name: "", type: "TEXT" }]);
+    };
+
+    const removeField = (index: number) => {
+        setFields(fields().filter((_, i) => i !== index));
+    };
+
+    const updateField = (index: number, key: keyof CollectionField, value: string) => {
+        setFields(fields().map((field, i) => 
+            i === index ? { ...field, [key]: value } : field
+        ));
+    };
 
     const handleClose = () => {
         props.setIsOpen(false);
@@ -192,15 +313,20 @@ export const CreateCollectionModal: Component<CreateCollectionModalProps> = (pro
         setTimeout(() => {
             setCollectionName("");
             setDescription("");
+            setFields([]);
         }, 300); // Wait for animation to complete
     };
 
     const handleSubmit = async (e: Event) => {
         e.preventDefault();
 
+        // Filter out empty field names
+        const validFields = fields().filter(f => f.name.trim());
+
         console.log("Creating collection:", {
             name: collectionName(),
             description: description(),
+            fields: validFields,
         });
 
         // TODO: Add API call to create collection
@@ -257,6 +383,56 @@ export const CreateCollectionModal: Component<CreateCollectionModalProps> = (pro
                                 value={description()}
                                 onInput={(e) => setDescription(e.currentTarget.value)}
                             />
+                        </div>
+
+                        <div class={fieldsSection}>
+                            <div class={fieldsSectionHeader}>
+                                <label class={label}>Fields</label>
+                                <button type="button" class={addFieldButton} onClick={addField}>
+                                    <span>+</span>
+                                    <span>Add Field</span>
+                                </button>
+                            </div>
+                            {fields().length === 0 ? (
+                                <div class={emptyFieldsMessage}>
+                                    No fields defined. Click "Add Field" to add database columns.
+                                </div>
+                            ) : (
+                                <For each={fields()}>
+                                    {(field, index) => (
+                                        <div class={fieldRow}>
+                                            <input
+                                                type="text"
+                                                class={fieldInput}
+                                                placeholder="Field name"
+                                                value={field.name}
+                                                onInput={(e) => updateField(index(), "name", e.currentTarget.value)}
+                                                autocomplete="off"
+                                            />
+                                            <select
+                                                class={fieldSelect}
+                                                value={field.type}
+                                                onChange={(e) => updateField(index(), "type", e.currentTarget.value)}
+                                            >
+                                                <For each={FIELD_TYPES}>
+                                                    {(type) => <option value={type}>{type}</option>}
+                                                </For>
+                                            </select>
+                                            <button
+                                                type="button"
+                                                class={removeFieldButton}
+                                                onClick={() => removeField(index())}
+                                                title="Remove field"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    )}
+                                </For>
+                            )}
+                            <div class={helpText}>
+                                Define the columns for this collection's database table
+                            </div>
                         </div>
                     </div>
 
