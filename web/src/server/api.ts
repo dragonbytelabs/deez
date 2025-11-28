@@ -20,11 +20,18 @@ const routes: Route = {
 	getCollectionByName: "/api/admin/table",
 };
 
-type MeFuncData = {
-	authenticated: boolean;
+export type UserInfo = {
+	user_id: number;
+	email: string;
 };
 
-const meFunc = async () => {
+type MeFuncData = {
+	authenticated: boolean;
+	user_id?: number;
+	email?: string;
+};
+
+const meFunc = async (): Promise<{ authenticated: boolean; user?: UserInfo }> => {
 	try {
 		const response = await fetch(routes.me, {
 			method: methods.GET,
@@ -34,10 +41,19 @@ const meFunc = async () => {
 			credentials: "include",
 		});
 		const data: MeFuncData = await response.json();
-		return data.authenticated;
+		if (data.authenticated && data.user_id && data.email) {
+			return {
+				authenticated: true,
+				user: {
+					user_id: data.user_id,
+					email: data.email,
+				},
+			};
+		}
+		return { authenticated: false };
 	} catch (error) {
 		console.error("Auth check failed:", error);
-		return false;
+		return { authenticated: false };
 	}
 };
 
@@ -106,7 +122,7 @@ type ApiRoutes = {
 		confirmPassword: string,
 	) => Promise<Response>;
 	logout: () => Promise<Response>;
-	me: () => Promise<boolean>;
+	me: () => Promise<{ authenticated: boolean; user?: UserInfo }>;
 	getCollections: () => Promise<Response>;
 	getCollectionByName: (tableName: string) => Promise<Response>;
 };

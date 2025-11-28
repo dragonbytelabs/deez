@@ -1,7 +1,7 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
 import { type Component, createSignal, onMount, Show } from "solid-js";
-import { api } from "../server/api";
+import { type UserInfo, api } from "../server/api";
 import { Sidebar } from "./sidebar";
 
 const layout = css`
@@ -76,11 +76,15 @@ export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 	const navigate = useNavigate();
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
 	const [sidebarOpen, setSidebarOpen] = createSignal(true);
+	const [userInfo, setUserInfo] = createSignal<UserInfo | null>(null);
 
 	onMount(async () => {
-		const authenticated = await api.me();
-		setIsAuthenticated(authenticated);
-		if (!authenticated) {
+		const result = await api.me();
+		setIsAuthenticated(result.authenticated);
+		if (result.authenticated && result.user) {
+			setUserInfo(result.user);
+		}
+		if (!result.authenticated) {
 			navigate("/login", { replace: true });
 		}
 	});
@@ -89,7 +93,7 @@ export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 		<Show when={isAuthenticated() !== null} fallback={<div>Loading...</div>}>
 			<Show when={isAuthenticated()} fallback={null}>
 				<div class={layout}>
-					<Sidebar isOpen={sidebarOpen()} onToggle={setSidebarOpen} />
+					<Sidebar isOpen={sidebarOpen()} onToggle={setSidebarOpen} user={userInfo()} />
 
 					{/* Desktop toggle button - outside sidebar */}
 					<button
