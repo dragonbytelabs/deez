@@ -39,3 +39,13 @@ func RegisterAdmin(mux *http.ServeMux, db *dbx.DB) {
 		})
 	})))
 }
+
+func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
+	// Get user profile
+	mux.Handle("GET /api/admin/user/profile", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "user profile endpoint",
+		})
+	})))
+}

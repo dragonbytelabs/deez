@@ -2,6 +2,7 @@ import { Route, Router } from "@solidjs/router";
 import { Admin } from "./Admin";
 import { AdminSettings } from "./admin-settings";
 import { AdminTables } from "./admin-tables";
+import { AdminUserProfile } from "./admin-user-profile";
 import { GuestRoute } from "./components/guest-route";
 import { ProtectedRoute } from "./components/protected-route";
 import { Layout } from "./components/root-layout";
@@ -24,6 +25,10 @@ export default function App() {
 			<Route
 				path="/_/admin/settings"
 				component={() => <ProtectedRoute component={AdminSettings} />}
+			/>
+			<Route
+				path="/_/admin/user/profile"
+				component={() => <ProtectedRoute component={AdminUserProfile} />}
 			/>
 			<Route path="/login" component={() => <GuestRoute component={Login} />} />
 			<Route
