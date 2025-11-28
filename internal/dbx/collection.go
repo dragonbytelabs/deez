@@ -3,6 +3,7 @@ package dbx
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"dragonbytelabs/dz/internal/models"
@@ -11,7 +12,7 @@ import (
 // ErrDuplicateCollectionName is returned when a collection name already exists for the user
 var ErrDuplicateCollectionName = errors.New("collection with this name already exists")
 
-// CreateCollection creates a new collection for a user
+// CreateCollection creates a new collection for a user and its associated data table
 func (d *DB) CreateCollection(ctx context.Context, userID int64, name string, description *string) (*models.Collection, error) {
 	q := MustQuery("create_collection.sql")
 
@@ -35,7 +36,27 @@ func (d *DB) CreateCollection(ctx context.Context, userID int64, name string, de
 		}
 		return nil, err
 	}
+
+	// Create the collection's data table immediately after the collection is created
+	// This implements the "trigger" behavior requested - when a row is added to collections,
+	// a corresponding data table is created in the database
+	if err := d.createCollectionDataTable(ctx, c.ID); err != nil {
+		// If table creation fails, we should delete the collection to maintain consistency
+		// This is a best-effort cleanup
+		_ = d.DeleteCollection(ctx, c.ID, userID)
+		return nil, fmt.Errorf("failed to create collection data table: %w", err)
+	}
+
 	return &c, nil
+}
+
+// createCollectionDataTable creates a data table for a specific collection
+func (d *DB) createCollectionDataTable(ctx context.Context, collectionID int64) error {
+	queryTemplate := MustQuery("create_collection_table.sql")
+	query := fmt.Sprintf(queryTemplate, collectionID)
+
+	_, err := d.DBX.ExecContext(ctx, query)
+	return err
 }
 
 // GetCollectionByID retrieves a collection by ID for a specific user
@@ -109,13 +130,29 @@ func (d *DB) UpdateCollection(ctx context.Context, id int64, userID int64, name 
 	return &c, nil
 }
 
-// DeleteCollection deletes a collection by ID for a specific user
+// DeleteCollection deletes a collection by ID for a specific user and drops its data table
 func (d *DB) DeleteCollection(ctx context.Context, id int64, userID int64) error {
+	// First, drop the collection's data table
+	// This implements the "trigger" behavior - when a collection is deleted,
+	// its associated data table is also deleted
+	if err := d.dropCollectionDataTable(ctx, id); err != nil {
+		return fmt.Errorf("failed to drop collection data table: %w", err)
+	}
+
 	q := MustQuery("delete_collection.sql")
 
 	_, err := d.DBX.NamedExecContext(ctx, q, map[string]interface{}{
 		"id":      id,
 		"user_id": userID,
 	})
+	return err
+}
+
+// dropCollectionDataTable drops the data table for a specific collection
+func (d *DB) dropCollectionDataTable(ctx context.Context, collectionID int64) error {
+	queryTemplate := MustQuery("drop_collection_table.sql")
+	query := fmt.Sprintf(queryTemplate, collectionID)
+
+	_, err := d.DBX.ExecContext(ctx, query)
 	return err
 }

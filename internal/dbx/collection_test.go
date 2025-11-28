@@ -2,6 +2,7 @@ package dbx
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
@@ -210,6 +211,71 @@ func TestDB_DeleteCollection(t *testing.T) {
 		err := db.DeleteCollection(ctx, 99999, user.ID)
 		if err != nil {
 			t.Errorf("DeleteCollection() returned error for non-existent collection: %v", err)
+		}
+	})
+}
+
+func TestDB_CreateCollectionDataTable(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	// Create a user first
+	hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
+	user, err := db.CreateUser(ctx, "datatable@example.com", string(hash), "Data Table User")
+	if err != nil {
+		t.Fatalf("CreateUser() returned error: %v", err)
+	}
+
+	t.Run("creates collection data table when collection is created", func(t *testing.T) {
+		description := "Test Description"
+		collection, err := db.CreateCollection(ctx, user.ID, "Data Table Test", &description)
+		if err != nil {
+			t.Fatalf("CreateCollection() returned error: %v", err)
+		}
+
+		// Verify the collection data table was created (format: collection_<id>_data)
+		expectedTableName := fmt.Sprintf("collection_%d_data", collection.ID)
+		exists, err := db.checkTableExists(ctx, expectedTableName)
+		if err != nil {
+			t.Fatalf("checkTableExists() returned error: %v", err)
+		}
+		if !exists {
+			t.Errorf("Collection data table %s was not created", expectedTableName)
+		}
+	})
+
+	t.Run("drops collection data table when collection is deleted", func(t *testing.T) {
+		collection, err := db.CreateCollection(ctx, user.ID, "Delete Table Test", nil)
+		if err != nil {
+			t.Fatalf("CreateCollection() returned error: %v", err)
+		}
+
+		expectedTableName := fmt.Sprintf("collection_%d_data", collection.ID)
+
+		// Verify table exists before deletion
+		exists, err := db.checkTableExists(ctx, expectedTableName)
+		if err != nil {
+			t.Fatalf("checkTableExists() before delete returned error: %v", err)
+		}
+		if !exists {
+			t.Fatalf("Collection data table %s should exist before delete", expectedTableName)
+		}
+
+		// Delete the collection
+		err = db.DeleteCollection(ctx, collection.ID, user.ID)
+		if err != nil {
+			t.Fatalf("DeleteCollection() returned error: %v", err)
+		}
+
+		// Verify table was dropped
+		exists, err = db.checkTableExists(ctx, expectedTableName)
+		if err != nil {
+			t.Fatalf("checkTableExists() after delete returned error: %v", err)
+		}
+		if exists {
+			t.Errorf("Collection data table %s should have been dropped after collection delete", expectedTableName)
 		}
 	})
 }
