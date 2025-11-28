@@ -105,6 +105,8 @@ func TestDB_ApplyMigrations(t *testing.T) {
 		"users":             true,
 		"sessions":          true,
 		"collections":       true,
+		"teams":             true,
+		"team_members":      true,
 		"schema_migrations": true,
 	}
 
