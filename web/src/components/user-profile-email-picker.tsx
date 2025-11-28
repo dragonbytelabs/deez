@@ -193,7 +193,7 @@ export const EmailPicker: Component<EmailPickerProps> = (props) => {
 	};
 
 	const validateEmail = (email: string): boolean => {
-		// RFC 5322 simplified email regex pattern
+		// Basic client-side validation; server performs authoritative validation
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		return emailRegex.test(email);
 	};
@@ -249,7 +249,11 @@ export const EmailPicker: Component<EmailPickerProps> = (props) => {
 				tabIndex={0}
 				class={`${modalOverlay} ${props.isOpen() ? "open" : ""}`}
 				onClick={handleClose}
-				onKeyDown={(e) => e.key === "Escape" && handleClose()}
+				onKeyDown={(e) => {
+					if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+						handleClose();
+					}
+				}}
 			/>
 
 			{/* Slide-in Panel */}

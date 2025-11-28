@@ -132,7 +132,6 @@ const updateAvatarFunc = async (avatarUrl: string) => {
 
 const updateEmailFunc = async (email: string) => {
 	const body = JSON.stringify({ email });
-	console.log("API updateEmail called with body:", body);
 	const r = await fetch(routes.updateEmail, {
 		method: methods.PUT,
 		headers: {
