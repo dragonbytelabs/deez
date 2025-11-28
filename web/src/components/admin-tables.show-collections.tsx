@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { For, Show, type Component } from "solid-js";
+import { createSignal, For, Show, type Component } from "solid-js";
 
 const sidebar = css`
   width: 270px;
@@ -13,6 +13,30 @@ const sidebar = css`
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--gray700);
+  }
+`;
+
+const searchBox = css`
+  padding: 16px;
+  border-bottom: 1px solid var(--gray700);
+`;
+
+const searchInput = css`
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--gray700);
+  border: 1px solid var(--gray600);
+  border-radius: 8px;
+  color: var(--white);
+  font-size: 14px;
+  
+  &::placeholder {
+    color: var(--gray500);
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
   }
 `;
 
@@ -82,9 +106,28 @@ interface ShowCollectionsProps {
 }
 
 export const ShowCollections: Component<ShowCollectionsProps> = (props) => {
+  const [searchTerm, setSearchTerm] = createSignal("");
+
+  const filteredCollections = () => {
+    const term = searchTerm().toLowerCase();
+    if (!term) return props.collections;
+    return props.collections.filter(name => 
+      name.toLowerCase().includes(term)
+    );
+  };
 
   return (
     <div class={sidebar}>
+      <div class={searchBox}>
+        <input
+          type="text"
+          class={searchInput}
+          placeholder="Search collections..."
+          value={searchTerm()}
+          onInput={(e) => setSearchTerm(e.currentTarget.value)}
+        />
+      </div>
+
       <div class={collectionsHeader}>
         Collections
       </div>
@@ -95,7 +138,7 @@ export const ShowCollections: Component<ShowCollectionsProps> = (props) => {
         </Show>
 
         <Show when={!props.isLoading}>
-          <For each={props.collections}>
+          <For each={filteredCollections()}>
             {(collection) => (
               <div
                 class={collectionItem}
@@ -107,6 +150,12 @@ export const ShowCollections: Component<ShowCollectionsProps> = (props) => {
               </div>
             )}
           </For>
+        </Show>
+
+        <Show when={!props.isLoading && filteredCollections().length === 0}>
+          <div class={loading}>
+            {searchTerm() ? "No collections found" : "No collections"}
+          </div>
         </Show>
       </div>
     </div>
