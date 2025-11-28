@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -17,10 +18,10 @@ import (
 
 // allowedMimeTypes defines the allowed file types for upload
 var allowedMimeTypes = map[string]bool{
-	"image/jpeg": true,
-	"image/png":  true,
-	"image/gif":  true,
-	"image/webp": true,
+	"image/jpeg":    true,
+	"image/png":     true,
+	"image/gif":     true,
+	"image/webp":    true,
 	"image/svg+xml": true,
 }
 
@@ -33,12 +34,32 @@ func generateRandomFilename(ext string) (string, error) {
 	return hex.EncodeToString(bytes) + ext, nil
 }
 
+// getMediaUserID gets the user's database ID from the session by looking up the user hash
+func getMediaUserID(ctx context.Context, sess *session.Session, db *dbx.DB) (int64, bool) {
+	userHashRaw := sess.Get("user_id")
+	if userHashRaw == nil {
+		return 0, false
+	}
+
+	userHash, ok := userHashRaw.(string)
+	if !ok {
+		return 0, false
+	}
+
+	user, err := db.GetUserByHash(ctx, userHash)
+	if err != nil || user == nil {
+		return 0, false
+	}
+
+	return user.ID, true
+}
+
 // RegisterMedia registers all media-related routes
 func RegisterMedia(mux *http.ServeMux, db *dbx.DB, store storage.Store, maxFileSize int64) {
 	// Upload a new media file
 	mux.Handle("POST /api/media/upload", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess := session.GetSession(r)
-		userID, ok := getUserIDFromSession(sess)
+		userID, ok := getMediaUserID(r.Context(), sess, db)
 		if !ok {
 			log.Printf("UploadMedia: invalid user_id in session")
 			http.Error(w, "invalid session", http.StatusUnauthorized)
@@ -136,7 +157,7 @@ func RegisterMedia(mux *http.ServeMux, db *dbx.DB, store storage.Store, maxFileS
 	// Get all media for the authenticated user
 	mux.Handle("GET /api/media", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess := session.GetSession(r)
-		userID, ok := getUserIDFromSession(sess)
+		userID, ok := getMediaUserID(r.Context(), sess, db)
 		if !ok {
 			log.Printf("GetMedia: invalid user_id in session")
 			http.Error(w, "invalid session", http.StatusUnauthorized)
@@ -159,7 +180,7 @@ func RegisterMedia(mux *http.ServeMux, db *dbx.DB, store storage.Store, maxFileS
 	// Get a specific media item by ID
 	mux.Handle("GET /api/media/{id}", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess := session.GetSession(r)
-		userID, ok := getUserIDFromSession(sess)
+		userID, ok := getMediaUserID(r.Context(), sess, db)
 		if !ok {
 			log.Printf("GetMediaByID: invalid user_id in session")
 			http.Error(w, "invalid session", http.StatusUnauthorized)
@@ -193,7 +214,7 @@ func RegisterMedia(mux *http.ServeMux, db *dbx.DB, store storage.Store, maxFileS
 	// Delete a media item
 	mux.Handle("DELETE /api/media/{id}", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess := session.GetSession(r)
-		userID, ok := getUserIDFromSession(sess)
+		userID, ok := getMediaUserID(r.Context(), sess, db)
 		if !ok {
 			log.Printf("DeleteMedia: invalid user_id in session")
 			http.Error(w, "invalid session", http.StatusUnauthorized)

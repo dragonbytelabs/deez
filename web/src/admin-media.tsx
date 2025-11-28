@@ -2,6 +2,15 @@ import { css } from "@linaria/core";
 import { createSignal, For, onMount, Show } from "solid-js";
 import { api, type MediaItem } from "./server/api";
 
+// Allowed MIME types for image uploads - must match backend validation
+const ALLOWED_MIME_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+];
+
 const layout = css`
   display: flex;
   height: 100vh;
@@ -208,6 +217,16 @@ function formatFileSize(bytes: number): string {
     return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
 
+function getFileTypeFromMimeType(mimeType: string): string {
+    const parts = mimeType.split("/");
+    if (parts.length >= 2 && parts[1]) {
+        // Handle special cases like "svg+xml" -> "SVG"
+        const subtype = parts[1].split("+")[0];
+        return subtype.toUpperCase();
+    }
+    return "FILE";
+}
+
 export const AdminMedia = () => {
     const [media, setMedia] = createSignal<MediaItem[]>([]);
     const [isLoading, setIsLoading] = createSignal(true);
@@ -330,7 +349,7 @@ export const AdminMedia = () => {
                             ref={fileInputRef}
                             type="file"
                             class={hiddenInput}
-                            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                            accept={ALLOWED_MIME_TYPES.join(",")}
                             onChange={handleFileSelect}
                         />
                         <button
@@ -373,7 +392,7 @@ export const AdminMedia = () => {
                                             {item.original_name}
                                         </div>
                                         <div class={mediaSize}>
-                                            {formatFileSize(item.size)} • {item.mime_type.split('/')[1].toUpperCase()}
+                                            {formatFileSize(item.size)} • {getFileTypeFromMimeType(item.mime_type)}
                                         </div>
                                         <div class={mediaActions}>
                                             <button
