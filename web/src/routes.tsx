@@ -1,5 +1,6 @@
 import { Route, Router } from "@solidjs/router";
 import { Admin } from "./Admin";
+import { AdminOnboarding } from "./admin-onboarding";
 import { AdminSettings } from "./admin-settings";
 import { AdminTables } from "./admin-tables";
 import { AdminUserProfile } from "./admin-user-profile";
@@ -16,6 +17,7 @@ const PAdmin = () => (<ProtectedRoute><Admin/></ProtectedRoute>)
 const PAdminTables = () => (<ProtectedRoute><AdminTables/></ProtectedRoute>)
 const PAdminSettings = () => (<ProtectedRoute><AdminSettings/></ProtectedRoute>)
 const PAdminProfile = () => (<ProtectedRoute><AdminUserProfile/></ProtectedRoute>)
+const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRoute>)
 	return (
 		<Router root={Layout}>
 			<Route path="/" component={PHome} />
@@ -34,6 +36,10 @@ const PAdminProfile = () => (<ProtectedRoute><AdminUserProfile/></ProtectedRoute
 			<Route
 				path="/_/admin/user/profile"
 				component={PAdminProfile}
+			/>
+			<Route
+				path="/_/admin/onboarding"
+				component={PAdminOnboarding}
 			/>
 			<Route path="/login" component={() => <GuestRoute component={Login} />} />
 			<Route
