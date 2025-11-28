@@ -1,5 +1,6 @@
 import { Route, Router } from "@solidjs/router";
 import { Admin } from "./Admin";
+import { AdminMedia } from "./admin-media";
 import { AdminOnboarding } from "./admin-onboarding";
 import { AdminSettings } from "./admin-settings";
 import { AdminTables } from "./admin-tables";
@@ -15,6 +16,7 @@ export const Routes = () => {
 const PHome = () => (<ProtectedRoute><Home /></ProtectedRoute>)
 const PAdmin = () => (<ProtectedRoute><Admin/></ProtectedRoute>)
 const PAdminTables = () => (<ProtectedRoute><AdminTables/></ProtectedRoute>)
+const PAdminMedia = () => (<ProtectedRoute><AdminMedia/></ProtectedRoute>)
 const PAdminSettings = () => (<ProtectedRoute><AdminSettings/></ProtectedRoute>)
 const PAdminProfile = () => (<ProtectedRoute><AdminUserProfile/></ProtectedRoute>)
 const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRoute>)
@@ -28,6 +30,10 @@ const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRou
 			<Route
 				path="/_/admin/tables"
 				component={PAdminTables}
+			/>
+			<Route
+				path="/_/admin/media"
+				component={PAdminMedia}
 			/>
 			<Route
 				path="/_/admin/settings"

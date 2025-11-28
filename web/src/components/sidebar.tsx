@@ -197,6 +197,7 @@ export const Sidebar: Component = () => {
   const sidebarMenuLinks = [
     { title: "Home", icon: "🏠", link: "/_/admin" },
     { title: "Database", icon: "🗄️", link: "/_/admin/tables" },
+    { title: "Media", icon: "🖼️", link: "/_/admin/media" },
     { title: "Settings", icon: "⚙️", link: "/_/admin/settings" },
   ];
 
