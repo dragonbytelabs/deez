@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"dragonbytelabs/dz/internal/dbx"
@@ -45,8 +46,9 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 			return
 		}
 		log.Printf("Register: hash generated, length=%d", len(hash))
+		displayName := strings.Split(in.Email, "@")[0]
 
-		u, err := db.CreateUser(r.Context(), in.Email, string(hash), in.Email)
+		u, err := db.CreateUser(r.Context(), in.Email, string(hash), displayName)
 		if err != nil {
 			time.Sleep(duration - time.Since(startTime))
 			log.Printf("Register: CreateUser error: %v", err)

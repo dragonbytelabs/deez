@@ -58,9 +58,13 @@ func (d *DB) CreateUser(ctx context.Context, email, passwordHash, display string
 		"avatar_url":    avatarURL,
 	}
 
+	log.Printf("CreateUser with avatar %v", args)
+
 	if err := stmt.GetContext(ctx, &u, args); err != nil {
 		return nil, err
 	}
+
+	log.Printf("Returning user %v", u)
 	return &u, nil
 }
 

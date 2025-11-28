@@ -5,6 +5,7 @@ import {
 	createSignal,
 	For,
 	type Setter,
+	Show,
 } from "solid-js";
 import { UserUploadAvatar } from "./user-avatar.upload";
 
@@ -83,6 +84,7 @@ const modalBody = css`
 
 const avatarGrid = css`
   display: grid;
+  justify-items: center;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 24px;
@@ -91,6 +93,8 @@ const avatarGrid = css`
 const avatarOption = css`
   aspect-ratio: 1;
   border-radius: 50%;
+  width: 80px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -124,8 +128,8 @@ const previewLabel = css`
 `;
 
 const previewAvatar = css`
-  width: 100px;
-  height: 100px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -231,6 +235,14 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 			.replace(/"/g, "&quot;")
 			.replace(/'/g, "&apos;");
 	};
+	// Helper function to properly encode UTF-8 strings to base64
+	const utf8ToBase64 = (str: string): string => {
+		// Convert string to UTF-8 bytes, then to base64
+		const bytes = new TextEncoder().encode(str);
+		let binary = '';
+		bytes.forEach(byte => binary += String.fromCharCode(byte));
+		return btoa(binary);
+	};
 
 	const generateAvatarSvg = (
 		emoji: string,
@@ -242,7 +254,7 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
   <circle cx="50" cy="50" r="50" fill="${safeColor}"/>
   <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-size="50">${safeEmoji}</text>
 </svg>`;
-		const encoded = btoa(svg);
+		const encoded = utf8ToBase64(svg);
 		return `data:image/svg+xml;base64,${encoded}`;
 	};
 
@@ -285,18 +297,18 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 	};
 
 	return (
-		<>
-			{/* Overlay */}
-			<div
-				role="button"
-				tabIndex={0}
-				class={`${modalOverlay} ${props.isOpen() ? "open" : ""}`}
-				onClick={handleClose}
-				onKeyDown={(e) => e.key === "Escape" && handleClose()}
-			/>
+        <Show when={props.isOpen()}>
+            {/* Overlay */}
+<div
+    role="button"
+    tabIndex={0}
+    class={`${modalOverlay} ${props.isOpen() ? "open" : ""}`}
+    onClick={handleClose}
+    onKeyDown={(e) => e.key === "Escape" && handleClose()}
+/>
 
 			{/* Slide-in Panel */}
-			<div class={`${modalPanel} ${props.isOpen() ? "open" : ""}`}>
+			<div class={`${modalPanel} open`}>
 				<div class={modalHeader}>
 					<h2 class={modalTitle}>Choose Your Avatar</h2>
 					<button class={closeButton} onClick={handleClose} type="button">
@@ -365,6 +377,6 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 					</div>
 				</form>
 			</div>
-		</>
+		</Show>
 	);
 };
