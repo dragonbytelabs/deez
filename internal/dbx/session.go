@@ -2,6 +2,7 @@ package dbx
 
 import (
 	"context"
+	"dragonbytelabs/dz/internal/models"
 	"encoding/json"
 	"log"
 	"time"
@@ -9,18 +10,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type Session struct {
-	ID             string    `db:"id" json:"id"`
-	Data           string    `db:"data" json:"data"`
-	CreatedAt      time.Time `db:"created_at" json:"created_at"`
-	LastActivityAt time.Time `db:"last_activity_at" json:"last_activity_at"`
-}
-
 // GetSessionById
-func (d *DB) GetSessionById(ctx context.Context, id string) (*Session, error) {
+func (d *DB) GetSessionById(ctx context.Context, id string) (*models.Session, error) {
 	q := MustQuery("get_session_by_id.sql")
 
-	var s Session
+	var s models.Session
 	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
 	if err != nil {
 		return nil, err
