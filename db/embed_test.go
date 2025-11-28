@@ -18,10 +18,10 @@ func TestMigrationsFS(t *testing.T) {
 
 		// Check for expected migration files
 		expectedMigrations := map[string]bool{
-			"001_users.sql":       false,
-			"002_sessions.sql":    false,
+			"001_users.sql":        false,
+			"002_sessions.sql":     false,
 			"003_user_avatars.sql": false,
-			"004_collections.sql": false,
+			"004_collections.sql":  false,
 		}
 
 		for _, entry := range entries {
