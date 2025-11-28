@@ -68,6 +68,7 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 
 		// Store user in session
 		sess.Put("email", u.Email)
+		sess.Put("user_id", u.UserHash)
 
 		// Ensure timing
 		if time.Since(startTime) < duration {
@@ -131,6 +132,7 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 
 		// Store user in session
 		sess.Put("email", u.Email)
+		sess.Put("user_id", u.UserHash)
 
 		// Ensure timing
 		if time.Since(startTime) < duration {
@@ -157,6 +159,7 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 
 		// Clear user data
 		sess.Delete("email")
+		sess.Delete("user_id")
 
 		log.Println("Logout: successful")
 		w.Header().Set("Content-Type", "application/json")

@@ -83,6 +83,61 @@ func TestDB_GetUserByEmail(t *testing.T) {
 	})
 }
 
+func TestDB_GetUserByHash(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	t.Run("returns nil for non-existent hash", func(t *testing.T) {
+		user, err := db.GetUserByHash(ctx, "nonexistent_hash_value")
+		if err != nil {
+			t.Fatalf("GetUserByHash() returned error: %v", err)
+		}
+		if user != nil {
+			t.Error("GetUserByHash() should return nil for non-existent hash")
+		}
+	})
+
+	t.Run("returns user when hash exists", func(t *testing.T) {
+		hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
+		createdUser, err := db.CreateUser(ctx, "findbyhash@example.com", string(hash), "Find By Hash")
+		if err != nil {
+			t.Fatalf("CreateUser() returned error: %v", err)
+		}
+
+		user, err := db.GetUserByHash(ctx, createdUser.UserHash)
+		if err != nil {
+			t.Fatalf("GetUserByHash() returned error: %v", err)
+		}
+		if user == nil {
+			t.Fatal("GetUserByHash() returned nil for existing user")
+		}
+		if user.Email != "findbyhash@example.com" {
+			t.Errorf("GetUserByHash() user.Email = %q, want %q", user.Email, "findbyhash@example.com")
+		}
+		if user.UserHash != createdUser.UserHash {
+			t.Errorf("GetUserByHash() user.UserHash = %q, want %q", user.UserHash, createdUser.UserHash)
+		}
+	})
+
+	t.Run("user_hash is generated on create", func(t *testing.T) {
+		hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
+		user, err := db.CreateUser(ctx, "hashtest@example.com", string(hash), "Hash Test")
+		if err != nil {
+			t.Fatalf("CreateUser() returned error: %v", err)
+		}
+
+		if user.UserHash == "" {
+			t.Error("CreateUser() returned user with empty UserHash")
+		}
+		// UserHash should be a long base64 string (64 bytes = 86 chars in base64)
+		if len(user.UserHash) < 80 {
+			t.Errorf("CreateUser() user.UserHash length = %d, want at least 80", len(user.UserHash))
+		}
+	})
+}
+
 func TestDB_UpdateUserAvatar(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()

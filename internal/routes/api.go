@@ -25,10 +25,18 @@ func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		userAvatar, err := db.GetUserByEmail(r.Context(), email.(string))
+		user, err := db.GetUserByHash(r.Context(), userID.(string))
 		if err != nil {
-			log.Fatalf("error fetching user avatar: %v", err)
+			log.Printf("error fetching user: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if user == nil {
+			// User not found, session may be stale
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"authenticated": false,
+			})
 			return
 		}
 
@@ -36,7 +44,7 @@ func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"authenticated": true,
 			"email":         email,
-			"avatar_url":    userAvatar.AvatarURL,
+			"avatar_url":    user.AvatarURL,
 		})
 	})
 }

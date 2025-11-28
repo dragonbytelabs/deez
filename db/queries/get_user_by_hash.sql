@@ -1,5 +1,5 @@
--- get user by email 
+-- get user by hash.
 SELECT id, user_hash, email, password_hash, display_name, avatar_url, created_at, updated_at
 FROM users
-WHERE email = :email
+WHERE user_hash = :user_hash
 LIMIT 1;

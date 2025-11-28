@@ -2,8 +2,10 @@ package dbx
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"strings"
 	"unicode"
 
@@ -35,6 +37,16 @@ func generateInitialAvatar(displayName string) string {
 	return "data:image/svg+xml;base64," + encoded
 }
 
+// generateUserHash creates a random 64-byte hash encoded as base64 URL-safe string
+func generateUserHash() string {
+	id := make([]byte, 64)
+	_, err := io.ReadFull(rand.Reader, id)
+	if err != nil {
+		panic("failed to generate user hash")
+	}
+	return base64.RawURLEncoding.EncodeToString(id)
+}
+
 // CreateUser (sqlx + named params)
 func (d *DB) CreateUser(ctx context.Context, email, passwordHash, display string) (*models.User, error) {
 	log.Printf("CreateUser called with email=%s, display=%s", email, display)
@@ -50,12 +62,15 @@ func (d *DB) CreateUser(ctx context.Context, email, passwordHash, display string
 
 	// Generate initial avatar from display name
 	avatarURL := generateInitialAvatar(display)
+	// Generate user hash
+	userHash := generateUserHash()
 
 	args := map[string]any{
 		"email":         email,
 		"password_hash": passwordHash,
 		"display_name":  display,
 		"avatar_url":    avatarURL,
+		"user_hash":     userHash,
 	}
 
 	log.Printf("CreateUser with avatar %v", args)
@@ -73,12 +88,6 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, er
 	q := MustQuery("get_user_by_email.sql")
 
 	var u models.User
-	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
 	args := map[string]interface{}{
 		"email": email,
 	}
@@ -114,6 +123,29 @@ func (d *DB) UpdateUserAvatar(ctx context.Context, userID int64, avatarURL strin
 	}
 
 	if err := stmt.GetContext(ctx, &u, args); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// GetUserByHash retrieves a user by their user_hash (sqlx + named params)
+func (d *DB) GetUserByHash(ctx context.Context, userHash string) (*models.User, error) {
+	q := MustQuery("get_user_by_hash.sql")
+
+	var u models.User
+	args := map[string]interface{}{
+		"user_hash": userHash,
+	}
+
+	rows, err := d.DBX.NamedQueryContext(ctx, q, args)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil // no user found
+	}
+	if err := rows.StructScan(&u); err != nil {
 		return nil, err
 	}
 	return &u, nil
