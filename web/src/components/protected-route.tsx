@@ -85,14 +85,22 @@ export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
 
 	const getInitialSidebarState = (): boolean => {
-		const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-		return stored === null ? true : stored === "true";
+		try {
+			const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+			return stored === null ? true : stored === "true";
+		} catch {
+			return true;
+		}
 	};
 
 	const [sidebarOpen, setSidebarOpen] = createSignal(getInitialSidebarState());
 
 	createEffect(() => {
-		localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen()));
+		try {
+			localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen()));
+		} catch {
+			// Ignore localStorage errors (e.g., quota exceeded, private browsing)
+		}
 	});
 
 	onMount(async () => {
