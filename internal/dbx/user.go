@@ -88,12 +88,6 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, er
 	q := MustQuery("get_user_by_email.sql")
 
 	var u models.User
-	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
 	args := map[string]interface{}{
 		"email": email,
 	}
@@ -139,12 +133,6 @@ func (d *DB) GetUserByHash(ctx context.Context, userHash string) (*models.User, 
 	q := MustQuery("get_user_by_hash.sql")
 
 	var u models.User
-	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
 	args := map[string]interface{}{
 		"user_hash": userHash,
 	}
