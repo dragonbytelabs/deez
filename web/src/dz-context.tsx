@@ -116,24 +116,3 @@ export const useDz = () => {
   }
   return context;
 };
-
-// Convenience hooks for specific parts of state
-export const useDzUser = () => {
-  const { store, actions } = useDz();
-  return {
-    get user() { return store.user; },
-    updateUser: actions.setUser,
-    updateUserAvatar: actions.updateUserAvatar,
-    updateUserDisplayName: actions.updateUserDisplayName,
-  }
-};
-
-export const useDzSettings = () => {
-  const { store, actions } = useDz();
-  return {
-    get settings() { return store.settings; },
-    toggleSidebar: actions.toggleSidebar,
-    setSidebarOpen: actions.setSidebarOpen,
-    setTheme: actions.setTheme,
-  };
-};

@@ -229,7 +229,3 @@ func TestGenerateInitialAvatar(t *testing.T) {
 		})
 	}
 }
-
-func containsString(s, substr string) bool {
-	return strings.Contains(s, substr)
-}

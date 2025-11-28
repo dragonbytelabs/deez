@@ -9,7 +9,7 @@ import {
 } from "solid-js";
 import { UserUploadAvatar } from "./user-avatar.upload";
 import { api } from "../server/api";
-import { useDzUser } from "../dz-context";
+import { useDz} from "../dz-context";
 
 const modalOverlay = css`
   position: fixed;
@@ -212,14 +212,14 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 	const [selectedIndex, setSelectedIndex] = createSignal<number | null>(null);
 	const [customImageUrl, setCustomImageUrl] = createSignal<string | null>(null);
 	const [isSaving, setIsSaving] = createSignal(false);
-	const { updateUserAvatar } = useDzUser();
+	const { actions } = useDz();
 
 	const handleAvatarSave = async (avatarUrl: string) => {
 		try {
 			const response = await api.updateAvatar(avatarUrl);
 			if (response.ok) {
 				console.log("Avatar updated successfully");
-				updateUserAvatar(avatarUrl);
+				actions.updateUserAvatar(avatarUrl);
 			} else {
 				const error = await response.text();
 				console.error("Failed to update avatar:", error);
