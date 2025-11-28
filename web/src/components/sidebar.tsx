@@ -262,6 +262,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   const sidebarMenuLinks = [
     { title: "Home", icon: "🏠", link: "/_/admin" },
     { title: "Database", icon: "🗄️", link: "/_/admin/tables" },
+    { title: "Settings", icon: "⚙️", link: "/_/admin/settings" },
   ];
 
   const isActive = (link: string) => {
@@ -271,8 +272,8 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   return (
     <>
       {/* Mobile Toggle button - moves to the right when sidebar is open */}
-      <button 
-        class={mobileToggleButton} 
+      <button
+        class={mobileToggleButton}
         classList={{ "sidebar-open": props.isOpen }}
         onClick={() => props.onToggle(!props.isOpen)}
       >
@@ -315,8 +316,8 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
         {/* Logout button at bottom */}
         <div class={sidebarFooter}>
-          <button 
-            class={logoutButton} 
+          <button
+            class={logoutButton}
             onClick={logout}
             title={!props.isOpen ? "Logout" : undefined}
           >
