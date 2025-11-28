@@ -1,7 +1,13 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
-import { type Component, createSignal, onMount, Show } from "solid-js";
-import { type UserInfo, api } from "../server/api";
+import {
+	type Component,
+	createEffect,
+	createSignal,
+	onMount,
+	Show,
+} from "solid-js";
+import { api, type UserInfo } from "../server/api";
 import { Sidebar } from "./sidebar";
 
 const SIDEBAR_STORAGE_KEY = "deez-sidebar-open";
@@ -77,6 +83,7 @@ const pageContent = css`
 export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 	const navigate = useNavigate();
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
+	const [userInfo, setUserInfo] = createSignal<UserInfo | null>(null);
 
 	const getInitialSidebarState = (): boolean => {
 		try {
@@ -112,7 +119,11 @@ export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 		<Show when={isAuthenticated() !== null} fallback={<div>Loading...</div>}>
 			<Show when={isAuthenticated()} fallback={null}>
 				<div class={layout}>
-					<Sidebar isOpen={sidebarOpen()} onToggle={setSidebarOpen} user={userInfo()} />
+					<Sidebar
+						isOpen={sidebarOpen()}
+						onToggle={setSidebarOpen}
+						user={userInfo()}
+					/>
 
 					{/* Desktop toggle button - outside sidebar */}
 					<button
