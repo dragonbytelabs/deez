@@ -4,6 +4,8 @@ import { type Component, createSignal, onMount, Show } from "solid-js";
 import { type UserInfo, api } from "../server/api";
 import { Sidebar } from "./sidebar";
 
+const SIDEBAR_STORAGE_KEY = "deez-sidebar-open";
+
 const layout = css`
   display: flex;
   min-height: 100vh;
@@ -75,8 +77,25 @@ const pageContent = css`
 export const ProtectedRoute: Component<{ component: Component }> = (props) => {
 	const navigate = useNavigate();
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
-	const [sidebarOpen, setSidebarOpen] = createSignal(true);
-	const [userInfo, setUserInfo] = createSignal<UserInfo | null>(null);
+
+	const getInitialSidebarState = (): boolean => {
+		try {
+			const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+			return stored === null ? true : stored === "true";
+		} catch {
+			return true;
+		}
+	};
+
+	const [sidebarOpen, setSidebarOpen] = createSignal(getInitialSidebarState());
+
+	createEffect(() => {
+		try {
+			localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen()));
+		} catch {
+			// Ignore localStorage errors (e.g., quota exceeded, private browsing)
+		}
+	});
 
 	onMount(async () => {
 		const result = await api.me();

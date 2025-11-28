@@ -51,4 +51,6 @@ func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 	routes.RegisterAPI(mux)
 	routes.RegisterAuth(mux, db, sm)
 	routes.RegisterAdmin(mux, db)
+	routes.RegisterAdminUserProfile(mux, db)
+	routes.RegisterCollection(mux, db)
 }
