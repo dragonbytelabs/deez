@@ -5,7 +5,7 @@ import { ShowCollections } from "./components/admin-tables.show-collections";
 
 const layout = css`
   display: flex;
-  height: calc(100vh - 80px); /* Adjust based on your top bar height */
+  height: 100vh; 
   
   @media (max-width: 768px) {
     flex-direction: column;
@@ -44,13 +44,6 @@ const dataSection = css`
   border-radius: 8px;
   padding: 20px;
   overflow-x: auto;
-`;
-
-const dataTitle = css`
-  font-size: 24px;
-  font-weight: bold;
-  color: var(--white);
-  margin-bottom: 20px;
 `;
 
 const table = css`
