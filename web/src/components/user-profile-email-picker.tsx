@@ -193,7 +193,9 @@ export const EmailPicker: Component<EmailPickerProps> = (props) => {
 	};
 
 	const validateEmail = (email: string): boolean => {
-		return email.includes("@") && email.includes(".");
+		// RFC 5322 simplified email regex pattern
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
 	};
 
 	const handleSubmit = async (e: Event) => {
@@ -216,7 +218,6 @@ export const EmailPicker: Component<EmailPickerProps> = (props) => {
 		try {
 			const response = await api.updateEmail(email);
 			if (response.ok) {
-				console.log("Email updated successfully");
 				actions.updateUserEmail(email);
 				handleClose();
 			} else {

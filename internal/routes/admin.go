@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+	"net/mail"
 	"strings"
 
 	"dragonbytelabs/dz/internal/dbx"
@@ -128,8 +129,8 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		// Basic email validation
-		if !strings.Contains(in.Email, "@") || !strings.Contains(in.Email, ".") {
+		// Validate email format using net/mail
+		if _, err := mail.ParseAddress(in.Email); err != nil {
 			http.Error(w, "invalid email format", http.StatusBadRequest)
 			return
 		}
