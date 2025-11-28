@@ -9,6 +9,12 @@ export interface CollectionField {
 export const FIELD_TYPES = ["TEXT", "INTEGER", "REAL", "BLOB"] as const;
 export type FieldType = typeof FIELD_TYPES[number];
 
+// Validate field name: must start with letter/underscore, contain only alphanumeric/underscore
+export const isValidFieldName = (name: string): boolean => {
+    if (!name.trim()) return false;
+    return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name.trim());
+};
+
 const modalOverlay = css`
   position: fixed;
   inset: 0;
@@ -320,8 +326,8 @@ export const CreateCollectionModal: Component<CreateCollectionModalProps> = (pro
     const handleSubmit = async (e: Event) => {
         e.preventDefault();
 
-        // Filter out empty field names
-        const validFields = fields().filter(f => f.name.trim());
+        // Filter out empty field names and validate field name format
+        const validFields = fields().filter(f => isValidFieldName(f.name));
 
         console.log("Creating collection:", {
             name: collectionName(),

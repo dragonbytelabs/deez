@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CollectionField, FIELD_TYPES } from "../components/admin-tables.create-collection.modal";
+import { CollectionField, FIELD_TYPES, isValidFieldName } from "../components/admin-tables.create-collection.modal";
 
 describe("CreateCollectionModal", () => {
 	describe("Collection Name Validation", () => {
@@ -182,6 +182,40 @@ describe("CreateCollectionModal", () => {
 			expect(validFields.length).toBe(2);
 			expect(validFields[0].name).toBe("title");
 			expect(validFields[1].name).toBe("price");
+		});
+	});
+
+	describe("Field Name Validation", () => {
+		it("should accept valid field names starting with letter", () => {
+			expect(isValidFieldName("name")).toBe(true);
+			expect(isValidFieldName("userName")).toBe(true);
+			expect(isValidFieldName("user_name")).toBe(true);
+		});
+
+		it("should accept valid field names starting with underscore", () => {
+			expect(isValidFieldName("_id")).toBe(true);
+			expect(isValidFieldName("_private_field")).toBe(true);
+		});
+
+		it("should accept field names with numbers after first character", () => {
+			expect(isValidFieldName("field1")).toBe(true);
+			expect(isValidFieldName("user_id_2")).toBe(true);
+		});
+
+		it("should reject empty field names", () => {
+			expect(isValidFieldName("")).toBe(false);
+			expect(isValidFieldName("   ")).toBe(false);
+		});
+
+		it("should reject field names starting with numbers", () => {
+			expect(isValidFieldName("1field")).toBe(false);
+			expect(isValidFieldName("123")).toBe(false);
+		});
+
+		it("should reject field names with special characters", () => {
+			expect(isValidFieldName("field-name")).toBe(false);
+			expect(isValidFieldName("field.name")).toBe(false);
+			expect(isValidFieldName("field name")).toBe(false);
 		});
 	});
 });
