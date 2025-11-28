@@ -8,6 +8,8 @@ import {
 	Show,
 } from "solid-js";
 import { UserUploadAvatar } from "./user-avatar.upload";
+import { api } from "../server/api";
+import { useDzUser } from "../dz-context";
 
 const modalOverlay = css`
   position: fixed;
@@ -204,13 +206,31 @@ const avatarOptions = [
 interface AvatarPickerProps {
 	isOpen: Accessor<boolean>;
 	setIsOpen: Setter<boolean>;
-	onAvatarSave: (avatarUrl: string) => void;
 }
 
 export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 	const [selectedIndex, setSelectedIndex] = createSignal<number | null>(null);
 	const [customImageUrl, setCustomImageUrl] = createSignal<string | null>(null);
 	const [isSaving, setIsSaving] = createSignal(false);
+	const { updateUserAvatar } = useDzUser();
+
+	const handleAvatarSave = async (avatarUrl: string) => {
+		try {
+			const response = await api.updateAvatar(avatarUrl);
+			if (response.ok) {
+				console.log("Avatar updated successfully");
+				updateUserAvatar(avatarUrl);
+			} else {
+				const error = await response.text();
+				console.error("Failed to update avatar:", error);
+				throw new Error(error);
+			}
+		} catch (error) {
+			console.error("Error updating avatar:", error);
+			throw error;
+		}
+	};
+
 
 	const handleClose = () => {
 		props.setIsOpen(false);
@@ -278,7 +298,7 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 		}
 
 		try {
-			await props.onAvatarSave(avatarUrl);
+			await handleAvatarSave(avatarUrl);
 			handleClose();
 		} catch (error) {
 			console.error("Failed to save avatar:", error);
