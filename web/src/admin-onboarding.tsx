@@ -75,12 +75,7 @@ const buttonSecondary = css`
 export const AdminOnboarding = () => {
 	const navigate = useNavigate();
 
-	const handleCreateTeam = () => {
-		// Navigate to admin page where they can create a team
-		navigate("/_/admin", { replace: true });
-	};
-
-	const handleSkip = () => {
+	const handleContinue = () => {
 		navigate("/_/admin", { replace: true });
 	};
 
@@ -89,10 +84,10 @@ export const AdminOnboarding = () => {
 			<div class={card}>
 				<h1 class={title}>Welcome!</h1>
 				<p class={subtitle}>Your account has been created successfully. Would you like to create a team to get started?</p>
-				<button type="button" class={buttonPrimary} onClick={handleCreateTeam}>
+				<button type="button" class={buttonPrimary} onClick={handleContinue}>
 					Create a Team
 				</button>
-				<button type="button" class={buttonSecondary} onClick={handleSkip}>
+				<button type="button" class={buttonSecondary} onClick={handleContinue}>
 					Skip for now
 				</button>
 			</div>
