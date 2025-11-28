@@ -63,57 +63,57 @@ const signupText = css`
 `;
 
 export default function LoginWithSocials() {
-  const [email, setEmail] = createSignal("");
-  const [password, setPassword] = createSignal("");
+	const [email, setEmail] = createSignal("");
+	const [password, setPassword] = createSignal("");
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    // Build body the same way <form> would
-    console.log("Username signal:", email());
-    console.log("Password signal:", password());
-    const response = await api.login(email(), password());
-    console.log("Submitting login:", email(), password());
+	const handleSubmit = async (e: Event) => {
+		e.preventDefault();
+		// Build body the same way <form> would
+		console.log("Username signal:", email());
+		console.log("Password signal:", password());
+		const response = await api.login(email(), password());
+		console.log("Submitting login:", email(), password());
 
-    if (response.ok) {
-      const data = await response.json();
-      console.log("Login successful:", data);
-      if (data.redirect) {
-        window.location.href = data.redirect; // Redirect to home page
-      }
-    } else {
-      const error = await response.text();
-      console.error("Login failed:", error);
-      // Show error message to user
-    }
-  };
+		if (response.ok) {
+			const data = await response.json();
+			console.log("Login successful:", data);
+			if (data.redirect) {
+				window.location.href = data.redirect; // Redirect to home page
+			}
+		} else {
+			const error = await response.text();
+			console.error("Login failed:", error);
+			// Show error message to user
+		}
+	};
 
-  return (
-    <div class={container}>
-      <div class={card}>
-        <h1 class={title}>Login</h1>
-        <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Email or Username"
-          class={inputField}
-          value={email()}
-          onInput={(e) => setEmail(e.currentTarget.value)}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          class={inputField}
-          value={password()}
-          onInput={(e) => setPassword(e.currentTarget.value)}
-        />
-        <button type="submit" class={buttonPrimary}>
-          Sign In
-        </button>
-        <p class={signupText}>
-          Don’t Have An Account? <a href="/register">Create a new account</a>
-        </p>
-        </form>
-      </div>
-    </div>
-  );
+	return (
+		<div class={container}>
+			<div class={card}>
+				<h1 class={title}>Login</h1>
+				<form onSubmit={handleSubmit}>
+					<input
+						type="text"
+						placeholder="Email or Username"
+						class={inputField}
+						value={email()}
+						onInput={(e) => setEmail(e.currentTarget.value)}
+					/>
+					<input
+						type="password"
+						placeholder="Password"
+						class={inputField}
+						value={password()}
+						onInput={(e) => setPassword(e.currentTarget.value)}
+					/>
+					<button type="submit" class={buttonPrimary}>
+						Sign In
+					</button>
+					<p class={signupText}>
+						Don’t Have An Account? <a href="/register">Create a new account</a>
+					</p>
+				</form>
+			</div>
+		</div>
+	);
 }

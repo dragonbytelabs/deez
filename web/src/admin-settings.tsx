@@ -22,10 +22,10 @@ const subtitle = css`
 `;
 
 export const AdminSettings = () => {
-    return (
-        <main class={mainContent}>
-            <h1 class={title}>Admin Settings</h1>
-            <p class={subtitle}>View and manage settings here</p>
-        </main>
-    );
+	return (
+		<main class={mainContent}>
+			<h1 class={title}>Admin Settings</h1>
+			<p class={subtitle}>View and manage settings here</p>
+		</main>
+	);
 };

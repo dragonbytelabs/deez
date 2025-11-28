@@ -1,6 +1,6 @@
 import { css } from "@linaria/core";
-import { For, Show, type Component } from "solid-js";
 import { useLocation } from "@solidjs/router";
+import { type Component, For, Show } from "solid-js";
 import { api } from "../server/api";
 
 const sidebar = css`
@@ -229,103 +229,103 @@ const overlay = css`
 `;
 
 interface SidebarProps {
-  isOpen: boolean;
-  onToggle: (open: boolean) => void;
+	isOpen: boolean;
+	onToggle: (open: boolean) => void;
 }
 
 export const Sidebar: Component<SidebarProps> = (props) => {
-  const location = useLocation();
+	const location = useLocation();
 
-  const logout = async () => {
-    try {
-      const response = await api.logout();
+	const logout = async () => {
+		try {
+			const response = await api.logout();
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Logout successful:", data);
-        if (data.redirect) {
-          window.location.href = data.redirect;
-        } else {
-          window.location.href = "/login";
-        }
-      } else {
-        const error = await response.text();
-        console.error("Logout failed:", error);
-        alert("Failed to logout. Please try again.");
-      }
-    } catch (error) {
-      console.error("Logout error:", error);
-      alert("Network error during logout.");
-    }
-  };
+			if (response.ok) {
+				const data = await response.json();
+				console.log("Logout successful:", data);
+				if (data.redirect) {
+					window.location.href = data.redirect;
+				} else {
+					window.location.href = "/login";
+				}
+			} else {
+				const error = await response.text();
+				console.error("Logout failed:", error);
+				alert("Failed to logout. Please try again.");
+			}
+		} catch (error) {
+			console.error("Logout error:", error);
+			alert("Network error during logout.");
+		}
+	};
 
-  const sidebarMenuLinks = [
-    { title: "Home", icon: "🏠", link: "/_/admin" },
-    { title: "Database", icon: "🗄️", link: "/_/admin/tables" },
-    { title: "Settings", icon: "⚙️", link: "/_/admin/settings" },
-  ];
+	const sidebarMenuLinks = [
+		{ title: "Home", icon: "🏠", link: "/_/admin" },
+		{ title: "Database", icon: "🗄️", link: "/_/admin/tables" },
+		{ title: "Settings", icon: "⚙️", link: "/_/admin/settings" },
+	];
 
-  const isActive = (link: string) => {
-    return location.pathname === link;
-  };
+	const isActive = (link: string) => {
+		return location.pathname === link;
+	};
 
-  return (
-    <>
-      {/* Mobile Toggle button - moves to the right when sidebar is open */}
-      <button
-        class={mobileToggleButton}
-        classList={{ "sidebar-open": props.isOpen }}
-        onClick={() => props.onToggle(!props.isOpen)}
-      >
-        {props.isOpen ? "✕" : "☰"}
-      </button>
+	return (
+		<>
+			{/* Mobile Toggle button - moves to the right when sidebar is open */}
+			<button
+				class={mobileToggleButton}
+				classList={{ "sidebar-open": props.isOpen }}
+				onClick={() => props.onToggle(!props.isOpen)}
+			>
+				{props.isOpen ? "✕" : "☰"}
+			</button>
 
-      {/* Overlay for mobile */}
-      <Show when={props.isOpen}>
-        <div class={overlay} onClick={() => props.onToggle(false)} />
-      </Show>
+			{/* Overlay for mobile */}
+			<Show when={props.isOpen}>
+				<div class={overlay} onClick={() => props.onToggle(false)} />
+			</Show>
 
-      {/* Sidebar */}
-      <div class={sidebar} classList={{ closed: !props.isOpen }}>
-        <div class={menuHeader}>
-          <span class={logoIcon}>🎮</span>
-          <span class={logoText}>Deez</span>
-        </div>
+			{/* Sidebar */}
+			<div class={sidebar} classList={{ closed: !props.isOpen }}>
+				<div class={menuHeader}>
+					<span class={logoIcon}>🎮</span>
+					<span class={logoText}>Deez</span>
+				</div>
 
-        <nav>
-          <ul class={menuList}>
-            <For each={sidebarMenuLinks}>
-              {(menu) => (
-                <li class={menuItem}>
-                  <a
-                    href={menu.link}
-                    class={menuLink}
-                    classList={{
-                      active: isActive(menu.link),
-                    }}
-                    title={!props.isOpen ? menu.title : undefined}
-                  >
-                    <span class={menuIcon}>{menu.icon}</span>
-                    <span class={menuText}>{menu.title}</span>
-                  </a>
-                </li>
-              )}
-            </For>
-          </ul>
-        </nav>
+				<nav>
+					<ul class={menuList}>
+						<For each={sidebarMenuLinks}>
+							{(menu) => (
+								<li class={menuItem}>
+									<a
+										href={menu.link}
+										class={menuLink}
+										classList={{
+											active: isActive(menu.link),
+										}}
+										title={!props.isOpen ? menu.title : undefined}
+									>
+										<span class={menuIcon}>{menu.icon}</span>
+										<span class={menuText}>{menu.title}</span>
+									</a>
+								</li>
+							)}
+						</For>
+					</ul>
+				</nav>
 
-        {/* Logout button at bottom */}
-        <div class={sidebarFooter}>
-          <button
-            class={logoutButton}
-            onClick={logout}
-            title={!props.isOpen ? "Logout" : undefined}
-          >
-            <span class={menuIcon}>🚪</span>
-            <span class={menuText}>Logout</span>
-          </button>
-        </div>
-      </div>
-    </>
-  );
+				{/* Logout button at bottom */}
+				<div class={sidebarFooter}>
+					<button
+						class={logoutButton}
+						onClick={logout}
+						title={!props.isOpen ? "Logout" : undefined}
+					>
+						<span class={menuIcon}>🚪</span>
+						<span class={menuText}>Logout</span>
+					</button>
+				</div>
+			</div>
+		</>
+	);
 };

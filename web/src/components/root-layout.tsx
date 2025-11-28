@@ -1,5 +1,5 @@
-import type { ParentProps } from "solid-js";
 import { css } from "@linaria/core";
+import type { ParentProps } from "solid-js";
 
 const layout = css`
   :global(html) {
@@ -40,9 +40,5 @@ const layout = css`
 `;
 
 export const Layout = (props: ParentProps) => {
-	return (
-  <div class={layout}>
-    { props.children }
-    </div>
-  )
+	return <div class={layout}>{props.children}</div>;
 };
