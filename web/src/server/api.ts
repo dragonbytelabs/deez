@@ -24,14 +24,12 @@ const routes: Route = {
 };
 
 export type UserInfo = {
-	user_id: number;
 	email: string;
 	avatar_url: string;
 };
 
 type MeFuncData = {
 	authenticated: boolean;
-	user_id?: number;
 	email?: string;
 	avatar_url?: string;
 };
@@ -46,12 +44,12 @@ const meFunc = async (): Promise<{ authenticated: boolean; user?: UserInfo }> =>
 			credentials: "include",
 		});
 		const data: MeFuncData = await response.json();
-		if (data.authenticated && data.user_id && data.email && data.avatar_url) {
+		console.log("meFunc response data:", data);
+		if (data.authenticated && data.email && data.avatar_url) {
 			return {
 				authenticated: true,
 				user: {
 					avatar_url: data.avatar_url,
-					user_id: data.user_id,
 					email: data.email,
 				},
 			};
@@ -97,7 +95,6 @@ const registerFunc = async (
 	confirmPassword: string,
 ) => {
 	const body = JSON.stringify({ email, password, confirmPassword });
-	console.log("API register called with body:", body);
 	const r = await fetch(routes.register, {
 		method: methods.POST,
 		headers: {

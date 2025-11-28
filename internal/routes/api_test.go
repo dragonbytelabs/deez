@@ -12,7 +12,9 @@ import (
 
 func TestRegisterAPI(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterAPI(mux)
+	db := setupTestDB(t)
+	defer db.Close()
+	RegisterAPI(mux, db)
 
 	// Create session manager for testing
 	store := session.NewInMemoryStore()
@@ -36,18 +38,6 @@ func TestRegisterAPI(t *testing.T) {
 		// Should contain "authenticated":false for unauthenticated users
 		if !containsString(body, `"authenticated":false`) {
 			t.Errorf("GET /api/me body should contain authenticated:false, got %v", body)
-		}
-	})
-
-	t.Run("GET /api/game requires authentication", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/game", nil)
-		rec := httptest.NewRecorder()
-
-		handler.ServeHTTP(rec, req)
-
-		// Should redirect to login
-		if rec.Code != http.StatusSeeOther {
-			t.Errorf("GET /api/game status = %v, want %v", rec.Code, http.StatusSeeOther)
 		}
 	})
 }

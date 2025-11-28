@@ -105,7 +105,7 @@ export default function LoginWithSocials() {
 			const data = await response.json();
 			console.log("Login successful:", data);
 			if (data.redirect) {
-				navigate(data.redirect);
+				navigate(data.redirect, { replace: true });
 			}
 		} else {
 			const errorText = await response.text();

@@ -1,6 +1,7 @@
 import { css } from "@linaria/core";
 import { createSignal, Show } from "solid-js";
 import { api } from "../server/api";
+import { useNavigate } from "@solidjs/router";
 
 const container = css`
   display: flex;
@@ -79,6 +80,8 @@ export default function RegisterForm() {
 	const [confirmPassword, setConfirmPassword] = createSignal("");
 	const [error, setError] = createSignal("");
 
+	const navigate = useNavigate();
+
 	const isValidEmail = (email: string): boolean => {
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		return emailRegex.test(email);
@@ -100,8 +103,10 @@ export default function RegisterForm() {
 
 		if (response.ok) {
 			const data = await response.json();
+			console.log("Registration successful:", data);
 			if (data.redirect) {
-				window.location.href = data.redirect;
+				// window.location.href = data.redirect;
+				navigate(data.redirect, { replace: true });
 			}
 		} else {
 			const errorText = await response.text();
