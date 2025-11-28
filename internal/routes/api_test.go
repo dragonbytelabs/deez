@@ -12,7 +12,9 @@ import (
 
 func TestRegisterAPI(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterAPI(mux)
+	db := setupTestDB(t)
+	defer db.Close()
+	RegisterAPI(mux, db)
 
 	// Create session manager for testing
 	store := session.NewInMemoryStore()
