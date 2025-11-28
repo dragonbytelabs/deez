@@ -121,7 +121,7 @@ export const useDz = () => {
 export const useDzUser = () => {
   const { store, actions } = useDz();
   return {
-    user: store.user,
+    get user() { return store.user; },
     updateUser: actions.setUser,
     updateUserAvatar: actions.updateUserAvatar,
     updateUserDisplayName: actions.updateUserDisplayName,
@@ -131,7 +131,7 @@ export const useDzUser = () => {
 export const useDzSettings = () => {
   const { store, actions } = useDz();
   return {
-    settings: store.settings,
+    get settings() { return store.settings; },
     toggleSidebar: actions.toggleSidebar,
     setSidebarOpen: actions.setSidebarOpen,
     setTheme: actions.setTheme,
