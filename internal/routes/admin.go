@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+	"net/mail"
 	"strings"
 
 	"dragonbytelabs/dz/internal/dbx"
@@ -98,6 +99,55 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 			http.Error(w, "failed to update avatar", http.StatusInternalServerError)
 			return
 		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"user":    user,
+		})
+	})))
+
+	// Update user email
+	mux.Handle("PUT /api/admin/user/email", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess := session.GetSession(r)
+		userID := sess.Get("user_id")
+		if userID == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		var in struct {
+			Email string `json:"email"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+
+		if in.Email == "" {
+			http.Error(w, "email is required", http.StatusBadRequest)
+			return
+		}
+
+		// Validate email format using net/mail
+		if _, err := mail.ParseAddress(in.Email); err != nil {
+			http.Error(w, "invalid email format", http.StatusBadRequest)
+			return
+		}
+
+		user, err := db.UpdateUserEmail(r.Context(), userID.(string), in.Email)
+		if err != nil {
+			// Check if it's a unique constraint violation
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				http.Error(w, "email already in use", http.StatusConflict)
+				return
+			}
+			http.Error(w, "failed to update email", http.StatusInternalServerError)
+			return
+		}
+
+		// Update the session with the new email
+		sess.Put("email", user.Email)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{

@@ -192,4 +192,18 @@ func TestRegisterAdminUserProfile(t *testing.T) {
 			t.Errorf("PUT /api/admin/user/avatar status = %v, want %v", rec.Code, http.StatusSeeOther)
 		}
 	})
+
+	t.Run("PUT /api/admin/user/email requires authentication", func(t *testing.T) {
+		body := strings.NewReader(`{"email":"newemail@example.com"}`)
+		req := httptest.NewRequest("PUT", "/api/admin/user/email", body)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		// Should redirect to login
+		if rec.Code != http.StatusSeeOther {
+			t.Errorf("PUT /api/admin/user/email status = %v, want %v", rec.Code, http.StatusSeeOther)
+		}
+	})
 }

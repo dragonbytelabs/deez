@@ -150,3 +150,25 @@ func (d *DB) GetUserByHash(ctx context.Context, userHash string) (*models.User, 
 	}
 	return &u, nil
 }
+
+// UpdateUserEmail updates the email for a user
+func (d *DB) UpdateUserEmail(ctx context.Context, userID, email string) (*models.User, error) {
+	q := MustQuery("update_user_email.sql")
+
+	var u models.User
+	stmt, err := d.DBX.PrepareNamedContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	args := map[string]any{
+		"user_id": userID,
+		"email":   email,
+	}
+
+	if err := stmt.GetContext(ctx, &u, args); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}

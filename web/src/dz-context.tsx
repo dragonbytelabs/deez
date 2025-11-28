@@ -28,6 +28,7 @@ interface DzContextType {
     setUser: (user: UserInfo | null) => void;
     updateUserAvatar: (avatarUrl: string) => void;
     updateUserDisplayName: (displayName: string) => void;
+    updateUserEmail: (email: string) => void;
     toggleSidebar: () => void;
     setSidebarOpen: (open: boolean) => void;
     setTheme: (theme: "dark" | "light") => void;
@@ -64,6 +65,16 @@ export const DzProvider: ParentComponent = (props) => {
         produce((draft) => {
           if (draft.user) {
             draft.user.display_name = displayName;
+          }
+        })
+      );
+    },
+
+    updateUserEmail: (email: string) => {
+      setStore(
+        produce((draft) => {
+          if (draft.user) {
+            draft.user.email = email;
           }
         })
       );
