@@ -1,5 +1,7 @@
 import { css } from "@linaria/core";
 import { For, Show, type Component } from "solid-js";
+import { useLocation } from "@solidjs/router";
+import { api } from "../server/api";
 
 const sidebar = css`
   position: fixed;
@@ -10,31 +12,69 @@ const sidebar = css`
   background: var(--gray800);
   border-right: 1px solid var(--gray700);
   padding: 20px;
-  transform: translateX(0);
-  transition: transform 0.3s ease;
+  transition: width 0.3s ease, padding 0.3s ease;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   
   &.closed {
-    transform: translateX(-100%);
+    width: 80px;
+    padding: 20px 10px;
+  }
+  
+  @media (max-width: 768px) {
+    transform: translateX(0);
+    transition: transform 0.3s ease;
+    
+    &.closed {
+      transform: translateX(-100%);
+      width: 250px;
+      padding: 20px;
+    }
   }
 `;
 
 const menuHeader = css`
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--gray700);
+  min-height: 40px;
 `;
 
-const logo = css`
+const logoIcon = css`
+  font-size: 32px;
+  min-width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const logoText = css`
   font-size: 24px;
   font-weight: bold;
-  color: var(--primary);
+  color: var(--white);
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.2s;
+  
+  .closed & {
+    opacity: 0;
+    width: 0;
+  }
+  
+  @media (max-width: 768px) {
+    .closed & {
+      opacity: 1;
+      width: auto;
+    }
+  }
 `;
 
-const toggleButton = css`
+const mobileToggleButton = css`
   position: fixed;
   left: 20px;
   top: 20px;
@@ -47,13 +87,21 @@ const toggleButton = css`
   height: 50px;
   border-radius: 8px;
   cursor: pointer;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   
   &:hover {
     background: var(--primaryDark);
+  }
+  
+  &.sidebar-open {
+    left: 270px; /* 250px sidebar + 20px margin */
+  }
+  
+  @media (max-width: 768px) {
+    display: flex;
   }
 `;
 
@@ -61,6 +109,7 @@ const menuList = css`
   list-style: none;
   padding: 0;
   margin: 0;
+  flex: 1;
 `;
 
 const menuItem = css`
@@ -75,6 +124,8 @@ const menuLink = css`
   text-decoration: none;
   border-radius: 8px;
   transition: all 0.2s;
+  white-space: nowrap;
+  gap: 12px;
   
   &:hover {
     background: var(--gray700);
@@ -85,6 +136,84 @@ const menuLink = css`
     background: var(--primary);
     color: white;
   }
+  
+  .closed & {
+    padding: 12px;
+    justify-content: center;
+  }
+  
+  @media (max-width: 768px) {
+    .closed & {
+      padding: 12px 16px;
+      justify-content: flex-start;
+    }
+  }
+`;
+
+const menuIcon = css`
+  font-size: 20px;
+  min-width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const menuText = css`
+  opacity: 1;
+  transition: opacity 0.2s;
+  
+  .closed & {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+  }
+  
+  @media (max-width: 768px) {
+    .closed & {
+      opacity: 1;
+      width: auto;
+      overflow: visible;
+    }
+  }
+`;
+
+const sidebarFooter = css`
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--gray700);
+`;
+
+const logoutButton = css`
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: var(--gray500);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+  font-size: 16px;
+  white-space: nowrap;
+  
+  &:hover {
+    background: var(--gray700);
+    color: var(--white);
+  }
+  
+  .closed & {
+    padding: 12px;
+    justify-content: center;
+  }
+  
+  @media (max-width: 768px) {
+    .closed & {
+      padding: 12px 16px;
+      justify-content: flex-start;
+    }
+  }
 `;
 
 const overlay = css`
@@ -92,9 +221,10 @@ const overlay = css`
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 99;
+  display: none;
   
-  @media (min-width: 769px) {
-    display: none;
+  @media (max-width: 768px) {
+    display: block;
   }
 `;
 
@@ -104,19 +234,48 @@ interface SidebarProps {
 }
 
 export const Sidebar: Component<SidebarProps> = (props) => {
+  const location = useLocation();
+
+  const logout = async () => {
+    try {
+      const response = await api.logout();
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Logout successful:", data);
+        if (data.redirect) {
+          window.location.href = data.redirect;
+        } else {
+          window.location.href = "/login";
+        }
+      } else {
+        const error = await response.text();
+        console.error("Logout failed:", error);
+        alert("Failed to logout. Please try again.");
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+      alert("Network error during logout.");
+    }
+  };
+
   const sidebarMenuLinks = [
-    { title: "🏠 Home", link: "/_/admin" },
-    { title: "🏠 database", link: "/_/admin/tables" },
+    { title: "Home", icon: "🏠", link: "/_/admin" },
+    { title: "Database", icon: "🗄️", link: "/_/admin/tables" },
   ];
 
   const isActive = (link: string) => {
-    return window.location.pathname === link;
-  }
+    return location.pathname === link;
+  };
 
   return (
     <>
-      {/* Toggle button */}
-      <button class={toggleButton} onClick={() => props.onToggle(!props.isOpen)}>
+      {/* Mobile Toggle button - moves to the right when sidebar is open */}
+      <button 
+        class={mobileToggleButton} 
+        classList={{ "sidebar-open": props.isOpen }}
+        onClick={() => props.onToggle(!props.isOpen)}
+      >
         {props.isOpen ? "✕" : "☰"}
       </button>
 
@@ -127,27 +286,44 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       {/* Sidebar */}
       <div class={sidebar} classList={{ closed: !props.isOpen }}>
-
         <div class={menuHeader}>
-          <div class={logo}>Admin</div>
+          <span class={logoIcon}>🎮</span>
+          <span class={logoText}>Deez</span>
         </div>
 
         <nav>
           <ul class={menuList}>
-            <For each={sidebarMenuLinks}>{(menu) =>
-              <li class={menuItem}>
-                <a href={menu.link}
-                  class={menuLink}
-                  classList={{
-                    active: isActive(menu.link)
-                  }}
-                >
-                  {menu.title}
-                </a>
-              </li>}
+            <For each={sidebarMenuLinks}>
+              {(menu) => (
+                <li class={menuItem}>
+                  <a
+                    href={menu.link}
+                    class={menuLink}
+                    classList={{
+                      active: isActive(menu.link),
+                    }}
+                    title={!props.isOpen ? menu.title : undefined}
+                  >
+                    <span class={menuIcon}>{menu.icon}</span>
+                    <span class={menuText}>{menu.title}</span>
+                  </a>
+                </li>
+              )}
             </For>
           </ul>
         </nav>
+
+        {/* Logout button at bottom */}
+        <div class={sidebarFooter}>
+          <button 
+            class={logoutButton} 
+            onClick={logout}
+            title={!props.isOpen ? "Logout" : undefined}
+          >
+            <span class={menuIcon}>🚪</span>
+            <span class={menuText}>Logout</span>
+          </button>
+        </div>
       </div>
     </>
   );
