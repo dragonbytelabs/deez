@@ -90,30 +90,30 @@ export default function RegisterForm() {
 			<div class={card}>
 				<h1 class={title}>Register</h1>
 				<form onSubmit={handleSubmit}>
-				<input
-					type="text"
-					placeholder="Email or Username"
-					class={inputField}
-					value={email()}
-					onInput={(e) => setEmail(e.currentTarget.value)}
-				/>
-				<input
-					type="password"
-					placeholder="Password"
-					class={inputField}
-					value={password()}
-					onInput={(e) => setPassword(e.currentTarget.value)}
-				/>
-				<input
-					type="password"
-					placeholder="Confirm Password"
-					class={inputField}
-					value={confirmPassword()}
-					onInput={(e) => setConfirmPassword(e.currentTarget.value)}
-				/>
-				<button type="submit" class={buttonPrimary}>
-					Create Account
-				</button>
+					<input
+						type="text"
+						placeholder="Email or Username"
+						class={inputField}
+						value={email()}
+						onInput={(e) => setEmail(e.currentTarget.value)}
+					/>
+					<input
+						type="password"
+						placeholder="Password"
+						class={inputField}
+						value={password()}
+						onInput={(e) => setPassword(e.currentTarget.value)}
+					/>
+					<input
+						type="password"
+						placeholder="Confirm Password"
+						class={inputField}
+						value={confirmPassword()}
+						onInput={(e) => setConfirmPassword(e.currentTarget.value)}
+					/>
+					<button type="submit" class={buttonPrimary}>
+						Create Account
+					</button>
 				</form>
 				<p class={signupText}>
 					Already Have An Account? <a href="/login">Login instead</a>

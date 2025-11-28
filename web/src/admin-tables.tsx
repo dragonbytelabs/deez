@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { createSignal, onMount, For, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
 
 const mainContent = css`
   padding: 40px;
@@ -118,146 +118,156 @@ const error = css`
 `;
 
 interface TableInfo {
-    name: string;
-    rowCount?: number;
+	name: string;
+	rowCount?: number;
 }
 
 interface TableData {
-    table: string;
-    data: Record<string, any>[];
+	table: string;
+	data: Record<string, any>[];
 }
 
 export const AdminTables = () => {
-    const [tables, setTables] = createSignal<TableInfo[]>([]);
-    const [selectedTable, setSelectedTable] = createSignal<string | null>(null);
-    const [tableData, setTableData] = createSignal<TableData | null>(null);
-    const [isLoading, setIsLoading] = createSignal(true);
-    const [errorMsg, setErrorMsg] = createSignal<string | null>(null);
+	const [tables, setTables] = createSignal<TableInfo[]>([]);
+	const [selectedTable, setSelectedTable] = createSignal<string | null>(null);
+	const [tableData, setTableData] = createSignal<TableData | null>(null);
+	const [isLoading, setIsLoading] = createSignal(true);
+	const [errorMsg, setErrorMsg] = createSignal<string | null>(null);
 
-    onMount(async () => {
-        await loadTables();
-    });
+	onMount(async () => {
+		await loadTables();
+	});
 
-    const loadTables = async () => {
-        try {
-            setIsLoading(true);
-            setErrorMsg(null);
-            
-            const response = await fetch("/api/admin/tables", {
-                credentials: "include",
-            });
+	const loadTables = async () => {
+		try {
+			setIsLoading(true);
+			setErrorMsg(null);
 
-            if (!response.ok) {
-                throw new Error("Failed to load tables");
-            }
+			const response = await fetch("/api/admin/tables", {
+				credentials: "include",
+			});
 
-            const data = await response.json();
-            setTables(data.tables.map((name: string) => ({ name })));
-        } catch (err) {
-            console.error("Error loading tables:", err);
-            setErrorMsg("Failed to load database tables");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+			if (!response.ok) {
+				throw new Error("Failed to load tables");
+			}
 
-    const loadTableData = async (tableName: string) => {
-        try {
-            setIsLoading(true);
-            setErrorMsg(null);
-            setSelectedTable(tableName);
+			const data = await response.json();
+			setTables(data.tables.map((name: string) => ({ name })));
+		} catch (err) {
+			console.error("Error loading tables:", err);
+			setErrorMsg("Failed to load database tables");
+		} finally {
+			setIsLoading(false);
+		}
+	};
 
-            const response = await fetch(`/api/admin/table/${tableName}`, {
-                credentials: "include",
-            });
+	const loadTableData = async (tableName: string) => {
+		try {
+			setIsLoading(true);
+			setErrorMsg(null);
+			setSelectedTable(tableName);
 
-            if (!response.ok) {
-                throw new Error("Failed to load table data");
-            }
+			const response = await fetch(`/api/admin/table/${tableName}`, {
+				credentials: "include",
+			});
 
-            const data = await response.json();
-            setTableData(data);
-        } catch (err) {
-            console.error("Error loading table data:", err);
-            setErrorMsg(`Failed to load data for table: ${tableName}`);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+			if (!response.ok) {
+				throw new Error("Failed to load table data");
+			}
 
-    return (
-        <main class={mainContent}>
-            <h1 class={title}>Database Admin</h1>
-            <p class={subtitle}>View and manage database tables</p>
+			const data = await response.json();
+			setTableData(data);
+		} catch (err) {
+			console.error("Error loading table data:", err);
+			setErrorMsg(`Failed to load data for table: ${tableName}`);
+		} finally {
+			setIsLoading(false);
+		}
+	};
 
-            <Show when={errorMsg()}>
-                <div class={error}>{errorMsg()}</div>
-            </Show>
+	return (
+		<main class={mainContent}>
+			<h1 class={title}>Database Admin</h1>
+			<p class={subtitle}>View and manage database tables</p>
 
-            <Show when={isLoading() && tables().length === 0}>
-                <div class={loading}>Loading tables...</div>
-            </Show>
+			<Show when={errorMsg()}>
+				<div class={error}>{errorMsg()}</div>
+			</Show>
 
-            <Show when={!isLoading() || tables().length > 0}>
-                <div class={tablesGrid}>
-                    <For each={tables()}>
-                        {(table) => (
-                            <div
-                                class={`${tableCard} ${selectedTable() === table.name ? "active" : ""}`}
-                                onClick={() => loadTableData(table.name)}
-                            >
-                                <div class={tableName}>📋 {table.name}</div>
-                                <div class={tableInfo}>Click to view data</div>
-                            </div>
-                        )}
-                    </For>
-                </div>
-            </Show>
+			<Show when={isLoading() && tables().length === 0}>
+				<div class={loading}>Loading tables...</div>
+			</Show>
 
-            <Show when={tableData()}>
-                <div class={dataSection}>
-                    <div class={dataTitle}>{tableData()?.table}</div>
+			<Show when={!isLoading() || tables().length > 0}>
+				<div class={tablesGrid}>
+					<For each={tables()}>
+						{(table) => (
+							<div
+								class={`${tableCard} ${selectedTable() === table.name ? "active" : ""}`}
+								onClick={() => loadTableData(table.name)}
+							>
+								<div class={tableName}>📋 {table.name}</div>
+								<div class={tableInfo}>Click to view data</div>
+							</div>
+						)}
+					</For>
+				</div>
+			</Show>
 
-                    <Show when={isLoading()}>
-                        <div class={loading}>Loading data...</div>
-                    </Show>
+			<Show when={tableData()}>
+				<div class={dataSection}>
+					<div class={dataTitle}>{tableData()?.table}</div>
 
-                    <Show when={!isLoading() && tableData()?.data && tableData()!.data.length > 0}>
-                        <table class={table}>
-                            <thead>
-                                <tr>
-                                    <For each={Object.keys(tableData()!.data[0])}>
-                                        {(column) => <th>{column}</th>}
-                                    </For>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <For each={tableData()!.data}>
-                                    {(row) => (
-                                        <tr>
-                                            <For each={Object.values(row)}>
-                                                {(value) => (
-                                                    <td>
-                                                        {value === null
-                                                            ? "NULL"
-                                                            : typeof value === "object"
-                                                            ? JSON.stringify(value)
-                                                            : String(value)}
-                                                    </td>
-                                                )}
-                                            </For>
-                                        </tr>
-                                    )}
-                                </For>
-                            </tbody>
-                        </table>
-                    </Show>
+					<Show when={isLoading()}>
+						<div class={loading}>Loading data...</div>
+					</Show>
 
-                    <Show when={!isLoading() && tableData()?.data && tableData()!.data.length === 0}>
-                        <div class={loading}>No data in this table</div>
-                    </Show>
-                </div>
-            </Show>
-        </main>
-    );
+					<Show
+						when={
+							!isLoading() && tableData()?.data && tableData()!.data.length > 0
+						}
+					>
+						<table class={table}>
+							<thead>
+								<tr>
+									<For each={Object.keys(tableData()!.data[0])}>
+										{(column) => <th>{column}</th>}
+									</For>
+								</tr>
+							</thead>
+							<tbody>
+								<For each={tableData()!.data}>
+									{(row) => (
+										<tr>
+											<For each={Object.values(row)}>
+												{(value) => (
+													<td>
+														{value === null
+															? "NULL"
+															: typeof value === "object"
+																? JSON.stringify(value)
+																: String(value)}
+													</td>
+												)}
+											</For>
+										</tr>
+									)}
+								</For>
+							</tbody>
+						</table>
+					</Show>
+
+					<Show
+						when={
+							!isLoading() &&
+							tableData()?.data &&
+							tableData()!.data.length === 0
+						}
+					>
+						<div class={loading}>No data in this table</div>
+					</Show>
+				</div>
+			</Show>
+		</main>
+	);
 };
