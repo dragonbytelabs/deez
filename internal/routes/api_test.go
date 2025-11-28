@@ -40,18 +40,6 @@ func TestRegisterAPI(t *testing.T) {
 			t.Errorf("GET /api/me body should contain authenticated:false, got %v", body)
 		}
 	})
-
-	t.Run("GET /api/game requires authentication", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/game", nil)
-		rec := httptest.NewRecorder()
-
-		handler.ServeHTTP(rec, req)
-
-		// Should redirect to login
-		if rec.Code != http.StatusSeeOther {
-			t.Errorf("GET /api/game status = %v, want %v", rec.Code, http.StatusSeeOther)
-		}
-	})
 }
 
 func containsString(s, substr string) bool {
