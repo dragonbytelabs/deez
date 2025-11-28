@@ -207,13 +207,25 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 		}, 300);
 	};
 
+	// Escape XML special characters for safe SVG generation
+	const escapeXml = (unsafe: string): string => {
+		return unsafe
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&apos;");
+	};
+
 	const generateAvatarSvg = (
 		emoji: string,
 		backgroundColor: string,
 	): string => {
+		const safeEmoji = escapeXml(emoji);
+		const safeColor = escapeXml(backgroundColor);
 		const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="50" fill="${backgroundColor}"/>
-  <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-size="50">${emoji}</text>
+  <circle cx="50" cy="50" r="50" fill="${safeColor}"/>
+  <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-size="50">${safeEmoji}</text>
 </svg>`;
 		const encoded = btoa(svg);
 		return `data:image/svg+xml;base64,${encoded}`;

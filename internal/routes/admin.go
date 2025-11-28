@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"dragonbytelabs/dz/internal/dbx"
 	"dragonbytelabs/dz/internal/session"
@@ -69,6 +70,12 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 
 		if in.AvatarURL == "" {
 			http.Error(w, "avatar_url is required", http.StatusBadRequest)
+			return
+		}
+
+		// Validate that avatar URL is a valid SVG data URI
+		if !strings.HasPrefix(in.AvatarURL, "data:image/svg+xml;base64,") {
+			http.Error(w, "avatar_url must be a valid SVG data URI", http.StatusBadRequest)
 			return
 		}
 
