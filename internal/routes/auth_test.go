@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"dragonbytelabs/dz/internal/session"
 
@@ -18,7 +19,7 @@ func TestRegisterAuth(t *testing.T) {
 
 	// Create session manager for testing
 	store := session.NewInMemoryStore()
-	sm := session.NewSessionManager(store, 30*60*1000000000, 60*60*1000000000, 12*60*60*1000000000, "session_id")
+	sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
 
 	mux := http.NewServeMux()
 	RegisterAuth(mux, db, sm)

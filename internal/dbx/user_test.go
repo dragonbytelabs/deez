@@ -3,6 +3,7 @@ package dbx
 import (
 	"context"
 	"encoding/base64"
+	"strings"
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
@@ -157,7 +158,7 @@ func TestGenerateInitialAvatar(t *testing.T) {
 			}
 			// Should be a data URL
 			prefix := "data:image/svg+xml;base64,"
-			if len(result) < len(prefix) || result[:len(prefix)] != prefix {
+			if !strings.HasPrefix(result, prefix) {
 				t.Errorf("generateInitialAvatar() should return a data URL, got %q", result[:min(50, len(result))])
 				return
 			}
@@ -167,7 +168,7 @@ func TestGenerateInitialAvatar(t *testing.T) {
 				t.Errorf("failed to decode base64: %v", err)
 				return
 			}
-			if !containsString(string(decoded), tt.expectedChar) {
+			if !strings.Contains(string(decoded), tt.expectedChar) {
 				t.Errorf("generateInitialAvatar(%q) decoded SVG should contain %q, got %q", tt.displayName, tt.expectedChar, string(decoded))
 			}
 		})
@@ -175,10 +176,5 @@ func TestGenerateInitialAvatar(t *testing.T) {
 }
 
 func containsString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(s, substr)
 }

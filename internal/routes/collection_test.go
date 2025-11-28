@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"dragonbytelabs/dz/internal/dbx"
 	"dragonbytelabs/dz/internal/session"
@@ -41,7 +42,7 @@ func TestRegisterCollection(t *testing.T) {
 
 	// Create session manager for testing
 	store := session.NewInMemoryStore()
-	sm := session.NewSessionManager(store, 30*60*1000000000, 60*60*1000000000, 12*60*60*1000000000, "session_id")
+	sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
 	handler := sm.Handle(mux)
 
 	t.Run("GET /api/collections requires authentication", func(t *testing.T) {
@@ -118,7 +119,7 @@ func TestRegisterAdmin(t *testing.T) {
 
 	// Create session manager for testing
 	store := session.NewInMemoryStore()
-	sm := session.NewSessionManager(store, 30*60*1000000000, 60*60*1000000000, 12*60*60*1000000000, "session_id")
+	sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
 	handler := sm.Handle(mux)
 
 	t.Run("GET /api/admin/tables requires authentication", func(t *testing.T) {
@@ -163,7 +164,7 @@ func TestRegisterAdminUserProfile(t *testing.T) {
 
 	// Create session manager for testing
 	store := session.NewInMemoryStore()
-	sm := session.NewSessionManager(store, 30*60*1000000000, 60*60*1000000000, 12*60*60*1000000000, "session_id")
+	sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
 	handler := sm.Handle(mux)
 
 	t.Run("GET /api/admin/user/profile requires authentication", func(t *testing.T) {

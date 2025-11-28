@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"dragonbytelabs/dz/internal/session"
 )
@@ -17,7 +18,7 @@ func TestRequireAuth(t *testing.T) {
 
 		// Create session manager with in-memory store
 		store := session.NewInMemoryStore()
-		sm := session.NewSessionManager(store, 30*60*1000000000, 60*60*1000000000, 12*60*60*1000000000, "session_id")
+		sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
 
 		// Wrap with RequireAuth and session middleware
 		handler := sm.Handle(RequireAuth(innerHandler))
@@ -46,7 +47,7 @@ func TestRequireGuest(t *testing.T) {
 
 		// Create session manager with in-memory store
 		store := session.NewInMemoryStore()
-		sm := session.NewSessionManager(store, 30*60*1000000000, 60*60*1000000000, 12*60*60*1000000000, "session_id")
+		sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
 
 		// Wrap with RequireGuest and session middleware
 		handler := sm.Handle(RequireGuest(innerHandler))

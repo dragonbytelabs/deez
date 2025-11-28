@@ -3,7 +3,9 @@ package routes
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"dragonbytelabs/dz/internal/session"
 )
@@ -14,7 +16,7 @@ func TestRegisterAPI(t *testing.T) {
 
 	// Create session manager for testing
 	store := session.NewInMemoryStore()
-	sm := session.NewSessionManager(store, 30*60*1000000000, 60*60*1000000000, 12*60*60*1000000000, "session_id")
+	sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
 	handler := sm.Handle(mux)
 
 	t.Run("GET /api/me returns unauthenticated for new session", func(t *testing.T) {
@@ -51,10 +53,5 @@ func TestRegisterAPI(t *testing.T) {
 }
 
 func containsString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(s, substr)
 }
