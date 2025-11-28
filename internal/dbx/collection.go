@@ -42,17 +42,23 @@ func (d *DB) CreateCollection(ctx context.Context, userID int64, name string, de
 	// a corresponding data table is created in the database
 	if err := d.createCollectionDataTable(ctx, c.ID); err != nil {
 		// If table creation fails, we should delete the collection to maintain consistency
-		// This is a best-effort cleanup
-		_ = d.DeleteCollection(ctx, c.ID, userID)
+		// Use direct delete to avoid potential recursion through DeleteCollection
+		deleteQuery := MustQuery("delete_collection.sql")
+		_, _ = d.DBX.NamedExecContext(ctx, deleteQuery, map[string]interface{}{
+			"id":      c.ID,
+			"user_id": userID,
+		})
 		return nil, fmt.Errorf("failed to create collection data table: %w", err)
 	}
 
 	return &c, nil
 }
 
-// createCollectionDataTable creates a data table for a specific collection
+// createCollectionDataTable creates a data table for a specific collection.
+// collectionID is validated as an int64 which prevents SQL injection when used with fmt.Sprintf.
 func (d *DB) createCollectionDataTable(ctx context.Context, collectionID int64) error {
 	queryTemplate := MustQuery("create_collection_table.sql")
+	// Safe: collectionID is int64, which cannot contain SQL injection characters
 	query := fmt.Sprintf(queryTemplate, collectionID)
 
 	_, err := d.DBX.ExecContext(ctx, query)
@@ -148,9 +154,11 @@ func (d *DB) DeleteCollection(ctx context.Context, id int64, userID int64) error
 	return err
 }
 
-// dropCollectionDataTable drops the data table for a specific collection
+// dropCollectionDataTable drops the data table for a specific collection.
+// collectionID is validated as an int64 which prevents SQL injection when used with fmt.Sprintf.
 func (d *DB) dropCollectionDataTable(ctx context.Context, collectionID int64) error {
 	queryTemplate := MustQuery("drop_collection_table.sql")
+	// Safe: collectionID is int64, which cannot contain SQL injection characters
 	query := fmt.Sprintf(queryTemplate, collectionID)
 
 	_, err := d.DBX.ExecContext(ctx, query)
