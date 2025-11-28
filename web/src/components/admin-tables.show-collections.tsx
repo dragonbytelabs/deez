@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { createSignal, For, Show, type Component } from "solid-js";
+import { For, Show, type Component } from "solid-js";
 
 const sidebar = css`
   width: 270px;
@@ -13,30 +13,6 @@ const sidebar = css`
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--gray700);
-  }
-`;
-
-const searchBox = css`
-  padding: 16px;
-  border-bottom: 1px solid var(--gray700);
-`;
-
-const searchInput = css`
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--gray700);
-  border: 1px solid var(--gray600);
-  border-radius: 8px;
-  color: var(--white);
-  font-size: 14px;
-  
-  &::placeholder {
-    color: var(--gray500);
-  }
-  
-  &:focus {
-    outline: none;
-    border-color: var(--primary);
   }
 `;
 
@@ -91,32 +67,6 @@ const collectionName = css`
   text-overflow: ellipsis;
 `;
 
-const footer = css`
-  padding: 16px;
-  border-top: 1px solid var(--gray700);
-`;
-
-const newCollectionButton = css`
-  width: 100%;
-  padding: 10px 16px;
-  background: transparent;
-  border: 1px solid var(--gray600);
-  border-radius: 8px;
-  color: var(--white);
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: var(--gray700);
-    border-color: var(--primary);
-  }
-`;
-
 const loading = css`
   text-align: center;
   padding: 20px;
@@ -132,28 +82,9 @@ interface ShowCollectionsProps {
 }
 
 export const ShowCollections: Component<ShowCollectionsProps> = (props) => {
-  const [searchTerm, setSearchTerm] = createSignal("");
-
-  const filteredCollections = () => {
-    const term = searchTerm().toLowerCase();
-    if (!term) return props.collections;
-    return props.collections.filter(name => 
-      name.toLowerCase().includes(term)
-    );
-  };
 
   return (
     <div class={sidebar}>
-      <div class={searchBox}>
-        <input
-          type="text"
-          class={searchInput}
-          placeholder="Search collections..."
-          value={searchTerm()}
-          onInput={(e) => setSearchTerm(e.currentTarget.value)}
-        />
-      </div>
-
       <div class={collectionsHeader}>
         Collections
       </div>
@@ -164,7 +95,7 @@ export const ShowCollections: Component<ShowCollectionsProps> = (props) => {
         </Show>
 
         <Show when={!props.isLoading}>
-          <For each={filteredCollections()}>
+          <For each={props.collections}>
             {(collection) => (
               <div
                 class={collectionItem}
@@ -177,19 +108,6 @@ export const ShowCollections: Component<ShowCollectionsProps> = (props) => {
             )}
           </For>
         </Show>
-
-        <Show when={!props.isLoading && filteredCollections().length === 0}>
-          <div class={loading}>
-            {searchTerm() ? "No collections found" : "No collections"}
-          </div>
-        </Show>
-      </div>
-
-      <div class={footer}>
-        <button class={newCollectionButton}>
-          <span>+</span>
-          <span>New collection</span>
-        </button>
       </div>
     </div>
   );
