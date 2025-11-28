@@ -137,12 +137,12 @@ const popupMenuItem = css`
   }
 `;
 
-interface SidebarProps {
+interface SidebarFooterProps {
     isOpen: boolean;
     user: UserInfo | null;
 }
 
-export const SidebarFooter: Component<SidebarProps> = (props) => {
+export const SidebarFooter: Component<SidebarFooterProps> = (props) => {
     const [showUserMenu, setShowUserMenu] = createSignal(false);
     const navigate = useNavigate();
 

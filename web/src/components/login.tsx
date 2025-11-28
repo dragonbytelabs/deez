@@ -1,6 +1,7 @@
 import { css } from "@linaria/core";
 import { createSignal, Show } from "solid-js";
 import { api } from "../server/api";
+import { useNavigate } from "@solidjs/router";
 
 const container = css`
   display: flex;
@@ -77,6 +78,7 @@ export default function LoginWithSocials() {
 	const [email, setEmail] = createSignal("");
 	const [password, setPassword] = createSignal("");
 	const [error, setError] = createSignal("");
+	const navigate = useNavigate();
 
 	const isValidEmail = (email: string): boolean => {
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -103,7 +105,7 @@ export default function LoginWithSocials() {
 			const data = await response.json();
 			console.log("Login successful:", data);
 			if (data.redirect) {
-				window.location.href = data.redirect; // Redirect to home page
+				navigate(data.redirect);
 			}
 		} else {
 			const errorText = await response.text();

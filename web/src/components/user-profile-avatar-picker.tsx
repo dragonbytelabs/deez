@@ -1,11 +1,11 @@
 import { css } from "@linaria/core";
 import {
-    type Accessor,
-    type Component,
-    createSignal,
-    For,
-    type Setter,
-    Show,
+	type Accessor,
+	type Component,
+	createSignal,
+	For,
+	type Setter,
+	Show,
 } from "solid-js";
 import { UserUploadAvatar } from "./user-avatar.upload";
 
@@ -190,21 +190,21 @@ const submitButton = css`
 
 // Define the 9 avatar options with animal emojis and background colors
 const avatarOptions = [
-    { emoji: "🐶", backgroundColor: "#4CAF50" }, // Dog - Green
-    { emoji: "🐱", backgroundColor: "#E91E63" }, // Cat - Pink
-    { emoji: "🦊", backgroundColor: "#FF5722" }, // Fox - Deep Orange
-    { emoji: "🐻", backgroundColor: "#795548" }, // Bear - Brown
-    { emoji: "🐼", backgroundColor: "#607D8B" }, // Panda - Blue Grey
-    { emoji: "🦁", backgroundColor: "#FF9800" }, // Lion - Orange
-    { emoji: "🐸", backgroundColor: "#8BC34A" }, // Frog - Light Green
-    { emoji: "🦉", backgroundColor: "#9C27B0" }, // Owl - Purple
-    { emoji: "🐧", backgroundColor: "#00BCD4" }, // Penguin - Cyan
+	{ emoji: "🐶", backgroundColor: "#4CAF50" }, // Dog - Green
+	{ emoji: "🐱", backgroundColor: "#E91E63" }, // Cat - Pink
+	{ emoji: "🦊", backgroundColor: "#FF5722" }, // Fox - Deep Orange
+	{ emoji: "🐻", backgroundColor: "#795548" }, // Bear - Brown
+	{ emoji: "🐼", backgroundColor: "#607D8B" }, // Panda - Blue Grey
+	{ emoji: "🦁", backgroundColor: "#FF9800" }, // Lion - Orange
+	{ emoji: "🐸", backgroundColor: "#8BC34A" }, // Frog - Light Green
+	{ emoji: "🦉", backgroundColor: "#9C27B0" }, // Owl - Purple
+	{ emoji: "🐧", backgroundColor: "#00BCD4" }, // Penguin - Cyan
 ];
 
 interface AvatarPickerProps {
-    isOpen: Accessor<boolean>;
-    setIsOpen: Setter<boolean>;
-    onAvatarSave: (avatarUrl: string) => void;
+	isOpen: Accessor<boolean>;
+	setIsOpen: Setter<boolean>;
+	onAvatarSave: (avatarUrl: string) => void;
 }
 
 export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
@@ -235,23 +235,31 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 			.replace(/"/g, "&quot;")
 			.replace(/'/g, "&apos;");
 	};
+	// Helper function to properly encode UTF-8 strings to base64
+	const utf8ToBase64 = (str: string): string => {
+		// Convert string to UTF-8 bytes, then to base64
+		const bytes = new TextEncoder().encode(str);
+		let binary = '';
+		bytes.forEach(byte => binary += String.fromCharCode(byte));
+		return btoa(binary);
+	};
 
-    const generateAvatarSvg = (
-        emoji: string,
-        backgroundColor: string,
-    ): string => {
-        const safeEmoji = escapeXml(emoji);
-        const safeColor = escapeXml(backgroundColor);
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+	const generateAvatarSvg = (
+		emoji: string,
+		backgroundColor: string,
+	): string => {
+		const safeEmoji = escapeXml(emoji);
+		const safeColor = escapeXml(backgroundColor);
+		const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
   <circle cx="50" cy="50" r="50" fill="${safeColor}"/>
   <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-size="50">${safeEmoji}</text>
 </svg>`;
-        const encoded = btoa(svg);
-        return `data:image/svg+xml;base64,${encoded}`;
-    };
+		const encoded = utf8ToBase64(svg);
+		return `data:image/svg+xml;base64,${encoded}`;
+	};
 
-    const handleSubmit = async (e: Event) => {
-        e.preventDefault();
+	const handleSubmit = async (e: Event) => {
+		e.preventDefault();
 
 		const customUrl = customImageUrl();
 		const selected = selectedIndex();
@@ -259,7 +267,7 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 		// Need either a custom image or a selected premade avatar
 		if (customUrl === null && selected === null) return;
 
-        setIsSaving(true);
+		setIsSaving(true);
 
 		let avatarUrl: string;
 		if (customUrl !== null) {
@@ -269,20 +277,20 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
 			avatarUrl = generateAvatarSvg(option.emoji, option.backgroundColor);
 		}
 
-        try {
-            await props.onAvatarSave(avatarUrl);
-            handleClose();
-        } catch (error) {
-            console.error("Failed to save avatar:", error);
-        } finally {
-            setIsSaving(false);
-        }
-    };
+		try {
+			await props.onAvatarSave(avatarUrl);
+			handleClose();
+		} catch (error) {
+			console.error("Failed to save avatar:", error);
+		} finally {
+			setIsSaving(false);
+		}
+	};
 
-    const selectedOption = () => {
-        const idx = selectedIndex();
-        return idx !== null ? avatarOptions[idx] : null;
-    };
+	const selectedOption = () => {
+		const idx = selectedIndex();
+		return idx !== null ? avatarOptions[idx] : null;
+	};
 
 	const hasSelection = () => {
 		return customImageUrl() !== null || selectedIndex() !== null;
@@ -299,14 +307,14 @@ export const AvatarPicker: Component<AvatarPickerProps> = (props) => {
     onKeyDown={(e) => e.key === "Escape" && handleClose()}
 />
 
-            {/* Slide-in Panel */}
-            <div class={`${modalPanel} open`}>
-                <div class={modalHeader}>
-                    <h2 class={modalTitle}>Choose Your Avatar</h2>
-                    <button class={closeButton} onClick={handleClose} type="button">
-                        ✕
-                    </button>
-                </div>
+			{/* Slide-in Panel */}
+			<div class={`${modalPanel} open`}>
+				<div class={modalHeader}>
+					<h2 class={modalTitle}>Choose Your Avatar</h2>
+					<button class={closeButton} onClick={handleClose} type="button">
+						✕
+					</button>
+				</div>
 
 				<form onSubmit={handleSubmit}>
 					<div class={modalBody}>
