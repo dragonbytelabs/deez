@@ -39,3 +39,11 @@ describe("Register Component", () => {
 		expect(typeof Register).toBe("function");
 	});
 });
+
+describe("AdminOnboarding Component", () => {
+	it("should export an AdminOnboarding component", async () => {
+		const { AdminOnboarding } = await import("../admin-onboarding");
+		expect(AdminOnboarding).toBeDefined();
+		expect(typeof AdminOnboarding).toBe("function");
+	});
+});

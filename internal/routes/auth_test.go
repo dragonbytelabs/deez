@@ -113,4 +113,22 @@ func TestRegisterAuth(t *testing.T) {
 			t.Errorf("POST /api/logout body should contain success:true, got %v", body)
 		}
 	})
+
+	t.Run("POST /api/register with valid data redirects to onboarding", func(t *testing.T) {
+		body := strings.NewReader(`{"email":"newuser@example.com","password":"password123","confirmPassword":"password123"}`)
+		req := httptest.NewRequest("POST", "/api/register", body)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("POST /api/register status = %v, want %v", rec.Code, http.StatusOK)
+		}
+
+		responseBody := rec.Body.String()
+		if !strings.Contains(responseBody, `"redirect":"/_/admin/onboarding"`) {
+			t.Errorf("POST /api/register should redirect to onboarding, got %v", responseBody)
+		}
+	})
 }

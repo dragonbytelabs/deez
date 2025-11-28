@@ -78,7 +78,7 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":  true,
-			"redirect": "/login",
+			"redirect": "/_/admin/onboarding",
 		})
 	})
 
