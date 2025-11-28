@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CollectionField, FIELD_TYPES, isValidFieldName } from "../components/admin-tables.create-collection.modal";
+import { type CollectionField, FIELD_TYPES, isValidFieldName } from "../components/admin-tables.create-collection.modal";
 
 describe("CreateCollectionModal", () => {
 	describe("Collection Name Validation", () => {

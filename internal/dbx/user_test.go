@@ -167,6 +167,50 @@ func TestDB_UpdateUserAvatar(t *testing.T) {
 	})
 }
 
+func TestDB_UpdateUserEmail(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	// Create a user first
+	hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
+	user, err := db.CreateUser(ctx, "email@example.com", string(hash), "Email User")
+	if err != nil {
+		t.Fatalf("CreateUser() returned error: %v", err)
+	}
+
+	t.Run("updates email successfully", func(t *testing.T) {
+		newEmail := "newemail@example.com"
+		updatedUser, err := db.UpdateUserEmail(ctx, user.UserHash, newEmail)
+		if err != nil {
+			t.Fatalf("UpdateUserEmail() returned error: %v", err)
+		}
+
+		if updatedUser == nil {
+			t.Fatal("UpdateUserEmail() returned nil user")
+		}
+		if updatedUser.Email != newEmail {
+			t.Errorf("UpdateUserEmail() user.Email = %v, want %v", updatedUser.Email, newEmail)
+		}
+	})
+
+	t.Run("fails on duplicate email", func(t *testing.T) {
+		// Create another user
+		hash2, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
+		_, err := db.CreateUser(ctx, "existing@example.com", string(hash2), "Existing User")
+		if err != nil {
+			t.Fatalf("CreateUser() returned error: %v", err)
+		}
+
+		// Try to update the first user's email to the existing one
+		_, err = db.UpdateUserEmail(ctx, user.UserHash, "existing@example.com")
+		if err == nil {
+			t.Error("UpdateUserEmail() should fail on duplicate email")
+		}
+	})
+}
+
 func TestGenerateInitialAvatar(t *testing.T) {
 	tests := []struct {
 		name         string
