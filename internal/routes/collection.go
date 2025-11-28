@@ -60,6 +60,10 @@ func RegisterCollection(mux *http.ServeMux, db *dbx.DB) {
 		collection, err := db.CreateCollection(r.Context(), userID, in.Name, in.Description)
 		if err != nil {
 			log.Printf("CreateCollection: error creating collection: %v", err)
+			if err == dbx.ErrDuplicateCollectionName {
+				http.Error(w, "collection with this name already exists", http.StatusConflict)
+				return
+			}
 			http.Error(w, "could not create collection", http.StatusInternalServerError)
 			return
 		}

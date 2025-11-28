@@ -2,8 +2,14 @@ package dbx
 
 import (
 	"context"
+	"errors"
+	"strings"
+
 	"dragonbytelabs/dz/internal/models"
 )
+
+// ErrDuplicateCollectionName is returned when a collection name already exists for the user
+var ErrDuplicateCollectionName = errors.New("collection with this name already exists")
 
 // CreateCollection creates a new collection for a user
 func (d *DB) CreateCollection(ctx context.Context, userID int64, name string, description *string) (*models.Collection, error) {
@@ -23,6 +29,10 @@ func (d *DB) CreateCollection(ctx context.Context, userID int64, name string, de
 	}
 
 	if err := stmt.GetContext(ctx, &c, args); err != nil {
+		// Check for unique constraint violation
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return nil, ErrDuplicateCollectionName
+		}
 		return nil, err
 	}
 	return &c, nil
@@ -64,7 +74,7 @@ func (d *DB) GetCollectionsByUser(ctx context.Context, userID int64) ([]models.C
 	}
 	defer rows.Close()
 
-	var collections []models.Collection
+	collections := make([]models.Collection, 0, 10) // Pre-allocate with reasonable capacity
 	for rows.Next() {
 		var c models.Collection
 		if err := rows.StructScan(&c); err != nil {
