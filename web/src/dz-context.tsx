@@ -5,14 +5,6 @@ import type { UserInfo } from "./server/api";
 // Define the shape of your app state
 export interface DzStore {
   user: UserInfo | null;
-  notifications: Array<{
-    id: string;
-    type: "success" | "error" | "info" | "warning";
-    message: string;
-    timestamp: number;
-  }>;
-  posts: Array<any>; // Define post type later
-  comments: Record<string, Array<any>>; // Comments by post ID
   settings: {
     theme: "dark" | "light";
     sidebarOpen: boolean;
@@ -22,9 +14,6 @@ export interface DzStore {
 // Initial state
 const initialState: DzStore = {
   user: null,
-  notifications: [],
-  posts: [],
-  comments: {},
   settings: {
     theme: "dark",
     sidebarOpen: true,
@@ -39,12 +28,6 @@ interface DzContextType {
     setUser: (user: UserInfo | null) => void;
     updateUserAvatar: (avatarUrl: string) => void;
     updateUserDisplayName: (displayName: string) => void;
-    addNotification: (
-      type: DzStore["notifications"][0]["type"],
-      message: string
-    ) => void;
-    removeNotification: (id: string) => void;
-    clearNotifications: () => void;
     toggleSidebar: () => void;
     setSidebarOpen: (open: boolean) => void;
     setTheme: (theme: "dark" | "light") => void;
@@ -61,7 +44,9 @@ export const DzProvider: ParentComponent = (props) => {
   // Actions for common operations
   const actions = {
     setUser: (user: UserInfo | null) => {
-      setStore("user", user);
+      setStore(produce((draft) => {
+        draft.user = user;
+      }));
     },
 
     updateUserAvatar: (avatarUrl: string) => {
@@ -84,43 +69,6 @@ export const DzProvider: ParentComponent = (props) => {
       );
     },
 
-    addNotification: (
-      type: DzStore["notifications"][0]["type"],
-      message: string
-    ) => {
-      const id = `notif-${Date.now()}-${Math.random()}`;
-      setStore(
-        produce((draft) => {
-          draft.notifications.push({
-            id,
-            type,
-            message,
-            timestamp: Date.now(),
-          });
-        })
-      );
-
-      // Auto-remove after 5 seconds
-      setTimeout(() => {
-        actions.removeNotification(id);
-      }, 5000);
-    },
-
-    removeNotification: (id: string) => {
-      setStore(
-        produce((draft) => {
-          const index = draft.notifications.findIndex((n) => n.id === id);
-          if (index !== -1) {
-            draft.notifications.splice(index, 1);
-          }
-        })
-      );
-    },
-
-    clearNotifications: () => {
-      setStore("notifications", []);
-    },
-
     toggleSidebar: () => {
       setStore(
         produce((draft) => {
@@ -130,11 +78,20 @@ export const DzProvider: ParentComponent = (props) => {
     },
 
     setSidebarOpen: (open: boolean) => {
-      setStore("settings", "sidebarOpen", open);
+      setStore(
+        produce((draft) => {
+          draft.settings.sidebarOpen = open;
+        })
+      );
+
     },
 
     setTheme: (theme: "dark" | "light") => {
-      setStore("settings", "theme", theme);
+      setStore(
+        produce((draft) => {
+          draft.settings.theme = theme;
+        })
+      );
     },
   };
 
@@ -162,18 +119,13 @@ export const useDz = () => {
 
 // Convenience hooks for specific parts of state
 export const useDzUser = () => {
-  const { store } = useDz();
-  return store.user;
-};
-
-export const useDzNotifications = () => {
   const { store, actions } = useDz();
   return {
-    notifications: store.notifications,
-    addNotification: actions.addNotification,
-    removeNotification: actions.removeNotification,
-    clearNotifications: actions.clearNotifications,
-  };
+    user: store.user,
+    updateUser: actions.setUser,
+    updateUserAvatar: actions.updateUserAvatar,
+    updateUserDisplayName: actions.updateUserDisplayName,
+  }
 };
 
 export const useDzSettings = () => {
