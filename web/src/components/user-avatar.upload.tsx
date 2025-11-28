@@ -1,6 +1,14 @@
 import { css } from "@linaria/core";
 import { type Component, createSignal } from "solid-js";
 
+const VALID_IMAGE_TYPES = [
+	"image/jpeg",
+	"image/png",
+	"image/gif",
+	"image/webp",
+];
+const ACCEPT_ATTRIBUTE = VALID_IMAGE_TYPES.join(",");
+
 const uploadSection = css`
   margin-top: 24px;
   padding-top: 24px;
@@ -64,8 +72,7 @@ export const UserUploadAvatar: Component<UserUploadAvatarProps> = (props) => {
 		}
 
 		// Validate file type
-		const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-		if (!validTypes.includes(file.type)) {
+		if (!VALID_IMAGE_TYPES.includes(file.type)) {
 			setError("Please select a valid image file (JPEG, PNG, GIF, or WebP)");
 			return;
 		}
@@ -101,7 +108,7 @@ export const UserUploadAvatar: Component<UserUploadAvatarProps> = (props) => {
 			<input
 				ref={fileInputRef}
 				type="file"
-				accept="image/jpeg,image/png,image/gif,image/webp"
+				accept={ACCEPT_ATTRIBUTE}
 				class={hiddenInput}
 				onChange={handleFileChange}
 			/>
