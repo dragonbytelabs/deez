@@ -8,9 +8,9 @@ export const GuestRoute: Component<{ component: Component }> = (props) => {
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
 
 	onMount(async () => {
-		const authenticated = await api.me();
-		setIsAuthenticated(authenticated);
-		if (authenticated) {
+		const result = await api.me();
+		setIsAuthenticated(result.authenticated);
+		if (result.authenticated) {
 			navigate("/", { replace: true });
 		}
 	});
