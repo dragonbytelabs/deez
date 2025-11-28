@@ -8,6 +8,7 @@ import (
 
 type User struct {
 	ID           int64      `db:"id" json:"id"`
+	UserHash     string     `db:"user_hash" json:"user_hash"`
 	Email        string     `db:"email" json:"email"`
 	PasswordHash string     `db:"password_hash" json:"-"`
 	DisplayName  *string    `db:"display_name" json:"display_name,omitempty"`
