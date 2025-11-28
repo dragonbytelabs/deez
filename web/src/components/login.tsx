@@ -94,7 +94,7 @@ export default function LoginWithSocials() {
 		}
 
 		// Build body the same way <form> would
-		console.log("Username signal:", email());
+		console.log("Email signal:", email());
 		console.log("Password signal:", password());
 		const response = await api.login(email(), password());
 		console.log("Submitting login:", email(), password());

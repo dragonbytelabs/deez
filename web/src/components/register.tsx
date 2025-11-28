@@ -94,7 +94,7 @@ export default function RegisterForm() {
 			return;
 		}
 
-		console.log("Username signal:", email());
+		console.log("Email signal:", email());
 		console.log("Password signal:", password());
 		const response = await api.register(email(), password(), confirmPassword());
 
