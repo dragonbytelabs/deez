@@ -64,6 +64,87 @@ func TestIsGitURL(t *testing.T) {
 	}
 }
 
+func TestValidateGitURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		url       string
+		expectErr bool
+	}{
+		{
+			name:      "valid https URL",
+			url:       "https://github.com/user/repo.git",
+			expectErr: false,
+		},
+		{
+			name:      "valid http URL",
+			url:       "http://github.com/user/repo",
+			expectErr: false,
+		},
+		{
+			name:      "valid git@ URL",
+			url:       "git@github.com:user/repo.git",
+			expectErr: false,
+		},
+		{
+			name:      "valid git:// URL",
+			url:       "git://github.com/user/repo.git",
+			expectErr: false,
+		},
+		{
+			name:      "URL with semicolon - command injection",
+			url:       "https://github.com/user/repo; rm -rf /",
+			expectErr: true,
+		},
+		{
+			name:      "URL with pipe - command injection",
+			url:       "https://github.com/user/repo | cat /etc/passwd",
+			expectErr: true,
+		},
+		{
+			name:      "URL with ampersand - command injection",
+			url:       "https://github.com/user/repo && malicious",
+			expectErr: true,
+		},
+		{
+			name:      "URL with dollar sign",
+			url:       "https://github.com/user/$HOME",
+			expectErr: true,
+		},
+		{
+			name:      "URL with backticks",
+			url:       "https://github.com/user/`whoami`",
+			expectErr: true,
+		},
+		{
+			name:      "URL with newline",
+			url:       "https://github.com/user/repo\nmalicious",
+			expectErr: true,
+		},
+		{
+			name:      "invalid prefix",
+			url:       "ftp://github.com/user/repo",
+			expectErr: true,
+		},
+		{
+			name:      "local path as URL",
+			url:       "/home/user/repo",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateGitURL(tt.url)
+			if tt.expectErr && err == nil {
+				t.Errorf("validateGitURL(%q) expected error, got nil", tt.url)
+			}
+			if !tt.expectErr && err != nil {
+				t.Errorf("validateGitURL(%q) unexpected error: %v", tt.url, err)
+			}
+		})
+	}
+}
+
 func TestExtractThemeName(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -104,8 +104,39 @@ func isGitURL(source string) bool {
 		strings.HasSuffix(source, ".git")
 }
 
+// validateGitURL validates the git URL to prevent command injection
+func validateGitURL(url string) error {
+	// Check for shell metacharacters that could be used for injection
+	dangerousChars := []string{";", "|", "&", "$", "`", "(", ")", "{", "}", "<", ">", "!", "\\", "'", "\"", "\n", "\r"}
+	for _, char := range dangerousChars {
+		if strings.Contains(url, char) {
+			return fmt.Errorf("invalid URL: contains disallowed character %q", char)
+		}
+	}
+
+	// Ensure URL starts with an expected prefix for git URLs
+	validPrefixes := []string{"https://", "http://", "git@", "git://"}
+	hasValidPrefix := false
+	for _, prefix := range validPrefixes {
+		if strings.HasPrefix(url, prefix) {
+			hasValidPrefix = true
+			break
+		}
+	}
+	if !hasValidPrefix {
+		return fmt.Errorf("invalid URL: must start with https://, http://, git@, or git://")
+	}
+
+	return nil
+}
+
 // cloneTheme clones a theme from a git URL
 func cloneTheme(url string, themesPath string) error {
+	// Validate URL to prevent command injection
+	if err := validateGitURL(url); err != nil {
+		return err
+	}
+
 	// Extract theme name from URL
 	themeName := extractThemeName(url)
 	if themeName == "" {
@@ -139,7 +170,9 @@ func cloneTheme(url string, themesPath string) error {
 	indexPath := filepath.Join(destPath, "index.html")
 	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
 		// Clean up invalid theme
-		os.RemoveAll(destPath)
+		if cleanupErr := os.RemoveAll(destPath); cleanupErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to clean up invalid theme directory %s: %v\n", destPath, cleanupErr)
+		}
 		return fmt.Errorf("invalid theme: missing index.html")
 	}
 
@@ -196,7 +229,9 @@ func copyTheme(source string, themesPath string) error {
 	// Copy directory recursively
 	if err := copyDir(source, destPath); err != nil {
 		// Clean up on error
-		os.RemoveAll(destPath)
+		if cleanupErr := os.RemoveAll(destPath); cleanupErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to clean up theme directory %s: %v\n", destPath, cleanupErr)
+		}
 		return fmt.Errorf("failed to copy theme: %w", err)
 	}
 
