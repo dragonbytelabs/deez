@@ -34,6 +34,7 @@ dz_content/
 # Go binaries
 server
 dz
+cli
 
 # Coverage output
 coverage/
