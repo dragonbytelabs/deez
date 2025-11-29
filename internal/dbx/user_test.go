@@ -210,6 +210,49 @@ func TestDB_UpdateUserEmail(t *testing.T) {
 		}
 	})
 }
+func TestDB_UpdateUserDisplayName(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	// Create a user first
+	hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
+	user, err := db.CreateUser(ctx, "email@example.com", string(hash), "Email User")
+	if err != nil {
+		t.Fatalf("CreateUser() returned error: %v", err)
+	}
+
+	t.Run("updates display name successfully", func(t *testing.T) {
+		newDisplayName := "Updated Name"
+		updatedUser, err := db.UpdateUserDisplayName(ctx, user.UserHash, newDisplayName)
+		if err != nil {
+			t.Fatalf("UpdateUserDisplayName() returned error: %v", err)
+		}
+
+		if updatedUser == nil {
+			t.Fatal("UpdateUserDisplayName() returned nil user")
+		}
+		if updatedUser.DisplayName == nil || *updatedUser.DisplayName != newDisplayName {
+			t.Errorf("UpdateUserDisplayName() user.DisplayName = %v, want %v", updatedUser.DisplayName, newDisplayName)
+		}
+	})
+
+	t.Run("preserves other user fields", func(t *testing.T) {
+		newDisplayName := "Another Name"
+		updatedUser, err := db.UpdateUserDisplayName(ctx, user.UserHash, newDisplayName)
+		if err != nil {
+			t.Fatalf("UpdateUserDisplayName() returned error: %v", err)
+		}
+
+		if updatedUser.Email != "email@example.com" {
+			t.Errorf("UpdateUserDisplayName() should preserve email, got %v", updatedUser.Email)
+		}
+		if updatedUser.UserHash != user.UserHash {
+			t.Errorf("UpdateUserDisplayName() should preserve user_hash, got %v", updatedUser.UserHash)
+		}
+	})
+}
 
 func TestGenerateInitialAvatar(t *testing.T) {
 	tests := []struct {

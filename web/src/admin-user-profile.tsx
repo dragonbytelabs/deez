@@ -2,6 +2,7 @@ import { css } from "@linaria/core";
 import { createSignal } from "solid-js";
 import { AvatarPicker } from "./components/user-profile-avatar-picker";
 import { EmailPicker } from "./components/user-profile-email-picker";
+import { DisplayNameEditor } from "./components/user-profile-display-name-editor";
 
 const mainContent = css`
   padding: 40px;
@@ -49,13 +50,14 @@ const button = css`
 export const AdminUserProfile = () => {
 	const [isAvatarPickerOpen, setIsAvatarPickerOpen] = createSignal(false);
 	const [isEmailPickerOpen, setIsEmailPickerOpen] = createSignal(false);
+	const [isDisplayNameEditorOpen, setIsDisplayNameEditorOpen] = createSignal(false);
 
 	const handleUpdateEmail = () => {
 		setIsEmailPickerOpen(true);
 	};
 
 	const handleUpdateDisplayName = () => {
-		console.log("Update display_name clicked");
+		setIsDisplayNameEditorOpen(true);
 	};
 
 	const handleUpdateAvatar = () => {
@@ -84,6 +86,10 @@ export const AdminUserProfile = () => {
 			<EmailPicker
 				isOpen={isEmailPickerOpen}
 				setIsOpen={setIsEmailPickerOpen}
+			/>
+			<DisplayNameEditor
+				isOpen={isDisplayNameEditorOpen}
+				setIsOpen={setIsDisplayNameEditorOpen}
 			/>
 		</main>
 	);

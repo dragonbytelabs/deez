@@ -26,6 +26,7 @@ const routes: Route = {
 	updateEmail: "/api/admin/user/email",
 	media: "/api/media",
 	mediaUpload: "/api/media/upload",
+	updateDisplayName: "/api/admin/user/display-name",
 };
 
 export type UserInfo = {
@@ -189,6 +190,15 @@ const uploadMediaFunc = async (file: File) => {
 const deleteMediaFunc = async (id: number) => {
 	const r = await fetch(`${routes.media}/${id}`, {
 		method: methods.DELETE,
+const updateDisplayNameFunc = async (displayName: string) => {
+	const body = JSON.stringify({ display_name: displayName });
+	console.log("API updateDisplayName called with body:", body);
+	const r = await fetch(routes.updateDisplayName, {
+		method: methods.PUT,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
 		credentials: "include",
 	});
 	return r;
@@ -211,6 +221,7 @@ type ApiRoutes = {
 	getMediaById: (id: number) => Promise<Response>;
 	uploadMedia: (file: File) => Promise<Response>;
 	deleteMedia: (id: number) => Promise<Response>;
+	updateDisplayName: (displayName: string) => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -226,4 +237,5 @@ export const api: ApiRoutes = {
 	getMediaById: getMediaByIdFunc,
 	uploadMedia: uploadMediaFunc,
 	deleteMedia: deleteMediaFunc,
+	updateDisplayName: updateDisplayNameFunc,
 };
