@@ -21,8 +21,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o server cmd/server/main.go
 FROM alpine:3.21
 WORKDIR /app
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and wget for healthcheck
+RUN apk --no-cache add ca-certificates wget
 
 # Copy the binary from builder
 COPY --from=backend-builder /app/server ./server
