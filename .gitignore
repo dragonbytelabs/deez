@@ -29,7 +29,12 @@ tmp
 *.db*
 .env
 uploads/
-dz_content/
+
+# Ignore dz_content except for default theme
+dz_content/*
+!dz_content/themes/
+dz_content/themes/*
+!dz_content/themes/default/
 
 # Go binary
 server
