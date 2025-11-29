@@ -16,6 +16,14 @@ type Config struct {
 	Session  SessionConfig
 	Queries  QueriesConfig
 	Media    MediaConfig
+	Content  ContentConfig
+}
+
+type ContentConfig struct {
+	BasePath    string // Base path for dz_content folder
+	ThemesPath  string // Path to themes folder
+	PluginsPath string // Path to plugins folder
+	UploadsPath string // Path to uploads folder
 }
 
 type AppConfig struct {
@@ -80,6 +88,12 @@ func Load() (*Config, error) {
 			StoragePath: getEnv("MEDIA_STORAGE_PATH", "uploads"),
 			MaxFileSize: getInt64("MEDIA_MAX_FILE_SIZE", 10*1024*1024), // 10MB default
 		},
+		Content: ContentConfig{
+			BasePath:    getEnv("CONTENT_PATH", "dz_content"),
+			ThemesPath:  getEnv("CONTENT_THEMES_PATH", "dz_content/themes"),
+			PluginsPath: getEnv("CONTENT_PLUGINS_PATH", "dz_content/plugins"),
+			UploadsPath: getEnv("CONTENT_UPLOADS_PATH", "dz_content/uploads"),
+		},
 	}
 
 	return cfg, nil
@@ -124,4 +138,15 @@ func MustLoad() *Config {
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
 	return cfg
+}
+
+// EnsureContentFolders creates the dz_content directory structure if it doesn't exist
+func (c *ContentConfig) EnsureContentFolders() error {
+	dirs := []string{c.BasePath, c.ThemesPath, c.PluginsPath, c.UploadsPath}
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+	return nil
 }

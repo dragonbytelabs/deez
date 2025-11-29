@@ -10,15 +10,15 @@ func TestRegisterStatic(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterStatic(mux)
 
-	t.Run("GET / returns index.html", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
+	t.Run("GET /_/admin returns index.html", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_/admin", nil)
 		rec := httptest.NewRecorder()
 
 		mux.ServeHTTP(rec, req)
 
 		// Should return 200 OK
 		if rec.Code != http.StatusOK {
-			t.Errorf("GET / status = %v, want %v", rec.Code, http.StatusOK)
+			t.Errorf("GET /_/admin status = %v, want %v", rec.Code, http.StatusOK)
 		}
 	})
 
@@ -34,15 +34,15 @@ func TestRegisterStatic(t *testing.T) {
 		}
 	})
 
-	t.Run("GET /any-route returns index.html", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/some/random/route", nil)
+	t.Run("GET /_/admin/any-route returns index.html", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_/admin/some/random/route", nil)
 		rec := httptest.NewRecorder()
 
 		mux.ServeHTTP(rec, req)
 
 		// Should return 200 OK (SPA routing)
 		if rec.Code != http.StatusOK {
-			t.Errorf("GET /some/random/route status = %v, want %v", rec.Code, http.StatusOK)
+			t.Errorf("GET /_/admin/some/random/route status = %v, want %v", rec.Code, http.StatusOK)
 		}
 	})
 }

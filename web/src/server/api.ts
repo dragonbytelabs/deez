@@ -27,6 +27,7 @@ const routes: Route = {
 	media: "/api/media",
 	mediaUpload: "/api/media/upload",
 	updateDisplayName: "/api/admin/user/display-name",
+	themes: "/api/themes",
 };
 
 export type UserInfo = {
@@ -55,6 +56,12 @@ export type MediaItem = {
 	url: string;
 	created_at: string;
 	updated_at?: string;
+};
+
+export type ThemeItem = {
+	name: string;
+	path: string;
+	active: boolean;
 };
 
 type MeFuncData = {
@@ -218,6 +225,29 @@ const updateDisplayNameFunc = async (displayName: string) => {
 	return r;
 };
 
+const getThemesFunc = async () => {
+	const response = await fetch(routes.themes, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const activateThemeFunc = async (themeName: string) => {
+	const r = await fetch(`${routes.themes}/${themeName}/activate`, {
+		method: methods.POST,
+		credentials: "include",
+	});
+	return r;
+};
+
+const deactivateThemeFunc = async () => {
+	const r = await fetch(`${routes.themes}/deactivate`, {
+		method: methods.POST,
+		credentials: "include",
+	});
+	return r;
+};
+
 type ApiRoutes = {
 	login: (email: string, password: string) => Promise<Response>;
 	register: (
@@ -236,6 +266,9 @@ type ApiRoutes = {
 	uploadMedia: (file: File) => Promise<Response>;
 	deleteMedia: (id: number) => Promise<Response>;
 	updateDisplayName: (displayName: string) => Promise<Response>;
+	getThemes: () => Promise<Response>;
+	activateTheme: (themeName: string) => Promise<Response>;
+	deactivateTheme: () => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -252,4 +285,7 @@ export const api: ApiRoutes = {
 	uploadMedia: uploadMediaFunc,
 	deleteMedia: deleteMediaFunc,
 	updateDisplayName: updateDisplayNameFunc,
+	getThemes: getThemesFunc,
+	activateTheme: activateThemeFunc,
+	deactivateTheme: deactivateThemeFunc,
 };
