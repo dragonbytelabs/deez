@@ -136,7 +136,7 @@ export const AdminDZForms = () => {
 			if (response.ok) {
 				const data = await response.json();
 				setForms(data.forms || []);
-				// Set the first form (id 0) as current if available
+				// Set the first form as current if available
 				if (data.forms && data.forms.length > 0) {
 					setCurrentForm(data.forms[0]);
 				}
@@ -176,7 +176,7 @@ export const AdminDZForms = () => {
 						<input
 							type="text"
 							class={fieldInput}
-							value={currentForm()?.id?.toString() ?? "0"}
+							value={currentForm()?.id?.toString() ?? ""}
 							disabled
 						/>
 					</div>

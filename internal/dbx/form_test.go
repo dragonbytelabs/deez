@@ -18,7 +18,7 @@ func TestGetAllForms(t *testing.T) {
 
 	// After migrations, should have the default form
 	if len(forms) == 0 {
-		t.Error("GetAllForms() returned empty slice, expected at least one form")
+		t.Fatal("GetAllForms() returned empty slice, expected at least one form")
 	}
 
 	// Check that default form exists with id starting from 1 (SQLite autoincrement)

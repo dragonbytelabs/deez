@@ -8,6 +8,6 @@ CREATE TABLE IF NOT EXISTS dz_forms (
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert initial form with id 0 (first row)
+-- Insert initial default form (first row in the database table)
 INSERT INTO dz_forms (name, description, fields) 
 VALUES ('Default Form', 'The default form created on plugin initialization', '[]');
