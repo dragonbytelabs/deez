@@ -119,10 +119,6 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 		var in struct {
 			Email string `json:"email"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-			http.Error(w, "bad json", http.StatusBadRequest)
-			return
-		}
 
 		if in.Email == "" {
 			http.Error(w, "email is required", http.StatusBadRequest)
@@ -148,6 +144,49 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 
 		// Update the session with the new email
 		sess.Put("email", user.Email)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"user":    user,
+		})
+	})))
+
+	// Update user display name
+	mux.Handle("PUT /api/admin/user/display-name", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess := session.GetSession(r)
+		userID := sess.Get("user_id")
+		if userID == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		var in struct {
+			DisplayName string `json:"display_name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+
+		// Trim whitespace
+		displayName := strings.TrimSpace(in.DisplayName)
+
+		if displayName == "" {
+			http.Error(w, "display_name is required", http.StatusBadRequest)
+			return
+		}
+
+		// Validate display name length (1-50 characters)
+		if len(displayName) > 50 {
+			http.Error(w, "display_name must be 50 characters or less", http.StatusBadRequest)
+			return
+		}
+
+		user, err := db.UpdateUserDisplayName(r.Context(), userID.(string), displayName)
+		if err != nil {
+			http.Error(w, "failed to update display name", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
