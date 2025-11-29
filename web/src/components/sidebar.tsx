@@ -198,6 +198,7 @@ export const Sidebar: Component = () => {
     { title: "Home", icon: "🏠", link: "/_/admin" },
     { title: "Database", icon: "🗄️", link: "/_/admin/tables" },
     { title: "Media", icon: "🖼️", link: "/_/admin/media" },
+    { title: "Appearance", icon: "🎨", link: "/_/admin/appearance" },
     { title: "Settings", icon: "⚙️", link: "/_/admin/settings" },
   ];
 
