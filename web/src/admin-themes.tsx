@@ -322,7 +322,9 @@ export const AdminThemes = () => {
     };
 
     const handlePreview = (themeName: string) => {
-        window.open(`/_/preview/${themeName}`, "_blank");
+        // URL encode the theme name to prevent URL manipulation
+        const encodedName = encodeURIComponent(themeName);
+        window.open(`/_/preview/${encodedName}`, "_blank");
     };
 
     const activeTheme = () => themes().find(t => t.active);

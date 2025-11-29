@@ -134,20 +134,36 @@ func ServeTheme(themesPath string, activeTheme string) http.Handler {
 			path = "/index.html"
 		}
 
-		filePath := filepath.Join(themePath, filepath.Clean(path))
+		// Clean the path and get absolute paths for security comparison
+		cleanPath := filepath.Clean(path)
+		filePath := filepath.Join(themePath, cleanPath)
+
+		// Get absolute paths for robust comparison
+		absThemePath, err := filepath.Abs(themePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		absFilePath, err := filepath.Abs(filePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
 
 		// Security check: ensure path stays within theme directory
-		if !strings.HasPrefix(filePath, themePath) {
+		// Use filepath.Rel to detect path traversal attempts
+		rel, err := filepath.Rel(absThemePath, absFilePath)
+		if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
 			http.NotFound(w, r)
 			return
 		}
 
 		// Check if file exists
-		info, err := os.Stat(filePath)
+		info, err := os.Stat(absFilePath)
 		if err != nil {
 			// If file doesn't exist and it's not an asset, serve index.html for SPA
 			if os.IsNotExist(err) && !hasAssetExtension(path) {
-				http.ServeFile(w, r, filepath.Join(themePath, "index.html"))
+				http.ServeFile(w, r, filepath.Join(absThemePath, "index.html"))
 				return
 			}
 			http.NotFound(w, r)
@@ -156,11 +172,11 @@ func ServeTheme(themesPath string, activeTheme string) http.Handler {
 
 		// If it's a directory, serve index.html from that directory
 		if info.IsDir() {
-			http.ServeFile(w, r, filepath.Join(filePath, "index.html"))
+			http.ServeFile(w, r, filepath.Join(absFilePath, "index.html"))
 			return
 		}
 
-		http.ServeFile(w, r, filePath)
+		http.ServeFile(w, r, absFilePath)
 	})
 }
 
@@ -184,10 +200,38 @@ func hasAssetExtension(path string) bool {
 func ThemePreviewHandler(themesPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		themeName := r.PathValue("name")
+		
+		// Validate theme name - only allow alphanumeric, hyphens, and underscores
+		for _, c := range themeName {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+				http.Error(w, "invalid theme name", http.StatusBadRequest)
+				return
+			}
+		}
+		
 		themePath := filepath.Join(themesPath, themeName)
 
+		// Get absolute paths for security
+		absThemesPath, err := filepath.Abs(themesPath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		absThemePath, err := filepath.Abs(themePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		// Verify theme path is within themes directory
+		rel, err := filepath.Rel(absThemesPath, absThemePath)
+		if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+			http.NotFound(w, r)
+			return
+		}
+
 		// Check theme exists
-		if _, err := os.Stat(themePath); os.IsNotExist(err) {
+		if _, err := os.Stat(absThemePath); os.IsNotExist(err) {
 			http.Error(w, "theme not found", http.StatusNotFound)
 			return
 		}
@@ -198,19 +242,21 @@ func ThemePreviewHandler(themesPath string) http.HandlerFunc {
 			rest = "index.html"
 		}
 
-		filePath := filepath.Join(themePath, filepath.Clean(rest))
+		cleanRest := filepath.Clean(rest)
+		absFilePath := filepath.Join(absThemePath, cleanRest)
 
 		// Security check: ensure path stays within theme directory
-		if !strings.HasPrefix(filePath, themePath) {
+		rel, err = filepath.Rel(absThemePath, absFilePath)
+		if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
 			http.NotFound(w, r)
 			return
 		}
 
 		// Check if file exists
-		info, err := os.Stat(filePath)
+		info, err := os.Stat(absFilePath)
 		if err != nil {
 			if os.IsNotExist(err) && !hasAssetExtension(rest) {
-				http.ServeFile(w, r, filepath.Join(themePath, "index.html"))
+				http.ServeFile(w, r, filepath.Join(absThemePath, "index.html"))
 				return
 			}
 			http.NotFound(w, r)
@@ -218,11 +264,11 @@ func ThemePreviewHandler(themesPath string) http.HandlerFunc {
 		}
 
 		if info.IsDir() {
-			http.ServeFile(w, r, filepath.Join(filePath, "index.html"))
+			http.ServeFile(w, r, filepath.Join(absFilePath, "index.html"))
 			return
 		}
 
-		http.ServeFile(w, r, filePath)
+		http.ServeFile(w, r, absFilePath)
 	}
 }
 

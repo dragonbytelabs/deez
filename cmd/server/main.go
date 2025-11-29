@@ -44,7 +44,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	log.Println("listening on " + addr)
-	log.Fatal(http.ListenAndServe(cfg.Server.Port, handler))
+	log.Fatal(http.ListenAndServe(addr, handler))
 }
 
 func setupDB(cfg config.DatabaseConfig) *dbx.DB {
