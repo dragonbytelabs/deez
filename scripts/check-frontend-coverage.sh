@@ -15,7 +15,7 @@ npx vitest run --coverage --coverage.reporter=text --coverage.reporter=json-summ
 if [ -f coverage/coverage-summary.json ]; then
     # Extract the total lines pct value from the JSON
     # Format: {"total": {"lines":{"total":X,"covered":Y,"skipped":Z,"pct":XX.XX},...
-    TOTAL_COVERAGE=$(sed -n 's/.*"total":\s*{"lines":{[^}]*"pct":\([0-9.]*\).*/\1/p' coverage/coverage-summary.json)
+    TOTAL_COVERAGE=$(sed -n 's/.*"total":[[:space:]]*{"lines":{[^}]*"pct":\([0-9.]*\).*/\1/p' coverage/coverage-summary.json)
     
     # Clean up
     rm -rf coverage
@@ -23,8 +23,8 @@ if [ -f coverage/coverage-summary.json ]; then
     echo "Total line coverage: ${TOTAL_COVERAGE}%"
     echo "Required threshold: ${THRESHOLD}%"
     
-    # Compare using bc for floating point comparison
-    PASS=$(echo "${TOTAL_COVERAGE} >= ${THRESHOLD}" | bc -l)
+    # Compare using awk for floating point comparison (more portable than bc)
+    PASS=$(awk "BEGIN{print(${TOTAL_COVERAGE} >= ${THRESHOLD})}")
     
     if [ "$PASS" -eq 1 ]; then
         echo "✓ Coverage check passed!"

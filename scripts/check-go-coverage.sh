@@ -17,8 +17,8 @@ rm -f coverage.out
 echo "Total coverage: ${TOTAL_COVERAGE}%"
 echo "Required threshold: ${THRESHOLD}%"
 
-# Compare using bc for floating point comparison
-PASS=$(echo "${TOTAL_COVERAGE} >= ${THRESHOLD}" | bc -l)
+# Compare using awk for floating point comparison (more portable than bc)
+PASS=$(awk "BEGIN{print(${TOTAL_COVERAGE} >= ${THRESHOLD})}")
 
 if [ "$PASS" -eq 1 ]; then
     echo "✓ Coverage check passed!"

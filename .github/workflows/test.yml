@@ -54,5 +54,6 @@ jobs:
         run: npm run test
 
       - name: Check frontend coverage
-        run: bash ../scripts/check-frontend-coverage.sh 90
+        working-directory: .
+        run: bash scripts/check-frontend-coverage.sh 90
 
