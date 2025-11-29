@@ -78,3 +78,14 @@ func TestCommandDescriptions(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandUsage(t *testing.T) {
+	// Verify all commands have non-empty usage strings
+	for _, cmd := range commands {
+		t.Run(cmd.Name, func(t *testing.T) {
+			if cmd.Usage == "" {
+				t.Errorf("command %q has empty usage", cmd.Name)
+			}
+		})
+	}
+}
