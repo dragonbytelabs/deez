@@ -8,7 +8,8 @@
 		"build": "tsc -b && vite build",
 		"preview": "vite preview",
 		"test": "npx vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"test:coverage": "npx vitest run --coverage"
 	},
 	"dependencies": {
 		"@linaria/core": "^6.3.0",
@@ -20,6 +21,7 @@
 		"@babel/preset-typescript": "^7.27.1",
 		"@biomejs/biome": "2.0.6",
 		"@solidjs/testing-library": "^0.8.10",
+		"@vitest/coverage-v8": "^4.0.14",
 		"@wyw-in-js/babel-preset": "^0.7.0",
 		"jsdom": "^27.2.0",
 		"typescript": "~5.8.3",
