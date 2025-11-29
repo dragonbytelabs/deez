@@ -245,7 +245,7 @@ func TestDB_UpdateUserDisplayName(t *testing.T) {
 			t.Fatalf("UpdateUserDisplayName() returned error: %v", err)
 		}
 
-		if updatedUser.Email != "displayname@example.com" {
+		if updatedUser.Email != "email@example.com" {
 			t.Errorf("UpdateUserDisplayName() should preserve email, got %v", updatedUser.Email)
 		}
 		if updatedUser.UserHash != user.UserHash {
