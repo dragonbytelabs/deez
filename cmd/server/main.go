@@ -78,6 +78,8 @@ func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, med
 	routes.RegisterAdminUserProfile(mux, db)
 	routes.RegisterCollection(mux, db)
 	routes.RegisterMedia(mux, db, mediaStore, mediaCfg.MaxFileSize)
+	routes.RegisterPlugins(mux, db)
+	routes.RegisterDZForms(mux, db)
 	
 	// Register theme serving at root (after all other routes)
 	routes.RegisterThemeServing(mux, db, contentCfg.ThemesPath)
