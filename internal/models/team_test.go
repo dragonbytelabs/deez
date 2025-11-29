@@ -8,11 +8,13 @@ import (
 func TestTeam_Struct(t *testing.T) {
 	now := time.Now()
 	description := "Test description"
+	avatarURL := "https://example.com/avatar.png"
 
 	team := Team{
 		ID:          1,
 		Name:        "Test Team",
 		Description: &description,
+		AvatarURL:   &avatarURL,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -25,6 +27,9 @@ func TestTeam_Struct(t *testing.T) {
 	}
 	if *team.Description != description {
 		t.Errorf("Team.Description = %v, want %v", *team.Description, description)
+	}
+	if *team.AvatarURL != avatarURL {
+		t.Errorf("Team.AvatarURL = %v, want %v", *team.AvatarURL, avatarURL)
 	}
 	if !team.CreatedAt.Equal(now) {
 		t.Errorf("Team.CreatedAt = %v, want %v", team.CreatedAt, now)
@@ -42,6 +47,9 @@ func TestTeam_NilDescription(t *testing.T) {
 
 	if team.Description != nil {
 		t.Errorf("Team.Description = %v, want nil", team.Description)
+	}
+	if team.AvatarURL != nil {
+		t.Errorf("Team.AvatarURL = %v, want nil", team.AvatarURL)
 	}
 }
 

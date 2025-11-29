@@ -46,7 +46,7 @@ func TestDB_CreateTeam(t *testing.T) {
 	})
 
 	t.Run("creates team with avatar_url", func(t *testing.T) {
-		avatarURL := "https://example.com/avatar.png"
+		avatarURL := "https://example.com/team-avatar.png"
 		team, err := db.CreateTeam(ctx, "Team With Avatar", nil, &avatarURL)
 		if err != nil {
 			t.Fatalf("CreateTeam() returned error: %v", err)
