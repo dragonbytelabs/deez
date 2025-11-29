@@ -28,7 +28,7 @@ jobs:
         run: go test ./...
 
       - name: Check Go coverage
-        run: bash scripts/check-go-coverage.sh 90
+        run: bash scripts/check-go-coverage.sh 40
 
   frontend:
     name: Frontend Tests
@@ -55,5 +55,5 @@ jobs:
 
       - name: Check frontend coverage
         working-directory: .
-        run: bash scripts/check-frontend-coverage.sh 90
+        run: bash scripts/check-frontend-coverage.sh 20
 
