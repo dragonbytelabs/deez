@@ -120,12 +120,15 @@ func RegisterThemes(mux *http.ServeMux, db *dbx.DB, themesPath string) {
 				http.Error(w, "only zip files are allowed", http.StatusBadRequest)
 				return
 			}
-			// Seek back to the beginning
-			if seeker, ok := file.(io.Seeker); ok {
-				if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-					http.Error(w, "error processing file", http.StatusInternalServerError)
-					return
-				}
+			// Seek back to the beginning - file must implement Seeker to continue
+			seeker, ok := file.(io.Seeker)
+			if !ok {
+				http.Error(w, "error processing file", http.StatusInternalServerError)
+				return
+			}
+			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+				http.Error(w, "error processing file", http.StatusInternalServerError)
+				return
 			}
 		}
 
@@ -162,7 +165,7 @@ func RegisterThemes(mux *http.ServeMux, db *dbx.DB, themesPath string) {
 			log.Printf("UploadTheme: error extracting zip: %v", err)
 			// Clean up partial extraction
 			os.RemoveAll(themePath)
-			http.Error(w, "error extracting theme: "+err.Error(), http.StatusBadRequest)
+			http.Error(w, "error extracting theme", http.StatusBadRequest)
 			return
 		}
 
@@ -288,9 +291,17 @@ func extractFile(file *zip.File, destPath string) error {
 
 	// Limit extraction size to prevent zip bombs (100MB per file)
 	const maxFileSize = 100 * 1024 * 1024
-	_, err = io.CopyN(outFile, rc, maxFileSize)
-	if err != nil && err != io.EOF {
+	
+	// Use LimitReader to limit the amount of data copied
+	limitedReader := io.LimitReader(rc, maxFileSize+1)
+	n, err := io.Copy(outFile, limitedReader)
+	if err != nil {
 		return err
+	}
+	
+	// If we read more than maxFileSize, the file is too large
+	if n > maxFileSize {
+		return os.ErrInvalid // File too large
 	}
 
 	return nil
