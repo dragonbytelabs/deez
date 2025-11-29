@@ -1,3 +1,3 @@
-INSERT INTO teams (name, description)
-VALUES (:name, :description)
-RETURNING id, name, description, created_at, updated_at;
+INSERT INTO teams (name, description, avatar_url)
+VALUES (:name, :description, :avatar_url)
+RETURNING id, name, description, avatar_url, created_at, updated_at;
