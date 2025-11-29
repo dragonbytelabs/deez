@@ -71,9 +71,9 @@ const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRou
 				path="/_/admin/onboarding"
 				component={PAdminOnboarding}
 			/>
-			<Route path="/login" component={() => <GuestRoute component={Login} />} />
+			<Route path="/_/admin/login" component={() => <GuestRoute component={Login} />} />
 			<Route
-				path="/register"
+				path="/_/admin/register"
 				component={() => <GuestRoute component={Register} />}
 			/>
 		</Router>

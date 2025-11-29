@@ -15,7 +15,7 @@ func RequireAuth(next http.Handler) http.Handler {
 		userID := sess.Get("user_id")
 		if userID == nil {
 			log.Printf("RequireAuth: user not authenticated, redirecting to login")
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/_/admin/login", http.StatusSeeOther)
 			return
 		}
 
