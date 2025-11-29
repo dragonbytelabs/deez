@@ -27,6 +27,9 @@ jobs:
       - name: Run Go tests
         run: go test ./...
 
+      - name: Check Go coverage
+        run: bash scripts/check-go-coverage.sh 40
+
   frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
@@ -49,3 +52,8 @@ jobs:
 
       - name: Run tests
         run: npm run test
+
+      - name: Check frontend coverage
+        working-directory: .
+        run: bash scripts/check-frontend-coverage.sh 20
+
