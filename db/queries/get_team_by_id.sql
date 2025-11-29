@@ -1,3 +1,3 @@
-SELECT id, name, description, created_at, updated_at
+SELECT id, name, description, avatar_url, created_at, updated_at
 FROM teams
 WHERE id = :id;

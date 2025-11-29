@@ -7,7 +7,7 @@ import (
 )
 
 // CreateTeam creates a new team
-func (d *DB) CreateTeam(ctx context.Context, name string, description *string) (*models.Team, error) {
+func (d *DB) CreateTeam(ctx context.Context, name string, description *string, avatarURL *string) (*models.Team, error) {
 	q := MustQuery("create_team.sql")
 
 	var t models.Team
@@ -20,6 +20,7 @@ func (d *DB) CreateTeam(ctx context.Context, name string, description *string) (
 	args := map[string]any{
 		"name":        name,
 		"description": description,
+		"avatar_url":  avatarURL,
 	}
 
 	if err := stmt.GetContext(ctx, &t, args); err != nil {
@@ -75,7 +76,7 @@ func (d *DB) GetTeamsByUser(ctx context.Context, userID int64) ([]models.Team, e
 }
 
 // UpdateTeam updates an existing team
-func (d *DB) UpdateTeam(ctx context.Context, id int64, name string, description *string) (*models.Team, error) {
+func (d *DB) UpdateTeam(ctx context.Context, id int64, name string, description *string, avatarURL *string) (*models.Team, error) {
 	q := MustQuery("update_team.sql")
 
 	var t models.Team
@@ -89,6 +90,7 @@ func (d *DB) UpdateTeam(ctx context.Context, id int64, name string, description 
 		"id":          id,
 		"name":        name,
 		"description": description,
+		"avatar_url":  avatarURL,
 	}
 
 	if err := stmt.GetContext(ctx, &t, args); err != nil {
