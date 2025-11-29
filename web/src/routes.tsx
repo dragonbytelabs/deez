@@ -6,6 +6,7 @@ import { AdminOnboarding } from "./admin-onboarding";
 import { AdminPlugins } from "./admin-plugins";
 import { AdminSettings } from "./admin-settings";
 import { AdminTables } from "./admin-tables";
+import { AdminThemes } from "./admin-themes";
 import { AdminUserProfile } from "./admin-user-profile";
 import { GuestRoute } from "./components/guest-route";
 import { ProtectedRoute } from "./components/protected-route";
@@ -22,6 +23,7 @@ const PAdminMedia = () => (<ProtectedRoute><AdminMedia/></ProtectedRoute>)
 const PAdminAppearance = () => (<ProtectedRoute><AdminAppearance/></ProtectedRoute>)
 const PAdminSettings = () => (<ProtectedRoute><AdminSettings/></ProtectedRoute>)
 const PAdminPlugins = () => (<ProtectedRoute><AdminPlugins/></ProtectedRoute>)
+const PAdminThemes = () => (<ProtectedRoute><AdminThemes/></ProtectedRoute>)
 const PAdminProfile = () => (<ProtectedRoute><AdminUserProfile/></ProtectedRoute>)
 const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRoute>)
 	return (
@@ -42,6 +44,10 @@ const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRou
 			<Route
 				path="/_/admin/appearance"
 				component={PAdminAppearance}
+			/>
+			<Route
+				path="/_/admin/themes"
+				component={PAdminThemes}
 			/>
 			<Route
 				path="/_/admin/settings"

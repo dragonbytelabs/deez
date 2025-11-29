@@ -29,6 +29,7 @@ tmp
 *.db*
 .env
 uploads/
+dz_content/
 
 # Go binary
 server

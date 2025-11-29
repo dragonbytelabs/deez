@@ -16,6 +16,11 @@ import (
 func main() {
 	cfg := config.MustLoad()
 
+	// Ensure dz_content folder structure exists
+	if err := cfg.Content.EnsureContentFolders(); err != nil {
+		log.Fatal(err)
+	}
+
 	db := setupDB(cfg.Database)
 	defer db.Close()
 
@@ -34,7 +39,7 @@ func main() {
 		cfg.Session.CookieName,
 	)
 	mux := http.NewServeMux()
-	setupRoutes(mux, db, sessionManager, mediaStore, cfg.Media)
+	setupRoutes(mux, db, sessionManager, mediaStore, cfg.Media, cfg.Content)
 	handler := sessionManager.Handle(mux)
 
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
@@ -54,9 +59,18 @@ func setupDB(cfg config.DatabaseConfig) *dbx.DB {
 	return db
 }
 
-func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, mediaStore storage.Store, mediaCfg config.MediaConfig) {
+func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, mediaStore storage.Store, mediaCfg config.MediaConfig, contentCfg config.ContentConfig) {
 	// Register uploads route first to ensure it takes priority over static catch-all
 	routes.ServeMediaFiles(mux, mediaCfg.StoragePath)
+	
+	// Register theme management API routes
+	routes.RegisterThemes(mux, db, contentCfg.ThemesPath)
+	
+	// Register theme preview route
+	mux.Handle("GET /_/preview/{name}/{rest...}", routes.ThemePreviewHandler(contentCfg.ThemesPath))
+	mux.Handle("GET /_/preview/{name}", routes.ThemePreviewHandler(contentCfg.ThemesPath))
+	
+	// Register static files for admin (under /_/ prefix)
 	routes.RegisterStatic(mux)
 	routes.RegisterAPI(mux, db)
 	routes.RegisterAuth(mux, db, sm)
@@ -64,4 +78,7 @@ func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, med
 	routes.RegisterAdminUserProfile(mux, db)
 	routes.RegisterCollection(mux, db)
 	routes.RegisterMedia(mux, db, mediaStore, mediaCfg.MaxFileSize)
+	
+	// Register theme serving at root (after all other routes)
+	routes.RegisterThemeServing(mux, db, contentCfg.ThemesPath)
 }
