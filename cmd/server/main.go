@@ -10,6 +10,7 @@ import (
 	"dragonbytelabs/dz/internal/dbx"
 	"dragonbytelabs/dz/internal/routes"
 	"dragonbytelabs/dz/internal/session"
+	"dragonbytelabs/dz/internal/storage"
 )
 
 func main() {
@@ -17,6 +18,13 @@ func main() {
 
 	db := setupDB(cfg.Database)
 	defer db.Close()
+
+	// Create media storage
+	mediaStore, err := storage.NewLocalStore(cfg.Media.StoragePath, "/uploads")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Create session manager
 	sessionManager := session.NewSessionManager(
 		session.NewSQLiteStore(db),
@@ -26,7 +34,7 @@ func main() {
 		cfg.Session.CookieName,
 	)
 	mux := http.NewServeMux()
-	setupRoutes(mux, db, sessionManager)
+	setupRoutes(mux, db, sessionManager, mediaStore, cfg.Media)
 	handler := sessionManager.Handle(mux)
 
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
@@ -46,11 +54,13 @@ func setupDB(cfg config.DatabaseConfig) *dbx.DB {
 	return db
 }
 
-func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
+func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, mediaStore storage.Store, mediaCfg config.MediaConfig) {
 	routes.RegisterStatic(mux)
 	routes.RegisterAPI(mux, db)
 	routes.RegisterAuth(mux, db, sm)
 	routes.RegisterAdmin(mux, db)
 	routes.RegisterAdminUserProfile(mux, db)
 	routes.RegisterCollection(mux, db)
+	routes.RegisterMedia(mux, db, mediaStore, mediaCfg.MaxFileSize)
+	routes.ServeMediaFiles(mux, mediaCfg.StoragePath)
 }

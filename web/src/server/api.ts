@@ -2,15 +2,17 @@ type Route = {
 	[key: string]: string;
 };
 
-type Method = "GET" | "POST" | "PUT";
+type Method = "GET" | "POST" | "PUT" | "DELETE";
 const MethodGET: Method = "GET";
 const MethodPOST: Method = "POST";
 const MethodPUT: Method = "PUT";
+const MethodDELETE: Method = "DELETE";
 
 const methods = {
 	GET: MethodGET,
 	POST: MethodPOST,
 	PUT: MethodPUT,
+	DELETE: MethodDELETE,
 };
 
 const routes: Route = {
@@ -22,6 +24,8 @@ const routes: Route = {
 	getCollectionByName: "/api/admin/table",
 	updateAvatar: "/api/admin/user/avatar",
 	updateEmail: "/api/admin/user/email",
+	media: "/api/media",
+	mediaUpload: "/api/media/upload",
 	updateDisplayName: "/api/admin/user/display-name",
 };
 
@@ -30,6 +34,20 @@ export type UserInfo = {
 	avatar_url: string;
 	user_id: string;
 	display_name: string;
+};
+
+export type MediaItem = {
+	id: number;
+	user_id: number;
+	filename: string;
+	original_name: string;
+	mime_type: string;
+	size: number;
+	storage_type: string;
+	storage_path: string;
+	url: string;
+	created_at: string;
+	updated_at?: string;
 };
 
 type MeFuncData = {
@@ -144,6 +162,39 @@ const updateEmailFunc = async (email: string) => {
 	return r;
 };
 
+const getMediaFunc = async () => {
+	const response = await fetch(routes.media, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const getMediaByIdFunc = async (id: number) => {
+	const response = await fetch(`${routes.media}/${id}`, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const uploadMediaFunc = async (file: File) => {
+	const formData = new FormData();
+	formData.append("file", file);
+	const r = await fetch(routes.mediaUpload, {
+		method: methods.POST,
+		body: formData,
+		credentials: "include",
+	});
+	return r;
+};
+
+const deleteMediaFunc = async (id: number) => {
+	const r = await fetch(`${routes.media}/${id}`, {
+		method: methods.DELETE,
+		credentials: "include",
+	});
+	return r;
+};
+
 const updateDisplayNameFunc = async (displayName: string) => {
 	const body = JSON.stringify({ display_name: displayName });
 	console.log("API updateDisplayName called with body:", body);
@@ -171,6 +222,10 @@ type ApiRoutes = {
 	getCollectionByName: (tableName: string) => Promise<Response>;
 	updateAvatar: (avatarUrl: string) => Promise<Response>;
 	updateEmail: (email: string) => Promise<Response>;
+	getMedia: () => Promise<Response>;
+	getMediaById: (id: number) => Promise<Response>;
+	uploadMedia: (file: File) => Promise<Response>;
+	deleteMedia: (id: number) => Promise<Response>;
 	updateDisplayName: (displayName: string) => Promise<Response>;
 };
 
@@ -183,5 +238,9 @@ export const api: ApiRoutes = {
 	getCollectionByName: getCollectionByNameFunc,
 	updateAvatar: updateAvatarFunc,
 	updateEmail: updateEmailFunc,
+	getMedia: getMediaFunc,
+	getMediaById: getMediaByIdFunc,
+	uploadMedia: uploadMediaFunc,
+	deleteMedia: deleteMediaFunc,
 	updateDisplayName: updateDisplayNameFunc,
 };

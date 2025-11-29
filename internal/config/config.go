@@ -15,6 +15,7 @@ type Config struct {
 	Database DatabaseConfig
 	Session  SessionConfig
 	Queries  QueriesConfig
+	Media    MediaConfig
 }
 
 type AppConfig struct {
@@ -40,6 +41,11 @@ type SessionConfig struct {
 type QueriesConfig struct {
 	CreateUser     string
 	GetUserByEmail string
+}
+
+type MediaConfig struct {
+	StoragePath string
+	MaxFileSize int64
 }
 
 // Load reads configuration from environment variables and defaults
@@ -70,6 +76,10 @@ func Load() (*Config, error) {
 			CreateUser:     getEnv("QUERY_CREATE_USER", "create_user.sql"),
 			GetUserByEmail: getEnv("QUERY_GET_USER_BY_EMAIL", "get_user_by_email.sql"),
 		},
+		Media: MediaConfig{
+			StoragePath: getEnv("MEDIA_STORAGE_PATH", "uploads"),
+			MaxFileSize: getInt64("MEDIA_MAX_FILE_SIZE", 10*1024*1024), // 10MB default
+		},
 	}
 
 	return cfg, nil
@@ -90,6 +100,19 @@ func getDuration(key string, defaultValue time.Duration) time.Duration {
 			return defaultValue
 		}
 		return duration
+	}
+	return defaultValue
+}
+
+func getInt64(key string, defaultValue int64) int64 {
+	if value := os.Getenv(key); value != "" {
+		var result int64
+		_, err := fmt.Sscanf(value, "%d", &result)
+		if err != nil {
+			log.Printf("Invalid int64 for %s: %v, using default", key, err)
+			return defaultValue
+		}
+		return result
 	}
 	return defaultValue
 }
