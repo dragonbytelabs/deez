@@ -15,7 +15,7 @@ func TestDB_CreateTeam(t *testing.T) {
 
 	t.Run("creates team successfully", func(t *testing.T) {
 		description := "Test Description"
-		team, err := db.CreateTeam(ctx, "Test Team", &description)
+		team, err := db.CreateTeam(ctx, "Test Team", &description, nil)
 		if err != nil {
 			t.Fatalf("CreateTeam() returned error: %v", err)
 		}
@@ -35,13 +35,25 @@ func TestDB_CreateTeam(t *testing.T) {
 	})
 
 	t.Run("creates team without description", func(t *testing.T) {
-		team, err := db.CreateTeam(ctx, "No Description Team", nil)
+		team, err := db.CreateTeam(ctx, "No Description Team", nil, nil)
 		if err != nil {
 			t.Fatalf("CreateTeam() returned error: %v", err)
 		}
 
 		if team.Description != nil {
 			t.Errorf("CreateTeam() team.Description = %v, want nil", team.Description)
+		}
+	})
+
+	t.Run("creates team with avatar_url", func(t *testing.T) {
+		avatarURL := "https://example.com/avatar.png"
+		team, err := db.CreateTeam(ctx, "Team With Avatar", nil, &avatarURL)
+		if err != nil {
+			t.Fatalf("CreateTeam() returned error: %v", err)
+		}
+
+		if team.AvatarURL == nil || *team.AvatarURL != avatarURL {
+			t.Errorf("CreateTeam() team.AvatarURL = %v, want %v", team.AvatarURL, avatarURL)
 		}
 	})
 }
@@ -53,7 +65,7 @@ func TestDB_GetTeamByID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a team
-	team, _ := db.CreateTeam(ctx, "Get By ID Team", nil)
+	team, _ := db.CreateTeam(ctx, "Get By ID Team", nil, nil)
 
 	t.Run("returns team when exists", func(t *testing.T) {
 		result, err := db.GetTeamByID(ctx, team.ID)
@@ -104,9 +116,9 @@ func TestDB_GetTeamsByUser(t *testing.T) {
 
 	t.Run("returns all user teams", func(t *testing.T) {
 		// Create some teams and add user to them
-		team1, _ := db.CreateTeam(ctx, "Team 1", nil)
-		team2, _ := db.CreateTeam(ctx, "Team 2", nil)
-		team3, _ := db.CreateTeam(ctx, "Team 3", nil)
+		team1, _ := db.CreateTeam(ctx, "Team 1", nil, nil)
+		team2, _ := db.CreateTeam(ctx, "Team 2", nil, nil)
+		team3, _ := db.CreateTeam(ctx, "Team 3", nil, nil)
 
 		db.AddTeamMember(ctx, team1.ID, user.ID, "member")
 		db.AddTeamMember(ctx, team2.ID, user.ID, "admin")
@@ -129,11 +141,11 @@ func TestDB_UpdateTeam(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a team
-	team, _ := db.CreateTeam(ctx, "Original Name", nil)
+	team, _ := db.CreateTeam(ctx, "Original Name", nil, nil)
 
 	t.Run("updates team successfully", func(t *testing.T) {
 		newDescription := "New Description"
-		updated, err := db.UpdateTeam(ctx, team.ID, "Updated Name", &newDescription)
+		updated, err := db.UpdateTeam(ctx, team.ID, "Updated Name", &newDescription, nil)
 		if err != nil {
 			t.Fatalf("UpdateTeam() returned error: %v", err)
 		}
@@ -154,7 +166,7 @@ func TestDB_DeleteTeam(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a team
-	team, _ := db.CreateTeam(ctx, "To Delete", nil)
+	team, _ := db.CreateTeam(ctx, "To Delete", nil, nil)
 
 	t.Run("deletes team successfully", func(t *testing.T) {
 		err := db.DeleteTeam(ctx, team.ID)
@@ -186,7 +198,7 @@ func TestDB_AddTeamMember(t *testing.T) {
 	// Create a user and team
 	hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
 	user, _ := db.CreateUser(ctx, "addmember@example.com", string(hash), "Add Member User")
-	team, _ := db.CreateTeam(ctx, "Add Member Team", nil)
+	team, _ := db.CreateTeam(ctx, "Add Member Team", nil, nil)
 
 	t.Run("adds member successfully", func(t *testing.T) {
 		member, err := db.AddTeamMember(ctx, team.ID, user.ID, "admin")
@@ -218,7 +230,7 @@ func TestDB_RemoveTeamMember(t *testing.T) {
 	// Create a user and team
 	hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
 	user, _ := db.CreateUser(ctx, "removemember@example.com", string(hash), "Remove Member User")
-	team, _ := db.CreateTeam(ctx, "Remove Member Team", nil)
+	team, _ := db.CreateTeam(ctx, "Remove Member Team", nil, nil)
 	db.AddTeamMember(ctx, team.ID, user.ID, "member")
 
 	t.Run("removes member successfully", func(t *testing.T) {
@@ -251,7 +263,7 @@ func TestDB_GetTeamMembers(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a team
-	team, _ := db.CreateTeam(ctx, "Members Team", nil)
+	team, _ := db.CreateTeam(ctx, "Members Team", nil, nil)
 
 	t.Run("returns empty slice for team with no members", func(t *testing.T) {
 		members, err := db.GetTeamMembers(ctx, team.ID)

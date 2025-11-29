@@ -29,6 +29,9 @@ export const ProtectedRoute: ParentComponent = (props) => {
 		setIsAuthenticated(result.authenticated);
 		if (result.authenticated && result.user) {
 			actions.setUser(result.user);
+			if (result.teams) {
+				actions.setTeams(result.teams);
+			}
 		}
 		if (!result.authenticated) {
 			navigate("/login", { replace: true });

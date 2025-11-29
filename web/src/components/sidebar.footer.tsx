@@ -1,6 +1,6 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
-import { type Component, Show, createSignal } from "solid-js";
+import { type Component, Show, createSignal, For } from "solid-js";
 import { api } from "../server/api";
 import { useDz } from "../dz-context";
 
@@ -19,7 +19,7 @@ const sidebarFooter = css`
   position: relative;
 `;
 
-const userSection = css`
+const teamSection = css`
   display: flex;
   align-items: center;
   gap: 12px;
@@ -50,7 +50,7 @@ const userSection = css`
   }
 `;
 
-const userAvatar = css`
+const teamAvatar = css`
   width: 40px;
   height: 40px;
   min-width: 40px;
@@ -72,7 +72,7 @@ const userAvatar = css`
   }
 `;
 
-const userName = css`
+const teamName = css`
   color: var(--white);
   font-size: 14px;
   white-space: nowrap;
@@ -144,18 +144,71 @@ const popupMenuItem = css`
   }
 `;
 
+const teamMenuItem = css`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--gray500);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  font-size: 14px;
+  text-align: left;
+  
+  &:hover {
+    background: var(--gray700);
+    color: var(--white);
+  }
+  
+  &.active {
+    background: var(--gray700);
+    color: var(--white);
+  }
+`;
+
+const teamMenuAvatar = css`
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  font-weight: bold;
+  font-size: 10px;
+  text-transform: uppercase;
+  overflow: hidden;
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+const menuDivider = css`
+  height: 1px;
+  background: var(--gray700);
+  margin: 4px 0;
+`;
+
 export const SidebarFooter: Component = () => {
-  const { store } = useDz();
-  const [showUserMenu, setShowUserMenu] = createSignal(false);
+  const { store, actions } = useDz();
+  const [showTeamMenu, setShowTeamMenu] = createSignal(false);
   const navigate = useNavigate();
 
   const toggleMenu = (event: MouseEvent) => {
     event.stopPropagation();
-    setShowUserMenu(!showUserMenu());
+    setShowTeamMenu(!showTeamMenu());
   };
 
   const closeMenu = () => {
-    setShowUserMenu(false);
+    setShowTeamMenu(false);
   };
 
   const logout = async () => {
@@ -193,26 +246,97 @@ export const SidebarFooter: Component = () => {
     logout();
   };
 
-  const getInitials = (displayName: string) => {
-    if (!displayName) return "?";
-    const parts = displayName.split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
+  const handleTeamSelect = (teamId: number) => {
+    const team = store.teams.find((t) => t.id === teamId);
+    if (team) {
+      actions.setCurrentTeam(team);
     }
-    return displayName.substring(0, 2).toUpperCase();
+    closeMenu();
+  };
+
+  const getInitial = (name: string) => {
+    if (!name) return "?";
+    return name.charAt(0).toUpperCase();
   };
 
   return (
     <>
-      <Show when={showUserMenu()}>
+      <Show when={showTeamMenu()}>
         <div class={menuOverlay} onClick={closeMenu} />
       </Show>
 
       <div class={sidebarFooter}>
-        <Show when={store.user}>
+        <Show when={store.currentTeam}>
+          {(team) => (
+            <>
+              <Show when={showTeamMenu()}>
+                <div class={popupMenu}>
+                  <Show when={store.teams.length > 0}>
+                    <For each={store.teams}>
+                      {(t) => (
+                        <button
+                          class={teamMenuItem}
+                          classList={{ active: t.id === team().id }}
+                          onClick={() => handleTeamSelect(t.id)}
+                        >
+                          <span class={teamMenuAvatar}>
+                            <Show
+                              when={t.avatar_url}
+                              fallback={getInitial(t.name)}
+                            >
+                              <img
+                                src={t.avatar_url}
+                                alt={`${t.name} avatar`}
+                              />
+                            </Show>
+                          </span>
+                          <span>{t.name}</span>
+                        </button>
+                      )}
+                    </For>
+                    <div class={menuDivider} />
+                  </Show>
+                  <button
+                    class={popupMenuItem}
+                    onClick={handleProfileClick}
+                  >
+                    <span class={menuIcon}>👤</span>
+                    <span>Profile</span>
+                  </button>
+                  <button
+                    class={popupMenuItem}
+                    onClick={handleLogoutClick}
+                  >
+                    <span class={menuIcon}>🚪</span>
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </Show>
+              <button
+                class={teamSection}
+                onClick={toggleMenu}
+                title={!store.settings.sidebarOpen ? team().name : undefined}
+              >
+                <div class={teamAvatar}>
+                  <Show
+                    when={team().avatar_url}
+                    fallback={getInitial(team().name)}
+                  >
+                    <img
+                      src={team().avatar_url}
+                      alt={`${team().name} avatar`}
+                    />
+                  </Show>
+                </div>
+                <span class={teamName}>{team().name}</span>
+              </button>
+            </>
+          )}
+        </Show>
+        <Show when={!store.currentTeam && store.user}>
           {(user) => (
             <>
-              <Show when={showUserMenu()}>
+              <Show when={showTeamMenu()}>
                 <div class={popupMenu}>
                   <button
                     class={popupMenuItem}
@@ -231,14 +355,14 @@ export const SidebarFooter: Component = () => {
                 </div>
               </Show>
               <button
-                class={userSection}
+                class={teamSection}
                 onClick={toggleMenu}
-                title={!store.settings.sidebarOpen? user().display_name : undefined}
+                title={!store.settings.sidebarOpen ? user().display_name : undefined}
               >
-                <div class={userAvatar}>
+                <div class={teamAvatar}>
                   <Show
                     when={user().avatar_url}
-                    fallback={getInitials(user().display_name || user().email)}
+                    fallback={getInitial(user().display_name || user().email)}
                   >
                     <img
                       src={user().avatar_url}
@@ -246,7 +370,7 @@ export const SidebarFooter: Component = () => {
                     />
                   </Show>
                 </div>
-                <span class={userName}>{user().display_name}</span>
+                <span class={teamName}>{user().display_name}</span>
               </button>
             </>
           )}
