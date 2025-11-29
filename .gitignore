@@ -31,8 +31,9 @@ tmp
 uploads/
 dz_content/
 
-# Go binary
+# Go binaries
 server
+dz
 
 # Coverage output
 coverage/
