@@ -22,7 +22,7 @@ const getInitial = (name: string): string => {
 
 // DragonByteForms submenu items configuration (same as in sidebar.tsx)
 const dzformsSubmenu = [
-	{ title: "Forms", link: "#", isHeader: true },
+	{ title: "Forms", link: "", isHeader: true },
 	{ title: "New Form", link: "/_/admin/plugins/dzforms/new" },
 	{ title: "Entries", link: "/_/admin/plugins/dzforms/entries" },
 	{ title: "Settings", link: "/_/admin/plugins/dzforms/settings" },
