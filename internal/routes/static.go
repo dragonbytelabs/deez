@@ -25,14 +25,6 @@ func RegisterStatic(mux *http.ServeMux) {
 	mux.HandleFunc("GET /_/{rest...}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, web.DistFS, "dist/index.html")
 	})
-	
-	// Specific auth routes that need to serve the SPA (login, register)
-	mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, web.DistFS, "dist/index.html")
-	})
-	mux.HandleFunc("GET /register", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, web.DistFS, "dist/index.html")
-	})
 }
 
 // ServeAdminFallback handles requests that don't match any theme
@@ -43,9 +35,7 @@ func ServeAdminFallback(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(path, "/_/") || 
 	   strings.HasPrefix(path, "/api/") || 
 	   strings.HasPrefix(path, "/assets/") ||
-	   strings.HasPrefix(path, "/uploads/") ||
-	   path == "/login" || 
-	   path == "/register" {
+	   strings.HasPrefix(path, "/uploads/") {
 		return
 	}
 	// Serve admin SPA for all other routes when no theme is active

@@ -282,9 +282,7 @@ func RegisterThemeServing(mux *http.ServeMux, db *dbx.DB, themesPath string) {
 		if strings.HasPrefix(path, "/_/") ||
 			strings.HasPrefix(path, "/api/") ||
 			strings.HasPrefix(path, "/assets/") ||
-			strings.HasPrefix(path, "/uploads/") ||
-			path == "/login" ||
-			path == "/register" {
+			strings.HasPrefix(path, "/uploads/") {
 			// These are handled by other registered routes
 			http.NotFound(w, r)
 			return
