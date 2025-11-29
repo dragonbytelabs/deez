@@ -30,5 +30,6 @@ tmp
 .env
 uploads/
 
-# Go binary
+# Go binaries
 server
+dz
