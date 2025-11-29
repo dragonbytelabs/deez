@@ -38,6 +38,7 @@ dz_content/themes/*
 
 # Go binary
 server
+/dz
 
 # Coverage output
 coverage/

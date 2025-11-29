@@ -6,6 +6,9 @@ import (
 	"dragonbytelabs/dz/internal/models"
 )
 
+// DefaultPluginVersion is the default version assigned to new plugins
+const DefaultPluginVersion = "1.0.0"
+
 // GetAllPlugins returns all plugins
 func (d *DB) GetAllPlugins(ctx context.Context) ([]models.Plugin, error) {
 	query := MustQuery("get_all_plugins.sql")
@@ -74,6 +77,17 @@ func (d *DB) UpdatePluginStatus(ctx context.Context, name string, isActive bool)
 	_, err := d.DBX.NamedExecContext(ctx, query, map[string]interface{}{
 		"name":      name,
 		"is_active": isActive,
+	})
+	return err
+}
+
+// AddPlugin adds a new plugin to the database
+func (d *DB) AddPlugin(ctx context.Context, name string) error {
+	query := MustQuery("add_plugin.sql")
+	_, err := d.DBX.NamedExecContext(ctx, query, map[string]interface{}{
+		"name":         name,
+		"display_name": name,
+		"version":      DefaultPluginVersion,
 	})
 	return err
 }
