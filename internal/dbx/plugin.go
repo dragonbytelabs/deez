@@ -77,3 +77,14 @@ func (d *DB) UpdatePluginStatus(ctx context.Context, name string, isActive bool)
 	})
 	return err
 }
+
+// AddPlugin adds a new plugin to the database
+func (d *DB) AddPlugin(ctx context.Context, name string) error {
+	query := MustQuery("add_plugin.sql")
+	_, err := d.DBX.NamedExecContext(ctx, query, map[string]interface{}{
+		"name":         name,
+		"display_name": name,
+		"version":      "1.0.0",
+	})
+	return err
+}

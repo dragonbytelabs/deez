@@ -146,3 +146,52 @@ func TestGetActivePlugins(t *testing.T) {
 		t.Errorf("active plugin name = %q, want %q", activePlugins[0].Name, "dzforms")
 	}
 }
+
+func TestAddPlugin(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	t.Run("add new plugin", func(t *testing.T) {
+		err := db.AddPlugin(ctx, "myplugin")
+		if err != nil {
+			t.Fatalf("AddPlugin() returned error: %v", err)
+		}
+
+		// Verify plugin was added
+		plugin, err := db.GetPluginByName(ctx, "myplugin")
+		if err != nil {
+			t.Fatalf("GetPluginByName() returned error: %v", err)
+		}
+		if plugin == nil {
+			t.Fatal("plugin was not found after AddPlugin()")
+		}
+		if plugin.Name != "myplugin" {
+			t.Errorf("plugin name = %q, want %q", plugin.Name, "myplugin")
+		}
+		if plugin.DisplayName != "myplugin" {
+			t.Errorf("plugin display_name = %q, want %q", plugin.DisplayName, "myplugin")
+		}
+		if plugin.Version != "1.0.0" {
+			t.Errorf("plugin version = %q, want %q", plugin.Version, "1.0.0")
+		}
+		if plugin.IsActive {
+			t.Error("plugin should not be active by default")
+		}
+	})
+
+	t.Run("add duplicate plugin", func(t *testing.T) {
+		// First add should succeed
+		err := db.AddPlugin(ctx, "testplugin")
+		if err != nil {
+			t.Fatalf("first AddPlugin() returned error: %v", err)
+		}
+
+		// Second add should fail (unique constraint)
+		err = db.AddPlugin(ctx, "testplugin")
+		if err == nil {
+			t.Error("AddPlugin() should return error for duplicate plugin name")
+		}
+	})
+}
