@@ -67,6 +67,12 @@ export type ThemeItem = {
 	active: boolean;
 };
 
+export type PluginSubMenuItem = {
+	title: string;
+	link: string;
+	isHeader?: boolean;
+};
+
 export type PluginInfo = {
 	id: number;
 	name: string;
@@ -77,6 +83,7 @@ export type PluginInfo = {
 	sidebar_icon?: string;
 	sidebar_title?: string;
 	sidebar_link?: string;
+	sidebar_submenu?: PluginSubMenuItem[];
 	created_at: string;
 	updated_at?: string;
 };

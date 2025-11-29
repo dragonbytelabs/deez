@@ -20,6 +20,18 @@ const getInitial = (name: string): string => {
 	return name.charAt(0).toUpperCase();
 };
 
+// DragonByteForms submenu items configuration (same as in sidebar.tsx)
+const dzformsSubmenu = [
+	{ title: "Forms", link: "#", isHeader: true },
+	{ title: "New Form", link: "/_/admin/plugins/dzforms/new" },
+	{ title: "Entries", link: "/_/admin/plugins/dzforms/entries" },
+	{ title: "Settings", link: "/_/admin/plugins/dzforms/settings" },
+	{ title: "Import/Export", link: "/_/admin/plugins/dzforms/import-export" },
+	{ title: "Add-Ons", link: "/_/admin/plugins/dzforms/addons" },
+	{ title: "System Status", link: "/_/admin/plugins/dzforms/status" },
+	{ title: "Help", link: "/_/admin/plugins/dzforms/help" },
+];
+
 describe("Sidebar Utilities", () => {
 	describe("getInitials", () => {
 		it("should return first two characters of email username in uppercase", () => {
@@ -76,6 +88,41 @@ describe("Sidebar Utilities", () => {
 
 		it("should handle lowercase team names", () => {
 			expect(getInitial("cab5476")).toBe("C");
+		});
+	});
+
+	describe("DragonByteForms Submenu", () => {
+		it("should have 8 submenu items", () => {
+			expect(dzformsSubmenu).toHaveLength(8);
+		});
+
+		it("should have Forms as first item with isHeader true", () => {
+			expect(dzformsSubmenu[0].title).toBe("Forms");
+			expect(dzformsSubmenu[0].isHeader).toBe(true);
+		});
+
+		it("should have New Form as second item", () => {
+			expect(dzformsSubmenu[1].title).toBe("New Form");
+			expect(dzformsSubmenu[1].link).toBe("/_/admin/plugins/dzforms/new");
+		});
+
+		it("should have all required menu items", () => {
+			const titles = dzformsSubmenu.map(item => item.title);
+			expect(titles).toContain("Forms");
+			expect(titles).toContain("New Form");
+			expect(titles).toContain("Entries");
+			expect(titles).toContain("Settings");
+			expect(titles).toContain("Import/Export");
+			expect(titles).toContain("Add-Ons");
+			expect(titles).toContain("System Status");
+			expect(titles).toContain("Help");
+		});
+
+		it("should have valid links for all non-header items", () => {
+			const nonHeaderItems = dzformsSubmenu.filter(item => !item.isHeader);
+			for (const item of nonHeaderItems) {
+				expect(item.link).toMatch(/^\/_\/admin\/plugins\/dzforms\//);
+			}
 		});
 	});
 });
