@@ -1,12 +1,13 @@
 import { createContext, useContext, type ParentComponent } from "solid-js";
 import { createStore, produce, type SetStoreFunction } from "solid-js/store";
-import type { UserInfo, TeamInfo } from "./server/api";
+import type { UserInfo, TeamInfo, PluginInfo } from "./server/api";
 
 // Define the shape of your app state
 export interface DzStore {
   user: UserInfo | null;
   teams: TeamInfo[];
   currentTeam: TeamInfo | null;
+  plugins: PluginInfo[];
   settings: {
     theme: "dark" | "light";
     sidebarOpen: boolean;
@@ -18,6 +19,7 @@ const initialState: DzStore = {
   user: null,
   teams: [],
   currentTeam: null,
+  plugins: [],
   settings: {
     theme: "dark",
     sidebarOpen: true,
@@ -35,6 +37,7 @@ interface DzContextType {
     updateUserEmail: (email: string) => void;
     setTeams: (teams: TeamInfo[]) => void;
     setCurrentTeam: (team: TeamInfo | null) => void;
+    setPlugins: (plugins: PluginInfo[]) => void;
     toggleSidebar: () => void;
     setSidebarOpen: (open: boolean) => void;
     setTheme: (theme: "dark" | "light") => void;
@@ -102,6 +105,14 @@ export const DzProvider: ParentComponent = (props) => {
       setStore(
         produce((draft) => {
           draft.currentTeam = team;
+        })
+      );
+    },
+
+    setPlugins: (plugins: PluginInfo[]) => {
+      setStore(
+        produce((draft) => {
+          draft.plugins = plugins;
         })
       );
     },

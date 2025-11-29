@@ -1,8 +1,9 @@
 import { css } from "@linaria/core";
 import { useLocation } from "@solidjs/router";
-import { type Component, For, Show } from "solid-js";
+import { type Component, createMemo, For, onMount, Show } from "solid-js";
 import { SidebarFooter } from "./sidebar.footer";
 import { useDz } from "../dz-context";
+import { api } from "../server/api";
 
 const sidebar = css`
   position: fixed;
@@ -194,7 +195,7 @@ export const Sidebar: Component = () => {
   const {store, actions} = useDz();
   const location = useLocation();
 
-  const sidebarMenuLinks = [
+  const coreMenuLinks = [
     { title: "Home", icon: "🏠", link: "/_/admin" },
     { title: "Database", icon: "🗄️", link: "/_/admin/tables" },
     { title: "Media", icon: "🖼️", link: "/_/admin/media" },
@@ -203,6 +204,38 @@ export const Sidebar: Component = () => {
     { title: "Appearance", icon: "✨", link: "/_/admin/appearance" },
     { title: "Settings", icon: "⚙️", link: "/_/admin/settings" },
   ];
+
+  // Fetch active plugins on mount
+  onMount(async () => {
+    try {
+      const response = await api.getActivePlugins();
+      if (response.ok) {
+        const data = await response.json();
+        actions.setPlugins(data.plugins || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch active plugins:", err);
+    }
+  });
+
+  // Combine core menu with active plugin menu items
+  const sidebarMenuLinks = createMemo(() => {
+    const pluginLinks = store.plugins
+      .filter(p => p.sidebar_link && p.sidebar_title)
+      .map(p => ({
+        title: p.sidebar_title!,
+        icon: p.sidebar_icon || "🔌",
+        link: p.sidebar_link!,
+      }));
+    
+    // Insert plugin links after "Plugins" menu item
+    const pluginsIndex = coreMenuLinks.findIndex(item => item.link === "/_/admin/plugins");
+    const result = [...coreMenuLinks];
+    if (pluginsIndex !== -1 && pluginLinks.length > 0) {
+      result.splice(pluginsIndex + 1, 0, ...pluginLinks);
+    }
+    return result;
+  });
 
   const isActive = (link: string) => {
     return location.pathname === link;
@@ -233,7 +266,7 @@ export const Sidebar: Component = () => {
 
         <nav>
           <ul class={menuList}>
-            <For each={sidebarMenuLinks}>
+            <For each={sidebarMenuLinks()}>
               {(menu) => (
                 <li class={menuItem}>
                   <a
