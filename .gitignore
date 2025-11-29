@@ -33,7 +33,7 @@ dz_content/
 
 # Go binary
 server
-dz
+/dz
 
 # Coverage output
 coverage/
