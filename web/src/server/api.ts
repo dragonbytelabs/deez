@@ -190,6 +190,11 @@ const uploadMediaFunc = async (file: File) => {
 const deleteMediaFunc = async (id: number) => {
 	const r = await fetch(`${routes.media}/${id}`, {
 		method: methods.DELETE,
+		credentials: "include",
+	});
+	return r;
+};
+
 const updateDisplayNameFunc = async (displayName: string) => {
 	const body = JSON.stringify({ display_name: displayName });
 	console.log("API updateDisplayName called with body:", body);
