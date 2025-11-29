@@ -69,7 +69,7 @@ func (d *DB) GetTableData(ctx context.Context, tableName string) ([]map[string]i
 	}
 	defer rows.Close()
 
-	var results []map[string]interface{}
+	results := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		row := make(map[string]interface{})
 		if err := rows.MapScan(row); err != nil {
