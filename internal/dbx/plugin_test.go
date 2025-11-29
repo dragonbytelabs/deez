@@ -173,8 +173,8 @@ func TestAddPlugin(t *testing.T) {
 		if plugin.DisplayName != "myplugin" {
 			t.Errorf("plugin display_name = %q, want %q", plugin.DisplayName, "myplugin")
 		}
-		if plugin.Version != "1.0.0" {
-			t.Errorf("plugin version = %q, want %q", plugin.Version, "1.0.0")
+		if plugin.Version != DefaultPluginVersion {
+			t.Errorf("plugin version = %q, want %q", plugin.Version, DefaultPluginVersion)
 		}
 		if plugin.IsActive {
 			t.Error("plugin should not be active by default")
