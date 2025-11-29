@@ -295,7 +295,9 @@ export const AdminMedia = () => {
 
     const handleCopyUrl = async (item: MediaItem) => {
         try {
-            await navigator.clipboard.writeText(item.url);
+            // Construct absolute URL for sharing
+            const absoluteUrl = `${window.location.origin}${item.url}`;
+            await navigator.clipboard.writeText(absoluteUrl);
             setSuccessMsg("URL copied to clipboard!");
             setTimeout(() => setSuccessMsg(null), 3000);
         } catch (err) {

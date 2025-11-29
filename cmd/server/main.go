@@ -55,6 +55,8 @@ func setupDB(cfg config.DatabaseConfig) *dbx.DB {
 }
 
 func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, mediaStore storage.Store, mediaCfg config.MediaConfig) {
+	// Register uploads route first to ensure it takes priority over static catch-all
+	routes.ServeMediaFiles(mux, mediaCfg.StoragePath)
 	routes.RegisterStatic(mux)
 	routes.RegisterAPI(mux, db)
 	routes.RegisterAuth(mux, db, sm)
@@ -62,5 +64,4 @@ func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, med
 	routes.RegisterAdminUserProfile(mux, db)
 	routes.RegisterCollection(mux, db)
 	routes.RegisterMedia(mux, db, mediaStore, mediaCfg.MaxFileSize)
-	routes.ServeMediaFiles(mux, mediaCfg.StoragePath)
 }
