@@ -1,10 +1,12 @@
 import { createContext, useContext, type ParentComponent } from "solid-js";
 import { createStore, produce, type SetStoreFunction } from "solid-js/store";
-import type { UserInfo } from "./server/api";
+import type { UserInfo, TeamInfo } from "./server/api";
 
 // Define the shape of your app state
 export interface DzStore {
   user: UserInfo | null;
+  teams: TeamInfo[];
+  currentTeam: TeamInfo | null;
   settings: {
     theme: "dark" | "light";
     sidebarOpen: boolean;
@@ -14,6 +16,8 @@ export interface DzStore {
 // Initial state
 const initialState: DzStore = {
   user: null,
+  teams: [],
+  currentTeam: null,
   settings: {
     theme: "dark",
     sidebarOpen: true,
@@ -29,6 +33,8 @@ interface DzContextType {
     updateUserAvatar: (avatarUrl: string) => void;
     updateUserDisplayName: (displayName: string) => void;
     updateUserEmail: (email: string) => void;
+    setTeams: (teams: TeamInfo[]) => void;
+    setCurrentTeam: (team: TeamInfo | null) => void;
     toggleSidebar: () => void;
     setSidebarOpen: (open: boolean) => void;
     setTheme: (theme: "dark" | "light") => void;
@@ -76,6 +82,26 @@ export const DzProvider: ParentComponent = (props) => {
           if (draft.user) {
             draft.user.email = email;
           }
+        })
+      );
+    },
+
+    setTeams: (teams: TeamInfo[]) => {
+      setStore(
+        produce((draft) => {
+          draft.teams = teams;
+          // If there are teams and no current team is selected, select the first one
+          if (teams.length > 0 && !draft.currentTeam) {
+            draft.currentTeam = teams[0];
+          }
+        })
+      );
+    },
+
+    setCurrentTeam: (team: TeamInfo | null) => {
+      setStore(
+        produce((draft) => {
+          draft.currentTeam = team;
         })
       );
     },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-// Test the getInitials function logic
+// Test the getInitials function logic (legacy)
 const getInitials = (email: string): string => {
 	const parts = email.split("@")[0];
 	if (parts.length >= 2) {
@@ -9,9 +9,15 @@ const getInitials = (email: string): string => {
 	return parts.toUpperCase();
 };
 
-// Test the getDisplayName function logic
+// Test the getDisplayName function logic (legacy)
 const getDisplayName = (email: string): string => {
 	return email.split("@")[0];
+};
+
+// Test the getInitial function logic for teams
+const getInitial = (name: string): string => {
+	if (!name) return "?";
+	return name.charAt(0).toUpperCase();
 };
 
 describe("Sidebar Utilities", () => {
@@ -52,6 +58,24 @@ describe("Sidebar Utilities", () => {
 
 		it("should handle emails with special characters in username", () => {
 			expect(getDisplayName("user_name@example.com")).toBe("user_name");
+		});
+	});
+
+	describe("getInitial (for teams)", () => {
+		it("should return the first character in uppercase", () => {
+			expect(getInitial("Team Alpha")).toBe("T");
+		});
+
+		it("should return ? for empty string", () => {
+			expect(getInitial("")).toBe("?");
+		});
+
+		it("should handle single character team names", () => {
+			expect(getInitial("A")).toBe("A");
+		});
+
+		it("should handle lowercase team names", () => {
+			expect(getInitial("cab5476")).toBe("C");
 		});
 	});
 });

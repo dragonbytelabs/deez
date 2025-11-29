@@ -36,6 +36,13 @@ export type UserInfo = {
 	display_name: string;
 };
 
+export type TeamInfo = {
+	id: number;
+	name: string;
+	description?: string;
+	avatar_url?: string;
+};
+
 export type MediaItem = {
 	id: number;
 	user_id: number;
@@ -53,9 +60,10 @@ export type MediaItem = {
 type MeFuncData = {
 	authenticated: boolean;
 	user?: UserInfo;
+	teams?: TeamInfo[];
 };
 
-const meFunc = async (): Promise<{ authenticated: boolean; user?: UserInfo }> => {
+const meFunc = async (): Promise<{ authenticated: boolean; user?: UserInfo; teams?: TeamInfo[] }> => {
 	try {
 		const response = await fetch(routes.me, {
 			method: methods.GET,
@@ -70,6 +78,7 @@ const meFunc = async (): Promise<{ authenticated: boolean; user?: UserInfo }> =>
 			return {
 				authenticated: true,
 				user: data.user,
+				teams: data.teams,
 			};
 		}
 		return { authenticated: false };
@@ -217,7 +226,7 @@ type ApiRoutes = {
 		confirmPassword: string,
 	) => Promise<Response>;
 	logout: () => Promise<Response>;
-	me: () => Promise<{ authenticated: boolean; user?: UserInfo }>;
+	me: () => Promise<{ authenticated: boolean; user?: UserInfo; teams?: TeamInfo[] }>;
 	getCollections: () => Promise<Response>;
 	getCollectionByName: (tableName: string) => Promise<Response>;
 	updateAvatar: (avatarUrl: string) => Promise<Response>;

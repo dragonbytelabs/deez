@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"dragonbytelabs/dz/internal/dbx"
+	"dragonbytelabs/dz/internal/models"
 	"dragonbytelabs/dz/internal/session"
 )
 
@@ -40,6 +41,25 @@ func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
+		// Get user's teams
+		teams, err := db.GetTeamsByUser(r.Context(), user.ID)
+		if err != nil {
+			log.Printf("error fetching teams: %v", err)
+			// Don't fail the request, just return empty teams
+			teams = []models.Team{}
+		}
+
+		// Build teams response with proper nullable handling
+		teamsResponse := make([]map[string]interface{}, len(teams))
+		for i, team := range teams {
+			teamsResponse[i] = map[string]interface{}{
+				"id":          team.ID,
+				"name":        team.Name,
+				"description": team.Description,
+				"avatar_url":  team.AvatarURL,
+			}
+		}
+
 		// Authenticated
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"authenticated": true,
@@ -49,6 +69,7 @@ func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
 				"user_id":      user.UserHash,
 				"display_name": user.DisplayName,
 			},
+			"teams": teamsResponse,
 		})
 	})
 }
