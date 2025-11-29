@@ -32,8 +32,8 @@ func TestRequireAuth(t *testing.T) {
 		if rec.Code != http.StatusSeeOther {
 			t.Errorf("RequireAuth() status = %v, want %v", rec.Code, http.StatusSeeOther)
 		}
-		if rec.Header().Get("Location") != "/login" {
-			t.Errorf("RequireAuth() redirect = %v, want /login", rec.Header().Get("Location"))
+		if rec.Header().Get("Location") != "/_/admin/login" {
+			t.Errorf("RequireAuth() redirect = %v, want /_/admin/login", rec.Header().Get("Location"))
 		}
 	})
 }
@@ -52,7 +52,7 @@ func TestRequireGuest(t *testing.T) {
 		// Wrap with RequireGuest and session middleware
 		handler := sm.Handle(RequireGuest(innerHandler))
 
-		req := httptest.NewRequest("GET", "/login", nil)
+		req := httptest.NewRequest("GET", "/_/admin/login", nil)
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)

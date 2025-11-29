@@ -260,7 +260,7 @@ describe("API Module", () => {
 		it("should call fetch with POST method", async () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({ redirect: "/login" }),
+				json: async () => ({ redirect: "/_/admin/login" }),
 			});
 
 			await fetch(routes.logout, {

@@ -28,6 +28,9 @@ const routes: Route = {
 	mediaUpload: "/api/media/upload",
 	updateDisplayName: "/api/admin/user/display-name",
 	themes: "/api/themes",
+	plugins: "/api/plugins",
+	pluginsActive: "/api/plugins/active",
+	dzforms: "/api/dzforms/forms",
 };
 
 export type UserInfo = {
@@ -62,6 +65,29 @@ export type ThemeItem = {
 	name: string;
 	path: string;
 	active: boolean;
+};
+
+export type PluginInfo = {
+	id: number;
+	name: string;
+	display_name: string;
+	description?: string;
+	version: string;
+	is_active: boolean;
+	sidebar_icon?: string;
+	sidebar_title?: string;
+	sidebar_link?: string;
+	created_at: string;
+	updated_at?: string;
+};
+
+export type FormInfo = {
+	id: number;
+	name: string;
+	description?: string;
+	fields: string;
+	created_at: string;
+	updated_at?: string;
 };
 
 type MeFuncData = {
@@ -248,6 +274,88 @@ const deactivateThemeFunc = async () => {
 	return r;
 };
 
+const getPluginsFunc = async () => {
+	const response = await fetch(routes.plugins, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const getActivePluginsFunc = async () => {
+	const response = await fetch(routes.pluginsActive, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const getPluginByNameFunc = async (name: string) => {
+	const response = await fetch(`${routes.plugins}/${name}`, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const updatePluginStatusFunc = async (name: string, isActive: boolean) => {
+	const body = JSON.stringify({ is_active: isActive });
+	const r = await fetch(`${routes.plugins}/${name}/status`, {
+		method: methods.PUT,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
+		credentials: "include",
+	});
+	return r;
+};
+
+const checkPluginUpdatesFunc = async (name: string) => {
+	const response = await fetch(`${routes.plugins}/${name}/check-updates`, {
+		credentials: "include",
+	});
+	return response;
+};
+
+// DZForms plugin functions
+const getFormsFunc = async () => {
+	const response = await fetch(routes.dzforms, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const getFormByIdFunc = async (id: number) => {
+	const response = await fetch(`${routes.dzforms}/${id}`, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const createFormFunc = async (name: string, description: string, fields: string) => {
+	const body = JSON.stringify({ name, description, fields });
+	const r = await fetch(routes.dzforms, {
+		method: methods.POST,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
+		credentials: "include",
+	});
+	return r;
+};
+
+const updateFormFunc = async (id: number, name: string, description: string, fields: string) => {
+	const body = JSON.stringify({ name, description, fields });
+	const r = await fetch(`${routes.dzforms}/${id}`, {
+		method: methods.PUT,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
+		credentials: "include",
+	});
+	return r;
+};
+
 type ApiRoutes = {
 	login: (email: string, password: string) => Promise<Response>;
 	register: (
@@ -269,6 +377,17 @@ type ApiRoutes = {
 	getThemes: () => Promise<Response>;
 	activateTheme: (themeName: string) => Promise<Response>;
 	deactivateTheme: () => Promise<Response>;
+	// Plugin functions
+	getPlugins: () => Promise<Response>;
+	getActivePlugins: () => Promise<Response>;
+	getPluginByName: (name: string) => Promise<Response>;
+	updatePluginStatus: (name: string, isActive: boolean) => Promise<Response>;
+	checkPluginUpdates: (name: string) => Promise<Response>;
+	// DZForms plugin functions
+	getForms: () => Promise<Response>;
+	getFormById: (id: number) => Promise<Response>;
+	createForm: (name: string, description: string, fields: string) => Promise<Response>;
+	updateForm: (id: number, name: string, description: string, fields: string) => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -288,4 +407,15 @@ export const api: ApiRoutes = {
 	getThemes: getThemesFunc,
 	activateTheme: activateThemeFunc,
 	deactivateTheme: deactivateThemeFunc,
+	// Plugin functions
+	getPlugins: getPluginsFunc,
+	getActivePlugins: getActivePluginsFunc,
+	getPluginByName: getPluginByNameFunc,
+	updatePluginStatus: updatePluginStatusFunc,
+	checkPluginUpdates: checkPluginUpdatesFunc,
+	// DZForms plugin functions
+	getForms: getFormsFunc,
+	getFormById: getFormByIdFunc,
+	createForm: createFormFunc,
+	updateForm: updateFormFunc,
 };

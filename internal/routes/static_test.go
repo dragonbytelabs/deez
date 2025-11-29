@@ -22,15 +22,15 @@ func TestRegisterStatic(t *testing.T) {
 		}
 	})
 
-	t.Run("GET /login returns index.html", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/login", nil)
+	t.Run("GET /_/admin/login returns index.html", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_/admin/login", nil)
 		rec := httptest.NewRecorder()
 
 		mux.ServeHTTP(rec, req)
 
 		// Should return 200 OK (SPA routing)
 		if rec.Code != http.StatusOK {
-			t.Errorf("GET /login status = %v, want %v", rec.Code, http.StatusOK)
+			t.Errorf("GET /_/admin/login status = %v, want %v", rec.Code, http.StatusOK)
 		}
 	})
 

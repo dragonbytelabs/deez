@@ -221,7 +221,7 @@ export const SidebarFooter: Component = () => {
         if (data.redirect) {
           navigate(data.redirect);
         } else {
-          navigate("/login");
+          navigate("/_/admin/login");
         }
       } else {
         const error = await response.text();

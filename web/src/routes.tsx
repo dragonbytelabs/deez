@@ -1,6 +1,7 @@
 import { Route, Router } from "@solidjs/router";
 import { Admin } from "./Admin";
 import { AdminAppearance } from "./admin-appearance";
+import { AdminDZForms } from "./admin-dzforms";
 import { AdminMedia } from "./admin-media";
 import { AdminOnboarding } from "./admin-onboarding";
 import { AdminPlugins } from "./admin-plugins";
@@ -23,6 +24,7 @@ const PAdminMedia = () => (<ProtectedRoute><AdminMedia/></ProtectedRoute>)
 const PAdminAppearance = () => (<ProtectedRoute><AdminAppearance/></ProtectedRoute>)
 const PAdminSettings = () => (<ProtectedRoute><AdminSettings/></ProtectedRoute>)
 const PAdminPlugins = () => (<ProtectedRoute><AdminPlugins/></ProtectedRoute>)
+const PAdminDZForms = () => (<ProtectedRoute><AdminDZForms/></ProtectedRoute>)
 const PAdminThemes = () => (<ProtectedRoute><AdminThemes/></ProtectedRoute>)
 const PAdminProfile = () => (<ProtectedRoute><AdminUserProfile/></ProtectedRoute>)
 const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRoute>)
@@ -58,6 +60,10 @@ const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRou
 				component={PAdminPlugins}
 			/>
 			<Route
+				path="/_/admin/plugins/dzforms"
+				component={PAdminDZForms}
+			/>
+			<Route
 				path="/_/admin/user/profile"
 				component={PAdminProfile}
 			/>
@@ -65,9 +71,9 @@ const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRou
 				path="/_/admin/onboarding"
 				component={PAdminOnboarding}
 			/>
-			<Route path="/login" component={() => <GuestRoute component={Login} />} />
+			<Route path="/_/admin/login" component={() => <GuestRoute component={Login} />} />
 			<Route
-				path="/register"
+				path="/_/admin/register"
 				component={() => <GuestRoute component={Register} />}
 			/>
 		</Router>
