@@ -141,7 +141,7 @@ export default function LoginWithSocials() {
 						Sign In
 					</button>
 					<p class={signupText}>
-						Don’t Have An Account? <a href="/register">Create a new account</a>
+						Don’t Have An Account? <a href="/_/admin/register">Create a new account</a>
 					</p>
 				</form>
 			</div>

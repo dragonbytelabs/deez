@@ -34,7 +34,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
 			}
 		}
 		if (!result.authenticated) {
-			navigate("/login", { replace: true });
+			navigate("/_/admin/login", { replace: true });
 		}
 	});
 

@@ -150,7 +150,7 @@ export default function RegisterForm() {
 					</button>
 				</form>
 				<p class={signupText}>
-					Already Have An Account? <a href="/login">Login instead</a>
+					Already Have An Account? <a href="/_/admin/login">Login instead</a>
 				</p>
 			</div>
 		</div>
