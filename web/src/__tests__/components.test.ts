@@ -47,3 +47,11 @@ describe("AdminOnboarding Component", () => {
 		expect(typeof AdminOnboarding).toBe("function");
 	});
 });
+
+describe("AdminPlugins Component", () => {
+	it("should export an AdminPlugins component", async () => {
+		const { AdminPlugins } = await import("../admin-plugins");
+		expect(AdminPlugins).toBeDefined();
+		expect(typeof AdminPlugins).toBe("function");
+	});
+});
