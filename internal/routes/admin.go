@@ -120,6 +120,11 @@ func RegisterAdminUserProfile(mux *http.ServeMux, db *dbx.DB) {
 			Email string `json:"email"`
 		}
 
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+
 		if in.Email == "" {
 			http.Error(w, "email is required", http.StatusBadRequest)
 			return
