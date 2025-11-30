@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { useLocation } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { type Component, createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { SidebarFooter } from "./sidebar.footer";
 import { useDz } from "../dz-context";
@@ -335,6 +335,7 @@ const pluginSubMenus: PluginSubMenu[] = [
 export const Sidebar: Component = () => {
   const {store, actions} = useDz();
   const location = useLocation();
+  const navigate = useNavigate();
   const [expandedPlugins, setExpandedPlugins] = createSignal<Set<string>>(new Set());
 
   const coreMenuLinks = [
@@ -471,7 +472,7 @@ export const Sidebar: Component = () => {
                     classList={{
                       active: isPluginActive(plugin),
                     }}
-                    onClick={() => plugin.subMenu ? togglePlugin(plugin.name) : window.location.href = plugin.link}
+                    onClick={() => plugin.subMenu ? togglePlugin(plugin.name) : navigate(plugin.link)}
                     title={!store.settings.sidebarOpen ? plugin.title : undefined}
                   >
                     <span class={menuIcon}>{plugin.icon}</span>
