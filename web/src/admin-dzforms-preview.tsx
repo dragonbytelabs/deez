@@ -350,6 +350,7 @@ export const AdminDZFormsPreview = () => {
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = createSignal(false);
+  const [entryIdCounter, setEntryIdCounter] = createSignal(1);
 
   const getFormId = (): number | null => {
     const formId = Number.parseInt(params.id, 10);
@@ -371,20 +372,17 @@ export const AdminDZFormsPreview = () => {
         if (data.form) {
           setForm(data.form);
           // Parse fields from JSON string
+          let fieldsToUse: FormField[];
           try {
             const parsedFields = JSON.parse(data.form.fields || "[]");
             // Use default fields if no fields are configured
-            if (parsedFields.length === 0) {
-              setFields(defaultFields);
-            } else {
-              setFields(parsedFields);
-            }
+            fieldsToUse = parsedFields.length === 0 ? defaultFields : parsedFields;
           } catch {
-            setFields(defaultFields);
+            fieldsToUse = defaultFields;
           }
-          // Initialize form data with empty values
+          setFields(fieldsToUse);
+          // Initialize form data with empty values using the actual parsed fields
           const initialData: Record<string, string> = {};
-          const fieldsToUse = fields().length > 0 ? fields() : defaultFields;
           for (const field of fieldsToUse) {
             initialData[field.name] = "";
           }
@@ -410,21 +408,29 @@ export const AdminDZFormsPreview = () => {
     e.preventDefault();
     setSubmitSuccess(false);
 
-    // Validate required fields
+    // Validate required fields with type-specific validation
     const currentFields = fields();
     for (const field of currentFields) {
-      if (field.required && !formData()[field.name]?.trim()) {
-        setError(`${field.label} is required`);
-        return;
+      if (field.required) {
+        const value = formData()[field.name];
+        // For checkboxes, check if value is 'true'; for other fields, check if trimmed value exists
+        const isValid = field.type === "checkbox" 
+          ? value === "true"
+          : value?.trim();
+        if (!isValid) {
+          setError(`${field.label} is required`);
+          return;
+        }
       }
     }
 
-    // Add entry to the preview table
+    // Add entry to the preview table using counter for unique IDs
     const newEntry: FormEntry = {
-      id: entries().length + 1,
+      id: entryIdCounter(),
       data: { ...formData() },
       submittedAt: new Date().toLocaleString(),
     };
+    setEntryIdCounter((prev) => prev + 1);
     setEntries((prev) => [...prev, newEntry]);
 
     // Clear form
