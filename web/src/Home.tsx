@@ -113,7 +113,7 @@ export const Home = () => {
 			}
 
 			// Fetch public auth settings
-			const authResponse = await fetch("/api/public-auth");
+			const authResponse = await api.getPublicAuth();
 			if (authResponse.ok) {
 				const authData = await authResponse.json();
 				setLoginEnabled(authData.login_enabled || false);

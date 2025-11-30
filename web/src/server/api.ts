@@ -29,6 +29,7 @@ const routes: Route = {
 	updateDisplayName: "/api/admin/user/display-name",
 	themes: "/api/themes",
 	publicTheme: "/api/public-theme",
+	publicAuth: "/api/public-auth",
 	plugins: "/api/plugins",
 	pluginsActive: "/api/plugins/active",
 	dzforms: "/api/dzforms/forms",
@@ -276,6 +277,13 @@ const getPublicThemeFunc = async () => {
 	return response;
 };
 
+const getPublicAuthFunc = async () => {
+	const response = await fetch(routes.publicAuth, {
+		credentials: "include",
+	});
+	return response;
+};
+
 const activateThemeFunc = async (themeName: string) => {
 	const r = await fetch(`${routes.themes}/${themeName}/activate`, {
 		method: methods.POST,
@@ -475,6 +483,7 @@ type ApiRoutes = {
 	updateDisplayName: (displayName: string) => Promise<Response>;
 	getThemes: () => Promise<Response>;
 	getPublicTheme: () => Promise<Response>;
+	getPublicAuth: () => Promise<Response>;
 	activateTheme: (themeName: string) => Promise<Response>;
 	deactivateTheme: () => Promise<Response>;
 	// Plugin functions
@@ -515,6 +524,7 @@ export const api: ApiRoutes = {
 	updateDisplayName: updateDisplayNameFunc,
 	getThemes: getThemesFunc,
 	getPublicTheme: getPublicThemeFunc,
+	getPublicAuth: getPublicAuthFunc,
 	activateTheme: activateThemeFunc,
 	deactivateTheme: deactivateThemeFunc,
 	// Plugin functions
