@@ -2,6 +2,7 @@ import { css } from "@linaria/core";
 import { createSignal, onMount, Show } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { api, type FormInfo } from "./server/api";
+import { EmbedModal } from "./components/embed-modal";
 
 const mainContent = css`
   padding: 40px;
@@ -136,6 +137,22 @@ const previewButton = css`
   }
 `;
 
+const embedButton = css`
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--gray300);
+  border: 1px solid var(--gray600);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--gray700);
+    border-color: var(--gray500);
+  }
+`;
+
 const errorText = css`
   color: #ef4444;
   font-size: 14px;
@@ -181,6 +198,7 @@ export const AdminDZFormsEdit = () => {
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [success, setSuccess] = createSignal<string | null>(null);
+  const [embedModalOpen, setEmbedModalOpen] = createSignal(false);
 
   const getFormId = (): number | null => {
     const formId = Number.parseInt(params.id, 10);
@@ -319,6 +337,13 @@ export const AdminDZFormsEdit = () => {
               </button>
               <button
                 type="button"
+                class={embedButton}
+                onClick={() => setEmbedModalOpen(true)}
+              >
+                Embed
+              </button>
+              <button
+                type="button"
                 class={cancelButton}
                 onClick={() => navigate("/_/admin/plugins/dzforms/forms")}
               >
@@ -327,6 +352,12 @@ export const AdminDZFormsEdit = () => {
             </div>
           </form>
         </div>
+        <EmbedModal
+          isOpen={embedModalOpen}
+          setIsOpen={setEmbedModalOpen}
+          formId={form()?.id ?? 0}
+          formName={form()?.name ?? "Form"}
+        />
       </Show>
     </main>
   );
