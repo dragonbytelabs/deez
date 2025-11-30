@@ -1,6 +1,6 @@
 import { css } from "@linaria/core";
-import { useLocation } from "@solidjs/router";
-import { type Component, createMemo, For, onMount, Show } from "solid-js";
+import { useLocation, useNavigate } from "@solidjs/router";
+import { type Component, createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { SidebarFooter } from "./sidebar.footer";
 import { useDz } from "../dz-context";
 import { api } from "../server/api";
@@ -18,7 +18,8 @@ const sidebar = css`
   z-index: 100;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   
   &.closed {
     width: 80px;
@@ -191,9 +192,151 @@ const overlay = css`
   }
 `;
 
+const expandableMenuItem = css`
+  margin-bottom: 10px;
+`;
+
+const expandableMenuHeader = css`
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  color: var(--gray500);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  gap: 12px;
+  cursor: pointer;
+  
+  &:hover {
+    background: var(--gray700);
+    color: var(--white);
+  }
+  
+  &.active {
+    background: var(--primary);
+    color: white;
+  }
+  
+  .closed & {
+    padding: 12px;
+    justify-content: center;
+  }
+  
+  @media (max-width: 768px) {
+    .closed & {
+      padding: 12px 16px;
+      justify-content: flex-start;
+    }
+  }
+`;
+
+const expandArrow = css`
+  margin-left: auto;
+  font-size: 12px;
+  transition: transform 0.2s;
+  
+  &.expanded {
+    transform: rotate(180deg);
+  }
+  
+  .closed & {
+    display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .closed & {
+      display: block;
+    }
+  }
+`;
+
+const subMenuList = css`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+  
+  &.expanded {
+    max-height: 500px;
+  }
+  
+  .closed & {
+    display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .closed & {
+      display: block;
+    }
+  }
+`;
+
+const subMenuItem = css`
+  margin-bottom: 2px;
+`;
+
+const subMenuTitle = css`
+  padding: 8px 16px 8px 48px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const subMenuLink = css`
+  display: flex;
+  align-items: center;
+  padding: 10px 16px 10px 48px;
+  color: var(--gray500);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-size: 14px;
+  
+  &:hover {
+    background: var(--gray700);
+    color: var(--white);
+  }
+  
+  &.active {
+    background: rgba(167, 139, 250, 0.2);
+    color: var(--primary);
+  }
+`;
+
+// Define plugin submenu items
+interface PluginSubMenu {
+  name: string;
+  title: string;
+  items: { title: string; link: string }[];
+}
+
+const pluginSubMenus: PluginSubMenu[] = [
+  {
+    name: "dzforms",
+    title: "Forms",
+    items: [
+      { title: "New Form", link: "/_/admin/plugins/dzforms/new" },
+      { title: "Entries", link: "/_/admin/plugins/dzforms/entries" },
+      { title: "Settings", link: "/_/admin/plugins/dzforms/settings" },
+      { title: "Import/Export", link: "/_/admin/plugins/dzforms/import-export" },
+      { title: "Add-Ons", link: "/_/admin/plugins/dzforms/addons" },
+      { title: "System Status", link: "/_/admin/plugins/dzforms/system-status" },
+      { title: "Help", link: "/_/admin/plugins/dzforms/help" },
+    ],
+  },
+];
+
 export const Sidebar: Component = () => {
   const {store, actions} = useDz();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [expandedPlugins, setExpandedPlugins] = createSignal<Set<string>>(new Set());
 
   const coreMenuLinks = [
     { title: "Home", icon: "🏠", link: "/_/admin" },
@@ -201,8 +344,6 @@ export const Sidebar: Component = () => {
     { title: "Media", icon: "🖼️", link: "/_/admin/media" },
     { title: "Themes", icon: "🎨", link: "/_/admin/themes" },
     { title: "Plugins", icon: "🔌", link: "/_/admin/plugins" },
-    { title: "Appearance", icon: "✨", link: "/_/admin/appearance" },
-    { title: "Settings", icon: "⚙️", link: "/_/admin/settings" },
   ];
 
   // Fetch active plugins on mount
@@ -218,28 +359,65 @@ export const Sidebar: Component = () => {
     }
   });
 
-  // Combine core menu with active plugin menu items
-  const sidebarMenuLinks = createMemo(() => {
-    const pluginLinks = store.plugins
-      .filter(p => p.sidebar_link && p.sidebar_title)
-      .map(p => ({
-        title: p.sidebar_title!,
-        icon: p.sidebar_icon || "🔌",
-        link: p.sidebar_link!,
-      }));
-    
-    // Insert plugin links after "Plugins" menu item
-    const pluginsIndex = coreMenuLinks.findIndex(item => item.link === "/_/admin/plugins");
-    const result = [...coreMenuLinks];
-    if (pluginsIndex !== -1 && pluginLinks.length > 0) {
-      result.splice(pluginsIndex + 1, 0, ...pluginLinks);
-    }
-    return result;
+  // Get active plugins with submenus
+  const activePluginsWithSubMenus = createMemo(() => {
+    return store.plugins
+      .filter(p => p.sidebar_link && p.sidebar_title && p.is_active)
+      .map(p => {
+        const subMenu = pluginSubMenus.find(sm => 
+          p.sidebar_link?.includes(sm.name)
+        );
+        return {
+          name: p.name,
+          title: p.sidebar_title!,
+          icon: p.sidebar_icon || "🔌",
+          link: p.sidebar_link!,
+          subMenu: subMenu,
+        };
+      });
   });
 
   const isActive = (link: string) => {
     return location.pathname === link;
   };
+
+  const isPluginActive = (plugin: { link: string; subMenu?: PluginSubMenu }) => {
+    if (isActive(plugin.link)) return true;
+    if (plugin.subMenu) {
+      return plugin.subMenu.items.some(item => isActive(item.link));
+    }
+    return false;
+  };
+
+  const togglePlugin = (pluginName: string) => {
+    setExpandedPlugins(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pluginName)) {
+        newSet.delete(pluginName);
+      } else {
+        newSet.add(pluginName);
+      }
+      return newSet;
+    });
+  };
+
+  // Auto-expand plugin if on one of its sub-pages
+  createMemo(() => {
+    activePluginsWithSubMenus().forEach(plugin => {
+      if (plugin.subMenu) {
+        const isOnSubPage = plugin.subMenu.items.some(item => 
+          location.pathname === item.link
+        ) || location.pathname === plugin.link;
+        if (isOnSubPage && !expandedPlugins().has(plugin.name)) {
+          setExpandedPlugins(prev => {
+            const newSet = new Set(prev);
+            newSet.add(plugin.name);
+            return newSet;
+          });
+        }
+      }
+    });
+  });
 
   return (
     <>
@@ -266,7 +444,8 @@ export const Sidebar: Component = () => {
 
         <nav>
           <ul class={menuList}>
-            <For each={sidebarMenuLinks()}>
+            {/* Core Menu Items */}
+            <For each={coreMenuLinks}>
               {(menu) => (
                 <li class={menuItem}>
                   <a
@@ -280,6 +459,59 @@ export const Sidebar: Component = () => {
                     <span class={menuIcon}>{menu.icon}</span>
                     <span class={menuText}>{menu.title}</span>
                   </a>
+                </li>
+              )}
+            </For>
+
+            {/* Active Plugins with expandable submenus */}
+            <For each={activePluginsWithSubMenus()}>
+              {(plugin) => (
+                <li class={expandableMenuItem}>
+                  <div
+                    class={expandableMenuHeader}
+                    classList={{
+                      active: isPluginActive(plugin),
+                    }}
+                    onClick={() => plugin.subMenu ? togglePlugin(plugin.name) : navigate(plugin.link)}
+                    title={!store.settings.sidebarOpen ? plugin.title : undefined}
+                  >
+                    <span class={menuIcon}>{plugin.icon}</span>
+                    <span class={menuText}>{plugin.title}</span>
+                    <Show when={plugin.subMenu}>
+                      <span 
+                        class={expandArrow}
+                        classList={{ expanded: expandedPlugins().has(plugin.name) }}
+                      >
+                        ▼
+                      </span>
+                    </Show>
+                  </div>
+                  
+                  <Show when={plugin.subMenu}>
+                    <ul
+                      class={subMenuList}
+                      classList={{ expanded: expandedPlugins().has(plugin.name) }}
+                    >
+                      <li class={subMenuItem}>
+                        <div class={subMenuTitle}>{plugin.subMenu!.title}</div>
+                      </li>
+                      <For each={plugin.subMenu!.items}>
+                        {(item) => (
+                          <li class={subMenuItem}>
+                            <a
+                              href={item.link}
+                              class={subMenuLink}
+                              classList={{
+                                active: isActive(item.link),
+                              }}
+                            >
+                              {item.title}
+                            </a>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
                 </li>
               )}
             </For>
