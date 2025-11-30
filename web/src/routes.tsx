@@ -12,6 +12,8 @@ import { AdminDZFormsHelp } from "./admin-dzforms-help";
 import { AdminMedia } from "./admin-media";
 import { AdminOnboarding } from "./admin-onboarding";
 import { AdminPlugins } from "./admin-plugins";
+import { AdminPosts } from "./admin-posts";
+import { AdminPostsEdit } from "./admin-posts-edit";
 import { AdminSettings } from "./admin-settings";
 import { AdminTables } from "./admin-tables";
 import { AdminThemes } from "./admin-themes";
@@ -38,6 +40,14 @@ export const Routes = () => {
 			<Route
 				path="/_/admin/media"
 				component={() => (<ProtectedRoute><AdminMedia/></ProtectedRoute>)}
+			/>
+			<Route
+				path="/_/admin/posts"
+				component={() => (<ProtectedRoute><AdminPosts/></ProtectedRoute>)}
+			/>
+			<Route
+				path="/_/admin/posts/:id"
+				component={() => (<ProtectedRoute><AdminPostsEdit/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/appearance"

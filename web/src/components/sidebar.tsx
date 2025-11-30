@@ -342,6 +342,7 @@ export const Sidebar: Component = () => {
     { title: "Home", icon: "🏠", link: "/_/admin" },
     { title: "Database", icon: "🗄️", link: "/_/admin/tables" },
     { title: "Media", icon: "🖼️", link: "/_/admin/media" },
+    { title: "Posts", icon: "📝", link: "/_/admin/posts" },
     { title: "Themes", icon: "🎨", link: "/_/admin/themes" },
     { title: "Plugins", icon: "🔌", link: "/_/admin/plugins" },
   ];
