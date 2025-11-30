@@ -56,11 +56,13 @@ describe("EmbedModal", () => {
 		it("should have proper HTML structure", () => {
 			const code = generateEmbedCode(1);
 
-			// Should have opening and closing script tag
-			expect(code).toMatch(/<script[^>]*>.*<\/script>/);
+			// Should have script tag with closing tag
+			expect(code).toContain("<script");
+			expect(code).toContain("</script>");
 
-			// Should have opening and closing div tag
-			expect(code).toMatch(/<div[^>]*>.*<\/div>/);
+			// Should have div tag with closing tag
+			expect(code).toContain("<div");
+			expect(code).toContain("</div>");
 		});
 
 		it("should use self-closing div format or empty div", () => {

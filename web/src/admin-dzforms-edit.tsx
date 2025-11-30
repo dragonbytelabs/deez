@@ -355,8 +355,8 @@ export const AdminDZFormsEdit = () => {
         <EmbedModal
           isOpen={embedModalOpen}
           setIsOpen={setEmbedModalOpen}
-          formId={form()?.id ?? 0}
-          formName={form()?.name ?? "Form"}
+          formId={form()!.id}
+          formName={form()!.name}
         />
       </Show>
     </main>
