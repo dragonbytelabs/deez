@@ -13,8 +13,10 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+
 # Copy built frontend assets
 COPY --from=frontend-builder /app/web/dist ./web/dist
+
 RUN CGO_ENABLED=0 GOOS=linux go build -o server cmd/server/main.go
 
 # Stage 3: Final runtime image
@@ -27,15 +29,18 @@ RUN apk --no-cache add ca-certificates wget
 # Copy the binary from builder
 COPY --from=backend-builder /app/server ./server
 
+# Copy content direectory
+COPY --from=backend-builder /app/dz_content ./dz_content
+
 # Copy database migrations and queries (embedded via go:embed)
 # These are already embedded in the binary, but we include .env.example as reference
-COPY .env.example .env.example
+COPY .env.example .env
 
 # Create directories for data persistence
 RUN mkdir -p /app/uploads
 
 # Set default environment variables
-ENV PORT=:3000
+ENV PORT=3000
 ENV DATABASE_PATH=/app/data/dz.db
 ENV MEDIA_STORAGE_PATH=/app/uploads
 
