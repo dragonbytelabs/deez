@@ -58,8 +58,16 @@ func RegisterAdmin(mux *http.ServeMux, db *dbx.DB) {
 		}
 
 		// Fetch updated values
-		loginEnabled, _ := db.IsPublicLoginEnabled(r.Context())
-		registerEnabled, _ := db.IsPublicRegisterEnabled(r.Context())
+		loginEnabled, err := db.IsPublicLoginEnabled(r.Context())
+		if err != nil {
+			http.Error(w, "failed to fetch updated login setting", http.StatusInternalServerError)
+			return
+		}
+		registerEnabled, err := db.IsPublicRegisterEnabled(r.Context())
+		if err != nil {
+			http.Error(w, "failed to fetch updated register setting", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
