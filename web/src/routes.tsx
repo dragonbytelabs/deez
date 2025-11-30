@@ -1,5 +1,5 @@
 import { Route, Router } from "@solidjs/router";
-import { Admin } from "./Admin";
+import { Admin } from "./admin";
 import { AdminAppearance } from "./admin-appearance";
 import { AdminDZForms } from "./admin-dzforms";
 import { AdminDZFormsNew } from "./admin-dzforms-new";
@@ -24,100 +24,81 @@ import { Login } from "./Login";
 import { Register } from "./Register";
 
 export const Routes = () => {
-const PHome = () => (<ProtectedRoute><Home /></ProtectedRoute>)
-const PAdmin = () => (<ProtectedRoute><Admin/></ProtectedRoute>)
-const PAdminTables = () => (<ProtectedRoute><AdminTables/></ProtectedRoute>)
-const PAdminMedia = () => (<ProtectedRoute><AdminMedia/></ProtectedRoute>)
-const PAdminAppearance = () => (<ProtectedRoute><AdminAppearance/></ProtectedRoute>)
-const PAdminSettings = () => (<ProtectedRoute><AdminSettings/></ProtectedRoute>)
-const PAdminPlugins = () => (<ProtectedRoute><AdminPlugins/></ProtectedRoute>)
-const PAdminDZForms = () => (<ProtectedRoute><AdminDZForms/></ProtectedRoute>)
-const PAdminDZFormsNew = () => (<ProtectedRoute><AdminDZFormsNew/></ProtectedRoute>)
-const PAdminDZFormsEntries = () => (<ProtectedRoute><AdminDZFormsEntries/></ProtectedRoute>)
-const PAdminDZFormsSettings = () => (<ProtectedRoute><AdminDZFormsSettings/></ProtectedRoute>)
-const PAdminDZFormsImportExport = () => (<ProtectedRoute><AdminDZFormsImportExport/></ProtectedRoute>)
-const PAdminDZFormsAddons = () => (<ProtectedRoute><AdminDZFormsAddons/></ProtectedRoute>)
-const PAdminDZFormsSystemStatus = () => (<ProtectedRoute><AdminDZFormsSystemStatus/></ProtectedRoute>)
-const PAdminDZFormsHelp = () => (<ProtectedRoute><AdminDZFormsHelp/></ProtectedRoute>)
-const PAdminThemes = () => (<ProtectedRoute><AdminThemes/></ProtectedRoute>)
-const PAdminProfile = () => (<ProtectedRoute><AdminUserProfile/></ProtectedRoute>)
-const PAdminOnboarding = () => (<ProtectedRoute><AdminOnboarding/></ProtectedRoute>)
 	return (
 		<Router root={Layout}>
-			<Route path="/" component={PHome} />
+			<Route path="/" component={() => (<GuestRoute><Home /></GuestRoute>)} />
 			<Route
 				path="/_/admin"
-				component={PAdmin}
+				component={() => (<ProtectedRoute><Admin/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/tables"
-				component={PAdminTables}
+				component={() => (<ProtectedRoute><AdminTables/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/media"
-				component={PAdminMedia}
+				component={() => (<ProtectedRoute><AdminMedia/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/appearance"
-				component={PAdminAppearance}
+				component={() => (<ProtectedRoute><AdminAppearance/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/themes"
-				component={PAdminThemes}
+				component={() => (<ProtectedRoute><AdminThemes/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/settings"
-				component={PAdminSettings}
+				component={() => (<ProtectedRoute><AdminSettings/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins"
-				component={PAdminPlugins}
+				component={() => (<ProtectedRoute><AdminPlugins/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms"
-				component={PAdminDZForms}
+				component={() => (<ProtectedRoute><AdminDZForms/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/new"
-				component={PAdminDZFormsNew}
+				component={() => (<ProtectedRoute><AdminDZFormsNew/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/entries"
-				component={PAdminDZFormsEntries}
+				component={() => (<ProtectedRoute><AdminDZFormsEntries/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/settings"
-				component={PAdminDZFormsSettings}
+				component={() => (<ProtectedRoute><AdminDZFormsSettings/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/import-export"
-				component={PAdminDZFormsImportExport}
+				component={() => (<ProtectedRoute><AdminDZFormsImportExport/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/addons"
-				component={PAdminDZFormsAddons}
+				component={() => (<ProtectedRoute><AdminDZFormsAddons/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/system-status"
-				component={PAdminDZFormsSystemStatus}
+				component={() => (<ProtectedRoute><AdminDZFormsSystemStatus/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/help"
-				component={PAdminDZFormsHelp}
+				component={() => (<ProtectedRoute><AdminDZFormsHelp/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/user/profile"
-				component={PAdminProfile}
+				component={() => (<ProtectedRoute><AdminUserProfile/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/onboarding"
-				component={PAdminOnboarding}
+
+				component ={ () => (<ProtectedRoute><AdminOnboarding/></ProtectedRoute>)}
 			/>
-			<Route path="/_/admin/login" component={() => <GuestRoute component={Login} />} />
+			<Route path="/_/admin/login" component={() => <GuestRoute><Login /></GuestRoute>} />
 			<Route
-				path="/_/admin/register"
-				component={() => <GuestRoute component={Register} />}
-			/>
+				path="/_/admin/register" component={() => <GuestRoute><Register /></GuestRoute>} />
 		</Router>
 	);
 }
