@@ -11,6 +11,64 @@ import (
 )
 
 func RegisterAdmin(mux *http.ServeMux, db *dbx.DB) {
+	// Get public auth settings
+	mux.Handle("GET /api/admin/settings/public-auth", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		loginEnabled, err := db.IsPublicLoginEnabled(r.Context())
+		if err != nil {
+			http.Error(w, "failed to get public login setting", http.StatusInternalServerError)
+			return
+		}
+
+		registerEnabled, err := db.IsPublicRegisterEnabled(r.Context())
+		if err != nil {
+			http.Error(w, "failed to get public register setting", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"public_login_enabled":    loginEnabled,
+			"public_register_enabled": registerEnabled,
+		})
+	})))
+
+	// Update public auth settings
+	mux.Handle("PUT /api/admin/settings/public-auth", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			PublicLoginEnabled    *bool `json:"public_login_enabled"`
+			PublicRegisterEnabled *bool `json:"public_register_enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+
+		if in.PublicLoginEnabled != nil {
+			if err := db.SetPublicLoginEnabled(r.Context(), *in.PublicLoginEnabled); err != nil {
+				http.Error(w, "failed to update public login setting", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if in.PublicRegisterEnabled != nil {
+			if err := db.SetPublicRegisterEnabled(r.Context(), *in.PublicRegisterEnabled); err != nil {
+				http.Error(w, "failed to update public register setting", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Fetch updated values
+		loginEnabled, _ := db.IsPublicLoginEnabled(r.Context())
+		registerEnabled, _ := db.IsPublicRegisterEnabled(r.Context())
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":                 true,
+			"public_login_enabled":    loginEnabled,
+			"public_register_enabled": registerEnabled,
+		})
+	})))
+
 	// Get all table names
 	mux.Handle("GET /api/admin/tables", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tables, err := db.GetAllTables(r.Context())

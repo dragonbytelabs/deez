@@ -11,6 +11,27 @@ import (
 )
 
 func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
+	// Public endpoint to check if public auth is enabled (for themes)
+	mux.HandleFunc("GET /api/public-auth", func(w http.ResponseWriter, r *http.Request) {
+		loginEnabled, err := db.IsPublicLoginEnabled(r.Context())
+		if err != nil {
+			log.Printf("error checking public login status: %v", err)
+			loginEnabled = false
+		}
+
+		registerEnabled, err := db.IsPublicRegisterEnabled(r.Context())
+		if err != nil {
+			log.Printf("error checking public register status: %v", err)
+			registerEnabled = false
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"login_enabled":    loginEnabled,
+			"register_enabled": registerEnabled,
+		})
+	})
+
 	mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
 		sess := session.GetSession(r)
 
