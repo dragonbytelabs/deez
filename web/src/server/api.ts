@@ -28,6 +28,7 @@ const routes: Route = {
 	mediaUpload: "/api/media/upload",
 	updateDisplayName: "/api/admin/user/display-name",
 	themes: "/api/themes",
+	publicTheme: "/api/public-theme",
 	plugins: "/api/plugins",
 	pluginsActive: "/api/plugins/active",
 	dzforms: "/api/dzforms/forms",
@@ -268,6 +269,13 @@ const getThemesFunc = async () => {
 	return response;
 };
 
+const getPublicThemeFunc = async () => {
+	const response = await fetch(routes.publicTheme, {
+		credentials: "include",
+	});
+	return response;
+};
+
 const activateThemeFunc = async (themeName: string) => {
 	const r = await fetch(`${routes.themes}/${themeName}/activate`, {
 		method: methods.POST,
@@ -466,6 +474,7 @@ type ApiRoutes = {
 	deleteMedia: (id: number) => Promise<Response>;
 	updateDisplayName: (displayName: string) => Promise<Response>;
 	getThemes: () => Promise<Response>;
+	getPublicTheme: () => Promise<Response>;
 	activateTheme: (themeName: string) => Promise<Response>;
 	deactivateTheme: () => Promise<Response>;
 	// Plugin functions
@@ -505,6 +514,7 @@ export const api: ApiRoutes = {
 	deleteMedia: deleteMediaFunc,
 	updateDisplayName: updateDisplayNameFunc,
 	getThemes: getThemesFunc,
+	getPublicTheme: getPublicThemeFunc,
 	activateTheme: activateThemeFunc,
 	deactivateTheme: deactivateThemeFunc,
 	// Plugin functions

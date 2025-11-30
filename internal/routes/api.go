@@ -11,6 +11,20 @@ import (
 )
 
 func RegisterAPI(mux *http.ServeMux, db *dbx.DB) {
+	// Public endpoint to get the active theme
+	mux.HandleFunc("GET /api/public-theme", func(w http.ResponseWriter, r *http.Request) {
+		activeTheme, err := db.GetActiveTheme(r.Context())
+		if err != nil {
+			log.Printf("error getting active theme: %v", err)
+			activeTheme = ""
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"active_theme": activeTheme,
+		})
+	})
+
 	// Public endpoint to check if public auth is enabled (for themes)
 	mux.HandleFunc("GET /api/public-auth", func(w http.ResponseWriter, r *http.Request) {
 		loginEnabled, err := db.IsPublicLoginEnabled(r.Context())

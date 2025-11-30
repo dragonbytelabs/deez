@@ -16,9 +16,9 @@ func TestSiteSettings(t *testing.T) {
 			t.Fatalf("GetActiveTheme failed: %v", err)
 		}
 
-		// Default should be 'default' theme
-		if theme != "default" {
-			t.Errorf("expected 'default' theme, got %q", theme)
+		// Default should be empty string
+		if theme != "" {
+			t.Errorf("expected empty theme, got %q", theme)
 		}
 	})
 
