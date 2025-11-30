@@ -17,6 +17,9 @@ export default defineConfig(() => ({
 			"/api": {
 				target: "http://localhost:3000", // Replace with your backend server's address
 			},
+			"/_/preview": {
+				target: "http://localhost:3000",
+			},
 		},
 	},
 	test: {
