@@ -31,6 +31,7 @@ const routes: Route = {
 	plugins: "/api/plugins",
 	pluginsActive: "/api/plugins/active",
 	dzforms: "/api/dzforms/forms",
+	publicAuthSettings: "/api/admin/settings/public-auth",
 };
 
 export type UserInfo = {
@@ -356,6 +357,38 @@ const updateFormFunc = async (id: number, name: string, description: string, fie
 	return r;
 };
 
+// Public auth settings functions
+const getPublicAuthSettingsFunc = async () => {
+	const response = await fetch(routes.publicAuthSettings, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const updatePublicAuthSettingsFunc = async (loginEnabled?: boolean, registerEnabled?: boolean) => {
+	const body: { public_login_enabled?: boolean; public_register_enabled?: boolean } = {};
+	if (loginEnabled !== undefined) {
+		body.public_login_enabled = loginEnabled;
+	}
+	if (registerEnabled !== undefined) {
+		body.public_register_enabled = registerEnabled;
+	}
+	const r = await fetch(routes.publicAuthSettings, {
+		method: methods.PUT,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify(body),
+		credentials: "include",
+	});
+	return r;
+};
+
+export type PublicAuthSettings = {
+	public_login_enabled: boolean;
+	public_register_enabled: boolean;
+};
+
 type ApiRoutes = {
 	login: (email: string, password: string) => Promise<Response>;
 	register: (
@@ -388,6 +421,9 @@ type ApiRoutes = {
 	getFormById: (id: number) => Promise<Response>;
 	createForm: (name: string, description: string, fields: string) => Promise<Response>;
 	updateForm: (id: number, name: string, description: string, fields: string) => Promise<Response>;
+	// Public auth settings functions
+	getPublicAuthSettings: () => Promise<Response>;
+	updatePublicAuthSettings: (loginEnabled?: boolean, registerEnabled?: boolean) => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -418,4 +454,7 @@ export const api: ApiRoutes = {
 	getFormById: getFormByIdFunc,
 	createForm: createFormFunc,
 	updateForm: updateFormFunc,
+	// Public auth settings functions
+	getPublicAuthSettings: getPublicAuthSettingsFunc,
+	updatePublicAuthSettings: updatePublicAuthSettingsFunc,
 };

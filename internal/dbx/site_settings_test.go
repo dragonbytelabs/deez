@@ -90,3 +90,95 @@ func TestSiteSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestPublicAuthSettings(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	t.Run("public login disabled by default", func(t *testing.T) {
+		enabled, err := db.IsPublicLoginEnabled(ctx)
+		if err != nil {
+			t.Fatalf("IsPublicLoginEnabled failed: %v", err)
+		}
+
+		if enabled {
+			t.Error("expected public login to be disabled by default")
+		}
+	})
+
+	t.Run("public register disabled by default", func(t *testing.T) {
+		enabled, err := db.IsPublicRegisterEnabled(ctx)
+		if err != nil {
+			t.Fatalf("IsPublicRegisterEnabled failed: %v", err)
+		}
+
+		if enabled {
+			t.Error("expected public register to be disabled by default")
+		}
+	})
+
+	t.Run("enable and disable public login", func(t *testing.T) {
+		// Enable
+		err := db.SetPublicLoginEnabled(ctx, true)
+		if err != nil {
+			t.Fatalf("SetPublicLoginEnabled(true) failed: %v", err)
+		}
+
+		enabled, err := db.IsPublicLoginEnabled(ctx)
+		if err != nil {
+			t.Fatalf("IsPublicLoginEnabled failed: %v", err)
+		}
+
+		if !enabled {
+			t.Error("expected public login to be enabled")
+		}
+
+		// Disable
+		err = db.SetPublicLoginEnabled(ctx, false)
+		if err != nil {
+			t.Fatalf("SetPublicLoginEnabled(false) failed: %v", err)
+		}
+
+		enabled, err = db.IsPublicLoginEnabled(ctx)
+		if err != nil {
+			t.Fatalf("IsPublicLoginEnabled failed: %v", err)
+		}
+
+		if enabled {
+			t.Error("expected public login to be disabled")
+		}
+	})
+
+	t.Run("enable and disable public register", func(t *testing.T) {
+		// Enable
+		err := db.SetPublicRegisterEnabled(ctx, true)
+		if err != nil {
+			t.Fatalf("SetPublicRegisterEnabled(true) failed: %v", err)
+		}
+
+		enabled, err := db.IsPublicRegisterEnabled(ctx)
+		if err != nil {
+			t.Fatalf("IsPublicRegisterEnabled failed: %v", err)
+		}
+
+		if !enabled {
+			t.Error("expected public register to be enabled")
+		}
+
+		// Disable
+		err = db.SetPublicRegisterEnabled(ctx, false)
+		if err != nil {
+			t.Fatalf("SetPublicRegisterEnabled(false) failed: %v", err)
+		}
+
+		enabled, err = db.IsPublicRegisterEnabled(ctx)
+		if err != nil {
+			t.Fatalf("IsPublicRegisterEnabled failed: %v", err)
+		}
+
+		if enabled {
+			t.Error("expected public register to be disabled")
+		}
+	})
+}

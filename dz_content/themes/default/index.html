@@ -49,7 +49,15 @@
             margin-bottom: 2rem;
         }
         
-        .admin-link {
+        .links {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .admin-link, .auth-link {
             display: inline-block;
             padding: 1rem 2rem;
             background: white;
@@ -61,9 +69,23 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
         
-        .admin-link:hover {
+        .admin-link:hover, .auth-link:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .auth-link {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+        }
+        
+        .auth-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .hidden {
+            display: none;
         }
         
         .footer {
@@ -78,10 +100,33 @@
         <div class="logo">DZ</div>
         <h1>Welcome to Your Site</h1>
         <p>This is the default theme. Upload a custom theme or customize this one to get started.</p>
-        <a href="/_/admin" class="admin-link">Go to Admin Panel</a>
+        <div class="links">
+            <a href="/_/admin" class="admin-link">Go to Admin Panel</a>
+            <a href="/login" id="login-link" class="auth-link hidden">Login</a>
+            <a href="/register" id="register-link" class="auth-link hidden">Register</a>
+        </div>
         <div class="footer">
             <p>Powered by DZ CMS</p>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch('/api/public-auth');
+                const data = await response.json();
+                
+                if (data.login_enabled) {
+                    document.getElementById('login-link').classList.remove('hidden');
+                }
+                
+                if (data.register_enabled) {
+                    document.getElementById('register-link').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+            }
+        });
+    </script>
 </body>
 </html>

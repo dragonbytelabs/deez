@@ -365,6 +365,14 @@ func ServeTheme(themesPath string, activeTheme string) http.Handler {
 			path = "/index.html"
 		}
 
+		// Handle special auth routes - map /login to login.html and /register to register.html
+		if path == "/login" || path == "/login/" {
+			path = "/login.html"
+		}
+		if path == "/register" || path == "/register/" {
+			path = "/register.html"
+		}
+
 		// Clean the path and get absolute paths for security comparison
 		cleanPath := filepath.Clean(path)
 		filePath := filepath.Join(themePath, cleanPath)
