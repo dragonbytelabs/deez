@@ -12,6 +12,35 @@ const getInitialSidebarState = (mockStorage: Record<string, string | null>): boo
 	}
 };
 
+// Test the admin route detection logic from protected-route.tsx
+const isAdminRoute = (pathname: string): boolean => {
+	return pathname.startsWith("/_/admin");
+};
+
+describe("Protected Route - Admin Route Detection", () => {
+	it("should return true for /_/admin path", () => {
+		expect(isAdminRoute("/_/admin")).toBe(true);
+	});
+
+	it("should return true for admin sub-routes", () => {
+		expect(isAdminRoute("/_/admin/tables")).toBe(true);
+		expect(isAdminRoute("/_/admin/media")).toBe(true);
+		expect(isAdminRoute("/_/admin/plugins")).toBe(true);
+		expect(isAdminRoute("/_/admin/plugins/dzforms")).toBe(true);
+		expect(isAdminRoute("/_/admin/user/profile")).toBe(true);
+	});
+
+	it("should return false for root path (public site)", () => {
+		expect(isAdminRoute("/")).toBe(false);
+	});
+
+	it("should return false for non-admin paths", () => {
+		expect(isAdminRoute("/about")).toBe(false);
+		expect(isAdminRoute("/contact")).toBe(false);
+		expect(isAdminRoute("/admin")).toBe(false);
+	});
+});
+
 describe("Protected Route - Sidebar State", () => {
 	describe("getInitialSidebarState", () => {
 		it("should return true when no value is stored", () => {

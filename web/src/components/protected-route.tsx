@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import {
 	createSignal,
 	onMount,
@@ -21,8 +21,11 @@ const layout = css`
 
 export const ProtectedRoute: ParentComponent = (props) => {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { actions} = useDz();
 	const [isAuthenticated, setIsAuthenticated] = createSignal<boolean>(false);
+
+	const isAdminRoute = () => location.pathname.startsWith("/_/admin");
 
 	onMount(async () => {
 		const result = await api.me();
@@ -42,10 +45,12 @@ export const ProtectedRoute: ParentComponent = (props) => {
 		<Show when={isAuthenticated() !== null} fallback={<div>Loading...</div>}>
 			<Show when={isAuthenticated()} fallback={null}>
 				<div class={layout}>
-					<Sidebar />
-					{/* Desktop toggle button - outside sidebar */}
-					<SidebarToggleButton />
-					<ProtectedRouteMain>
+					<Show when={isAdminRoute()}>
+						<Sidebar />
+						{/* Desktop toggle button - outside sidebar */}
+						<SidebarToggleButton />
+					</Show>
+					<ProtectedRouteMain isAdminRoute={isAdminRoute()}>
 						{props.children}
 					</ProtectedRouteMain>
 				</div>

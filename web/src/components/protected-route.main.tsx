@@ -4,6 +4,10 @@ import {
 } from "solid-js";
 import { useDz} from "../dz-context";
 
+interface ProtectedRouteMainProps {
+    isAdminRoute?: boolean;
+}
+
 const mainContent = css`
   flex: 1;
   margin-left: 250px;
@@ -13,6 +17,10 @@ const mainContent = css`
   
   &.sidebar-closed {
     margin-left: 80px;
+  }
+  
+  &.no-sidebar {
+    margin-left: 0;
   }
   
   @media (max-width: 768px) {
@@ -31,14 +39,15 @@ const pageContent = css`
 `;
 
 
-export const ProtectedRouteMain: ParentComponent = (props) => {
+export const ProtectedRouteMain: ParentComponent<ProtectedRouteMainProps> = (props) => {
     const { store} = useDz();
     return (
         <div
             class={mainContent}
             classList={{
-                "sidebar-closed": !store.settings.sidebarOpen,
-                "sidebar-open": store.settings.sidebarOpen,
+                "sidebar-closed": props.isAdminRoute && !store.settings.sidebarOpen,
+                "sidebar-open": props.isAdminRoute && store.settings.sidebarOpen,
+                "no-sidebar": !props.isAdminRoute,
             }}
         >
             <div class={pageContent}>
