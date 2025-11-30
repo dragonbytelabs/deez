@@ -7,5 +7,5 @@ CREATE TABLE IF NOT EXISTS site_settings (
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert default active theme setting (empty means no theme active, admin will be served)
-INSERT INTO site_settings (setting_key, setting_value) VALUES ('active_theme', '');
+-- Insert default active theme setting (defaults to 'default' theme if it exists)
+INSERT INTO site_settings (setting_key, setting_value) VALUES ('active_theme', 'default');
