@@ -316,11 +316,15 @@ interface PluginSubMenu {
   items: { title: string; link: string }[];
 }
 
+// Path constant for dynamic routes that need special handling
+const DZFORMS_EDIT_PATH = "/_/admin/plugins/dzforms/edit/";
+
 const pluginSubMenus: PluginSubMenu[] = [
   {
     name: "dzforms",
     title: "Forms",
     items: [
+      { title: "Forms", link: "/_/admin/plugins/dzforms/forms" },
       { title: "New Form", link: "/_/admin/plugins/dzforms/new" },
       { title: "Entries", link: "/_/admin/plugins/dzforms/entries" },
       { title: "Settings", link: "/_/admin/plugins/dzforms/settings" },
@@ -384,7 +388,9 @@ export const Sidebar: Component = () => {
   const isPluginActive = (plugin: { link: string; subMenu?: PluginSubMenu }) => {
     if (isActive(plugin.link)) return true;
     if (plugin.subMenu) {
-      return plugin.subMenu.items.some(item => isActive(item.link));
+      // Check for exact matches or paths that start with a submenu item link (for dynamic routes like edit/:id)
+      return plugin.subMenu.items.some(item => isActive(item.link)) ||
+        location.pathname.startsWith(DZFORMS_EDIT_PATH);
     }
     return false;
   };
@@ -407,7 +413,8 @@ export const Sidebar: Component = () => {
       if (plugin.subMenu) {
         const isOnSubPage = plugin.subMenu.items.some(item => 
           location.pathname === item.link
-        ) || location.pathname === plugin.link;
+        ) || location.pathname === plugin.link ||
+          location.pathname.startsWith(DZFORMS_EDIT_PATH);
         if (isOnSubPage && !expandedPlugins().has(plugin.name)) {
           setExpandedPlugins(prev => {
             const newSet = new Set(prev);
