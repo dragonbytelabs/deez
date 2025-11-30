@@ -159,16 +159,22 @@ export const AdminDZFormsEdit = () => {
   const [form, setForm] = createSignal<FormInfo | null>(null);
   const [name, setName] = createSignal("");
   const [description, setDescription] = createSignal("");
+  // fields state is maintained for future form builder functionality - currently preserves existing fields on save
   const [fields, setFields] = createSignal("[]");
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [success, setSuccess] = createSignal<string | null>(null);
 
+  const getFormId = (): number | null => {
+    const formId = Number.parseInt(params.id, 10);
+    return Number.isNaN(formId) ? null : formId;
+  };
+
   const fetchForm = async () => {
     try {
-      const formId = Number.parseInt(params.id, 10);
-      if (Number.isNaN(formId)) {
+      const formId = getFormId();
+      if (formId === null) {
         setError("Invalid form ID");
         setLoading(false);
         return;
@@ -207,7 +213,11 @@ export const AdminDZFormsEdit = () => {
     setSuccess(null);
 
     try {
-      const formId = Number.parseInt(params.id, 10);
+      const formId = getFormId();
+      if (formId === null) {
+        setError("Invalid form ID");
+        return;
+      }
       const response = await api.updateForm(formId, name(), description(), fields());
       if (response.ok) {
         setSuccess("Form updated successfully");

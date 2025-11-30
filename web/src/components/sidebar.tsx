@@ -316,6 +316,9 @@ interface PluginSubMenu {
   items: { title: string; link: string }[];
 }
 
+// Path constant for dynamic routes that need special handling
+const DZFORMS_EDIT_PATH = "/_/admin/plugins/dzforms/edit/";
+
 const pluginSubMenus: PluginSubMenu[] = [
   {
     name: "dzforms",
@@ -387,7 +390,7 @@ export const Sidebar: Component = () => {
     if (plugin.subMenu) {
       // Check for exact matches or paths that start with a submenu item link (for dynamic routes like edit/:id)
       return plugin.subMenu.items.some(item => isActive(item.link)) ||
-        location.pathname.startsWith("/_/admin/plugins/dzforms/edit/");
+        location.pathname.startsWith(DZFORMS_EDIT_PATH);
     }
     return false;
   };
@@ -411,7 +414,7 @@ export const Sidebar: Component = () => {
         const isOnSubPage = plugin.subMenu.items.some(item => 
           location.pathname === item.link
         ) || location.pathname === plugin.link ||
-          location.pathname.startsWith("/_/admin/plugins/dzforms/edit/");
+          location.pathname.startsWith(DZFORMS_EDIT_PATH);
         if (isOnSubPage && !expandedPlugins().has(plugin.name)) {
           setExpandedPlugins(prev => {
             const newSet = new Set(prev);
