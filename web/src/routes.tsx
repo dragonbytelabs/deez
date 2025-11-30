@@ -5,6 +5,7 @@ import { AdminDZForms } from "./admin-dzforms";
 import { AdminDZFormsNew } from "./admin-dzforms-new";
 import { AdminDZFormsForms } from "./admin-dzforms-forms";
 import { AdminDZFormsEdit } from "./admin-dzforms-edit";
+import { AdminDZFormsPreview } from "./admin-dzforms-preview";
 import { AdminDZFormsEntries } from "./admin-dzforms-entries";
 import { AdminDZFormsSettings } from "./admin-dzforms-settings";
 import { AdminDZFormsImportExport } from "./admin-dzforms-import-export";
@@ -72,6 +73,10 @@ export const Routes = () => {
 			<Route
 				path="/_/admin/plugins/dzforms/edit/:id"
 				component={() => (<ProtectedRoute><AdminDZFormsEdit/></ProtectedRoute>)}
+			/>
+			<Route
+				path="/_/admin/plugins/dzforms/preview/:id"
+				component={() => (<ProtectedRoute><AdminDZFormsPreview/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/plugins/dzforms/entries"

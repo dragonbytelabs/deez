@@ -120,6 +120,22 @@ const cancelButton = css`
   }
 `;
 
+const previewButton = css`
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--primary);
+    color: white;
+  }
+`;
+
 const errorText = css`
   color: #ef4444;
   font-size: 14px;
@@ -293,6 +309,13 @@ export const AdminDZFormsEdit = () => {
                 disabled={saving()}
               >
                 {saving() ? "Saving..." : "Save Changes"}
+              </button>
+              <button
+                type="button"
+                class={previewButton}
+                onClick={() => navigate(`/_/admin/plugins/dzforms/preview/${params.id}`)}
+              >
+                Preview Form
               </button>
               <button
                 type="button"
