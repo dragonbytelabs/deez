@@ -32,6 +32,7 @@ const routes: Route = {
 	pluginsActive: "/api/plugins/active",
 	dzforms: "/api/dzforms/forms",
 	publicAuthSettings: "/api/admin/settings/public-auth",
+	posts: "/api/posts",
 };
 
 export type UserInfo = {
@@ -89,6 +90,14 @@ export type FormInfo = {
 	fields: string;
 	created_at: string;
 	updated_at?: string;
+};
+
+export type PostInfo = {
+	id: number;
+	title: string;
+	content: string;
+	created_at: string;
+	updated_at: string;
 };
 
 type MeFuncData = {
@@ -384,6 +393,55 @@ const updatePublicAuthSettingsFunc = async (loginEnabled?: boolean, registerEnab
 	return r;
 };
 
+// Posts functions
+const getPostsFunc = async () => {
+	const response = await fetch(routes.posts, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const getPostByIdFunc = async (id: number) => {
+	const response = await fetch(`${routes.posts}/${id}`, {
+		credentials: "include",
+	});
+	return response;
+};
+
+const createPostFunc = async (title: string, content: string) => {
+	const body = JSON.stringify({ title, content });
+	const r = await fetch(routes.posts, {
+		method: methods.POST,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
+		credentials: "include",
+	});
+	return r;
+};
+
+const updatePostFunc = async (id: number, title: string, content: string) => {
+	const body = JSON.stringify({ title, content });
+	const r = await fetch(`${routes.posts}/${id}`, {
+		method: methods.PUT,
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body,
+		credentials: "include",
+	});
+	return r;
+};
+
+const deletePostFunc = async (id: number) => {
+	const r = await fetch(`${routes.posts}/${id}`, {
+		method: methods.DELETE,
+		credentials: "include",
+	});
+	return r;
+};
+
 export type PublicAuthSettings = {
 	public_login_enabled: boolean;
 	public_register_enabled: boolean;
@@ -424,6 +482,12 @@ type ApiRoutes = {
 	// Public auth settings functions
 	getPublicAuthSettings: () => Promise<Response>;
 	updatePublicAuthSettings: (loginEnabled?: boolean, registerEnabled?: boolean) => Promise<Response>;
+	// Posts functions
+	getPosts: () => Promise<Response>;
+	getPostById: (id: number) => Promise<Response>;
+	createPost: (title: string, content: string) => Promise<Response>;
+	updatePost: (id: number, title: string, content: string) => Promise<Response>;
+	deletePost: (id: number) => Promise<Response>;
 };
 
 export const api: ApiRoutes = {
@@ -457,4 +521,10 @@ export const api: ApiRoutes = {
 	// Public auth settings functions
 	getPublicAuthSettings: getPublicAuthSettingsFunc,
 	updatePublicAuthSettings: updatePublicAuthSettingsFunc,
+	// Posts functions
+	getPosts: getPostsFunc,
+	getPostById: getPostByIdFunc,
+	createPost: createPostFunc,
+	updatePost: updatePostFunc,
+	deletePost: deletePostFunc,
 };
