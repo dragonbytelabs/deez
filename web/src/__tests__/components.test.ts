@@ -55,3 +55,19 @@ describe("AdminPlugins Component", () => {
 		expect(typeof AdminPlugins).toBe("function");
 	});
 });
+
+describe("AdminDZFormsForms Component", () => {
+	it("should export an AdminDZFormsForms component", async () => {
+		const { AdminDZFormsForms } = await import("../admin-dzforms-forms");
+		expect(AdminDZFormsForms).toBeDefined();
+		expect(typeof AdminDZFormsForms).toBe("function");
+	});
+});
+
+describe("AdminDZFormsEdit Component", () => {
+	it("should export an AdminDZFormsEdit component", async () => {
+		const { AdminDZFormsEdit } = await import("../admin-dzforms-edit");
+		expect(AdminDZFormsEdit).toBeDefined();
+		expect(typeof AdminDZFormsEdit).toBe("function");
+	});
+});
