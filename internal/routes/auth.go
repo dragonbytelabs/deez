@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -56,6 +57,15 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 			return
 		}
 		log.Printf("Register: user created successfully, id=%d", u.ID)
+
+		// Check if this is a fresh install - if so, create a team for the user
+		isFreshInstall, err := db.IsFreshInstall(r.Context())
+		if err != nil {
+			log.Printf("Register: IsFreshInstall error: %v", err)
+			// Don't fail registration for this, just log the error
+		} else if isFreshInstall {
+			createInitialTeam(r.Context(), db, displayName, u.ID)
+		}
 
 		// Get session and migrate it
 		sess := session.GetSession(r)
@@ -174,4 +184,21 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 			"redirect": "/_/admin/login",
 		})
 	})
+}
+
+// createInitialTeam creates a team for the initial user on fresh install and adds them as admin
+func createInitialTeam(ctx context.Context, db *dbx.DB, teamName string, userID int64) {
+	team, err := db.CreateTeam(ctx, teamName, nil, nil)
+	if err != nil {
+		log.Printf("Register: CreateTeam error: %v", err)
+		return
+	}
+
+	_, err = db.AddTeamMember(ctx, team.ID, userID, "admin")
+	if err != nil {
+		log.Printf("Register: AddTeamMember error: %v", err)
+		return
+	}
+
+	log.Printf("Register: created team '%s' (id=%d) and added user as admin", teamName, team.ID)
 }

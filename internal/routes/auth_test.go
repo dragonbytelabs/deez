@@ -132,3 +132,79 @@ func TestRegisterAuth(t *testing.T) {
 		}
 	})
 }
+
+func TestRegisterAuth_FreshInstallCreatesTeam(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Create session manager for testing
+	store := session.NewInMemoryStore()
+	sm := session.NewSessionManager(store, 30*time.Minute, 1*time.Hour, 12*time.Hour, "session_id")
+
+	mux := http.NewServeMux()
+	RegisterAuth(mux, db, sm)
+	handler := sm.Handle(mux)
+
+	ctx := context.Background()
+
+	// Verify fresh_install is true initially
+	isFresh, err := db.IsFreshInstall(ctx)
+	if err != nil {
+		t.Fatalf("IsFreshInstall() returned error: %v", err)
+	}
+	if !isFresh {
+		t.Fatal("IsFreshInstall() should be true initially")
+	}
+
+	t.Run("first user registration creates team with display name and adds user as admin", func(t *testing.T) {
+		body := strings.NewReader(`{"email":"firstuser@example.com","password":"password123","confirmPassword":"password123"}`)
+		req := httptest.NewRequest("POST", "/api/register", body)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("POST /api/register status = %v, want %v", rec.Code, http.StatusOK)
+		}
+
+		// Verify the user was created
+		user, err := db.GetUserByEmail(ctx, "firstuser@example.com")
+		if err != nil {
+			t.Fatalf("GetUserByEmail() returned error: %v", err)
+		}
+		if user == nil {
+			t.Fatal("GetUserByEmail() returned nil for registered user")
+		}
+
+		// Verify a team was created for the user with their display name
+		teams, err := db.GetTeamsByUser(ctx, user.ID)
+		if err != nil {
+			t.Fatalf("GetTeamsByUser() returned error: %v", err)
+		}
+		if len(teams) != 1 {
+			t.Errorf("GetTeamsByUser() returned %d teams, want 1", len(teams))
+		}
+
+		// Display name should be "firstuser" (part before @)
+		expectedTeamName := "firstuser"
+		if teams[0].Name != expectedTeamName {
+			t.Errorf("Team name = %q, want %q", teams[0].Name, expectedTeamName)
+		}
+
+		// Verify the user is an admin of the team
+		members, err := db.GetTeamMembers(ctx, teams[0].ID)
+		if err != nil {
+			t.Fatalf("GetTeamMembers() returned error: %v", err)
+		}
+		if len(members) != 1 {
+			t.Errorf("GetTeamMembers() returned %d members, want 1", len(members))
+		}
+		if members[0].UserID != user.ID {
+			t.Errorf("Team member UserID = %d, want %d", members[0].UserID, user.ID)
+		}
+		if members[0].Role != "admin" {
+			t.Errorf("Team member Role = %q, want %q", members[0].Role, "admin")
+		}
+	})
+}
