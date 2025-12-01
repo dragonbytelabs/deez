@@ -112,9 +112,7 @@ const adminToolbarHTML = `
 <div id="dz-admin-toolbar">
 	<div class="dz-toolbar-left">
 		<a href="/_/admin" class="dz-toolbar-logo" title="Dashboard">
-			<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-				<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-			</svg>
+			<img src="/favicon-32.png" alt="Deez logo" class={logoIcon} />
 		</a>
 		<a href="/_/admin" class="dz-toolbar-item" title="Dashboard">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -136,7 +134,7 @@ const adminToolbarHTML = `
 	<div class="dz-toolbar-right">
 		<a href="/_/admin/user/profile" class="dz-toolbar-item dz-toolbar-user" title="Profile">
 			<img class="dz-toolbar-avatar" id="dz-toolbar-avatar" src="" alt="">
-			<span class="dz-toolbar-item-text" id="dz-toolbar-username">Howdy</span>
+			<span class="dz-toolbar-item-text" id="dz-toolbar-username">Hello</span>
 		</a>
 	</div>
 </div>
@@ -156,7 +154,7 @@ const adminToolbarHTML = `
 				} else {
 					avatar.style.display = 'none';
 				}
-				username.textContent = 'Howdy, ' + (data.user.display_name || 'User');
+				username.textContent = 'Hello, ' + (data.user.display_name || 'User');
 			}
 		})
 		.catch(function(err) {
