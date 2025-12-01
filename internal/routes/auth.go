@@ -57,6 +57,30 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 		}
 		log.Printf("Register: user created successfully, id=%d", u.ID)
 
+		// Check if this is a fresh install - if so, create a team for the user
+		isFreshInstall, err := db.IsFreshInstall(r.Context())
+		if err != nil {
+			log.Printf("Register: IsFreshInstall error: %v", err)
+			// Don't fail registration for this, just log the error
+		}
+		if isFreshInstall {
+			// Create a team with the user's display name
+			team, err := db.CreateTeam(r.Context(), displayName, nil, nil)
+			if err != nil {
+				log.Printf("Register: CreateTeam error: %v", err)
+				// Don't fail registration for this, just log the error
+			} else {
+				// Add the user as an admin of the team
+				_, err = db.AddTeamMember(r.Context(), team.ID, u.ID, "admin")
+				if err != nil {
+					log.Printf("Register: AddTeamMember error: %v", err)
+					// Don't fail registration for this, just log the error
+				} else {
+					log.Printf("Register: created team '%s' (id=%d) and added user as admin", displayName, team.ID)
+				}
+			}
+		}
+
 		// Get session and migrate it
 		sess := session.GetSession(r)
 		if err := sm.Migrate(sess); err != nil {
