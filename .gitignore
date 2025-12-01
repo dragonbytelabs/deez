@@ -11,6 +11,7 @@ node_modules
 dist
 !dist/.gitkeep
 !dist/index.html
+!dist/favicon-32.png
 dist-ssr
 *.local
 

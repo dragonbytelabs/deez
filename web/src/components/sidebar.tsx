@@ -49,7 +49,8 @@ const menuHeader = css`
 `;
 
 const logoIcon = css`
-  font-size: 32px;
+  width: 32px;
+  height: 32px;
   min-width: 32px;
   display: flex;
   align-items: center;
@@ -446,7 +447,7 @@ export const Sidebar: Component = () => {
       {/* Sidebar */}
       <div class={sidebar} classList={{ closed: !store.settings.sidebarOpen }}>
         <div class={menuHeader}>
-          <span class={logoIcon}>🎮</span>
+          <img src="/favicon-32.png" alt="Deez logo" class={logoIcon} />
           <span class={logoText}>Deez</span>
         </div>
 
