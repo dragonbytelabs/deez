@@ -156,7 +156,7 @@ const adminToolbarHTML = `
 				} else {
 					avatar.style.display = 'none';
 				}
-				username.textContent = 'Howdy, ' + (data.user.display_name || data.user.email.split('@')[0]);
+				username.textContent = 'Howdy, ' + (data.user.display_name || 'User');
 			}
 		})
 		.catch(function(err) {
