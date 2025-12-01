@@ -1,7 +1,6 @@
 import { css } from "@linaria/core";
 import { useNavigate } from "@solidjs/router";
 import { type Component, Show, createSignal, For } from "solid-js";
-import { api } from "../server/api";
 import { useDz } from "../dz-context";
 
 const menuIcon = css`
@@ -211,39 +210,10 @@ export const SidebarFooter: Component = () => {
     setShowTeamMenu(false);
   };
 
-  const logout = async () => {
-    try {
-      const response = await api.logout();
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Logout successful:", data);
-        if (data.redirect) {
-          navigate(data.redirect);
-        } else {
-          navigate("/_/admin/login");
-        }
-      } else {
-        const error = await response.text();
-        console.error("Logout failed:", error);
-        alert("Failed to logout. Please try again.");
-      }
-    } catch (error) {
-      console.error("Logout error:", error);
-      alert("Network error during logout.");
-    }
-  };
-
   const handleProfileClick = (event: MouseEvent) => {
     event.stopPropagation();
     closeMenu();
     navigate("/_/admin/user/profile");
-  };
-
-  const handleLogoutClick = (event: MouseEvent) => {
-    event.stopPropagation();
-    closeMenu();
-    logout();
   };
 
   const handleTeamSelect = (teamId: number) => {
@@ -252,6 +222,19 @@ export const SidebarFooter: Component = () => {
       actions.setCurrentTeam(team);
     }
     closeMenu();
+  };
+
+  const handleManageClick = (event: MouseEvent) => {
+    event.stopPropagation();
+    closeMenu();
+    // Navigate to team management page (can be updated when route exists)
+    navigate("/_/admin/settings");
+  };
+
+  const handleSettingsClick = (event: MouseEvent) => {
+    event.stopPropagation();
+    closeMenu();
+    navigate("/_/admin/settings");
   };
 
   const getInitial = (name: string) => {
@@ -271,7 +254,7 @@ export const SidebarFooter: Component = () => {
             <>
               <Show when={showTeamMenu()}>
                 <div class={popupMenu}>
-                  <Show when={store.teams.length > 0}>
+                  <Show when={store.teams.length > 1}>
                     <For each={store.teams}>
                       {(t) => (
                         <button
@@ -298,17 +281,24 @@ export const SidebarFooter: Component = () => {
                   </Show>
                   <button
                     class={popupMenuItem}
+                    onClick={handleManageClick}
+                  >
+                    <span class={menuIcon}>⚙️</span>
+                    <span>Manage</span>
+                  </button>
+                  <button
+                    class={popupMenuItem}
+                    onClick={handleSettingsClick}
+                  >
+                    <span class={menuIcon}>🔧</span>
+                    <span>Settings</span>
+                  </button>
+                  <button
+                    class={popupMenuItem}
                     onClick={handleProfileClick}
                   >
                     <span class={menuIcon}>👤</span>
                     <span>Profile</span>
-                  </button>
-                  <button
-                    class={popupMenuItem}
-                    onClick={handleLogoutClick}
-                  >
-                    <span class={menuIcon}>🚪</span>
-                    <span>Logout</span>
                   </button>
                 </div>
               </Show>
@@ -338,19 +328,50 @@ export const SidebarFooter: Component = () => {
             <>
               <Show when={showTeamMenu()}>
                 <div class={popupMenu}>
+                  <Show when={store.teams.length > 0}>
+                    <For each={store.teams}>
+                      {(t) => (
+                        <button
+                          class={teamMenuItem}
+                          onClick={() => handleTeamSelect(t.id)}
+                        >
+                          <span class={teamMenuAvatar}>
+                            <Show
+                              when={t.avatar_url}
+                              fallback={getInitial(t.name)}
+                            >
+                              <img
+                                src={t.avatar_url}
+                                alt={`${t.name} avatar`}
+                              />
+                            </Show>
+                          </span>
+                          <span>{t.name}</span>
+                        </button>
+                      )}
+                    </For>
+                    <div class={menuDivider} />
+                  </Show>
+                  <button
+                    class={popupMenuItem}
+                    onClick={handleManageClick}
+                  >
+                    <span class={menuIcon}>⚙️</span>
+                    <span>Manage</span>
+                  </button>
+                  <button
+                    class={popupMenuItem}
+                    onClick={handleSettingsClick}
+                  >
+                    <span class={menuIcon}>🔧</span>
+                    <span>Settings</span>
+                  </button>
                   <button
                     class={popupMenuItem}
                     onClick={handleProfileClick}
                   >
                     <span class={menuIcon}>👤</span>
                     <span>Profile</span>
-                  </button>
-                  <button
-                    class={popupMenuItem}
-                    onClick={handleLogoutClick}
-                  >
-                    <span class={menuIcon}>🚪</span>
-                    <span>Logout</span>
                   </button>
                 </div>
               </Show>
