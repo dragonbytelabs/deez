@@ -29,15 +29,16 @@ RUN apk --no-cache add ca-certificates wget
 # Copy the binary from builder
 COPY --from=backend-builder /app/server ./server
 
-# Copy content direectory
+# Copy content directory
 COPY --from=backend-builder /app/dz_content ./dz_content
 
 # Copy database migrations and queries (embedded via go:embed)
 # These are already embedded in the binary, but we include .env.example as reference
 COPY .env.example .env
 
-# Create directories for data persistence
-RUN mkdir -p /app/uploads
+# Create directories for data persistence with proper permissions
+RUN mkdir -p /app/data /app/uploads && \
+    chmod 755 /app/data /app/uploads
 
 # Set default environment variables
 ENV PORT=3000
