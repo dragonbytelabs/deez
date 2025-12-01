@@ -3,6 +3,7 @@ package dbx
 import (
 	"context"
 	"crypto/rand"
+	"dragonbytelabs/dz/internal/config"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -10,13 +11,6 @@ import (
 	"path/filepath"
 
 	"golang.org/x/crypto/bcrypt"
-)
-
-const (
-	defaultAdminUsername = "dz_admin"
-	defaultAdminEmail    = "dz_admin@localhost.com"
-	credentialsFileName  = "dragonbyte_application_password"
-	passwordLength       = 32
 )
 
 // generateSecurePassword generates a cryptographically secure random password
@@ -38,8 +32,8 @@ func generateSecurePassword(length int) (string, error) {
 }
 
 // writeCredentialsFile writes the admin credentials to the specified file
-func writeCredentialsFile(dir, username, password string) error {
-	filePath := filepath.Join(dir, credentialsFileName)
+func writeCredentialsFile(cfg *config.Config, dir, username, password string) error {
+	filePath := filepath.Join(dir, cfg.CredentialsFileName)
 	content := fmt.Sprintf("Username: %s\nPassword: %s\n", username, password)
 
 	// Write file with restricted permissions (owner read/write only)
@@ -52,7 +46,7 @@ func writeCredentialsFile(dir, username, password string) error {
 }
 
 // InitializeDefaultAdmin creates the default admin user if this is a fresh install
-func (d *DB) InitializeDefaultAdmin(ctx context.Context, appRootDir string) error {
+func (d *DB) InitializeDefaultAdmin(ctx context.Context, appRootDir string, cfg *config.Config) error {
 	// Check if this is a fresh install
 	isFresh, err := d.IsFreshInstall(ctx)
 	if err != nil {
@@ -65,7 +59,7 @@ func (d *DB) InitializeDefaultAdmin(ctx context.Context, appRootDir string) erro
 	}
 
 	// Check if admin user already exists
-	existingUser, err := d.GetUserByEmail(ctx, defaultAdminEmail)
+	existingUser, err := d.GetUserByEmail(ctx, cfg.DefaultAdminEmail)
 	if err != nil {
 		return fmt.Errorf("failed to check for existing admin user: %w", err)
 	}
@@ -76,7 +70,7 @@ func (d *DB) InitializeDefaultAdmin(ctx context.Context, appRootDir string) erro
 	}
 
 	// Generate secure password
-	password, err := generateSecurePassword(passwordLength)
+	password, err := generateSecurePassword(cfg.AdminPasswordLength)
 	if err != nil {
 		return fmt.Errorf("failed to generate secure password: %w", err)
 	}
@@ -88,15 +82,15 @@ func (d *DB) InitializeDefaultAdmin(ctx context.Context, appRootDir string) erro
 	}
 
 	// Create the admin user
-	_, err = d.CreateUser(ctx, defaultAdminEmail, string(hash), defaultAdminUsername)
+	_, err = d.CreateUser(ctx, cfg.DefaultAdminEmail, string(hash), cfg.DefaultAdminUsername)
 	if err != nil {
 		return fmt.Errorf("failed to create admin user: %w", err)
 	}
 
-	log.Printf("Default admin user created: %s", defaultAdminUsername)
+	log.Printf("Default admin user created: %s", cfg.DefaultAdminUsername)
 
 	// Write credentials to file
-	if err := writeCredentialsFile(appRootDir, defaultAdminEmail, password); err != nil {
+	if err := writeCredentialsFile(cfg, appRootDir, cfg.DefaultAdminEmail, password); err != nil {
 		return fmt.Errorf("failed to write admin credentials: %w", err)
 	}
 

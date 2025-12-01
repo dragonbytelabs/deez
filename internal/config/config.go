@@ -10,13 +10,17 @@ import (
 )
 
 type Config struct {
-	App      AppConfig
-	Server   ServerConfig
-	Database DatabaseConfig
-	Session  SessionConfig
-	Queries  QueriesConfig
-	Media    MediaConfig
-	Content  ContentConfig
+	App                  AppConfig
+	Server               ServerConfig
+	Database             DatabaseConfig
+	Session              SessionConfig
+	Queries              QueriesConfig
+	Media                MediaConfig
+	Content              ContentConfig
+	DefaultAdminEmail    string
+	DefaultAdminUsername string
+	CredentialsFileName  string
+	AdminPasswordLength  int
 }
 
 type ContentConfig struct {
@@ -94,6 +98,11 @@ func Load() (*Config, error) {
 			PluginsPath: getEnv("CONTENT_PLUGINS_PATH", "dz_content/plugins"),
 			UploadsPath: getEnv("CONTENT_UPLOADS_PATH", "dz_content/uploads"),
 		},
+		// Admin defaults
+		DefaultAdminEmail:    getEnv("DEFAULT_ADMIN_EMAIL", "admin@localhost.com"),
+		DefaultAdminUsername: getEnv("DEFAULT_ADMIN_USERNAME", "admin"),
+		CredentialsFileName:  getEnv("DEFAULT_ADMIN_CREDENTIALS_FILE", "dragonbyte_application_password"),
+		AdminPasswordLength:  32,
 	}
 
 	return cfg, nil

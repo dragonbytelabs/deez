@@ -2,6 +2,7 @@ package dbx
 
 import (
 	"context"
+	"dragonbytelabs/dz/internal/config"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,8 +90,12 @@ func TestGenerateSecurePassword(t *testing.T) {
 func TestWriteCredentialsFile(t *testing.T) {
 	t.Run("writes credentials file", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		cfg := &config.Config{
+			CredentialsFileName: "test_credentials.txt",
+		}
+		credentialsFileName := cfg.CredentialsFileName
 
-		err := writeCredentialsFile(tmpDir, "test@example.com", "testpassword123")
+		err := writeCredentialsFile(cfg, tmpDir, "test@example.com", "testpassword123")
 		if err != nil {
 			t.Fatalf("writeCredentialsFile() returned error: %v", err)
 		}
@@ -126,8 +131,15 @@ func TestInitializeDefaultAdmin(t *testing.T) {
 		defer db.Close()
 		ctx := context.Background()
 		tmpDir := t.TempDir()
+		cfg := &config.Config{
+			DefaultAdminEmail:    "tesUsert@email.com",
+			DefaultAdminUsername: "testUser",
+			AdminPasswordLength:  32,
+			CredentialsFileName:  "test_credentials.txt",
+		}
+		defaultAdminEmail := cfg.DefaultAdminEmail
 
-		err := db.InitializeDefaultAdmin(ctx, tmpDir)
+		err := db.InitializeDefaultAdmin(ctx, tmpDir, cfg)
 		if err != nil {
 			t.Fatalf("InitializeDefaultAdmin() returned error: %v", err)
 		}
@@ -146,11 +158,13 @@ func TestInitializeDefaultAdmin(t *testing.T) {
 			t.Errorf("expected email %q, got %q", defaultAdminEmail, user.Email)
 		}
 
+		defaultAdminUsername := cfg.DefaultAdminUsername
 		if user.DisplayName == nil || *user.DisplayName != defaultAdminUsername {
 			t.Errorf("expected display name %q, got %v", defaultAdminUsername, user.DisplayName)
 		}
 
 		// Check credentials file was created
+		credentialsFileName := cfg.CredentialsFileName
 		filePath := filepath.Join(tmpDir, credentialsFileName)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
@@ -172,17 +186,25 @@ func TestInitializeDefaultAdmin(t *testing.T) {
 		ctx := context.Background()
 		tmpDir := t.TempDir()
 
+		cfg := &config.Config{
+			DefaultAdminEmail:    "tesUsert@email.com",
+			DefaultAdminUsername: "testUser",
+			AdminPasswordLength:  32,
+			CredentialsFileName:  "test_credentials.txt",
+		}
+
 		// Set fresh_install to false
 		if err := db.SetFreshInstall(ctx, false); err != nil {
 			t.Fatalf("SetFreshInstall() returned error: %v", err)
 		}
 
-		err := db.InitializeDefaultAdmin(ctx, tmpDir)
+		err := db.InitializeDefaultAdmin(ctx, tmpDir, cfg)
 		if err != nil {
 			t.Fatalf("InitializeDefaultAdmin() returned error: %v", err)
 		}
 
 		// Check admin user was not created
+		defaultAdminEmail := cfg.DefaultAdminEmail
 		user, err := db.GetUserByEmail(ctx, defaultAdminEmail)
 		if err != nil {
 			t.Fatalf("GetUserByEmail() returned error: %v", err)
@@ -193,6 +215,7 @@ func TestInitializeDefaultAdmin(t *testing.T) {
 		}
 
 		// Check credentials file was not created
+		credentialsFileName := cfg.CredentialsFileName
 		filePath := filepath.Join(tmpDir, credentialsFileName)
 		if _, err := os.Stat(filePath); !os.IsNotExist(err) {
 			t.Error("expected credentials file to not exist when not a fresh install")
@@ -205,18 +228,29 @@ func TestInitializeDefaultAdmin(t *testing.T) {
 		ctx := context.Background()
 		tmpDir := t.TempDir()
 
+		cfg := &config.Config{
+			DefaultAdminEmail:    "tesUsert@email.com",
+			DefaultAdminUsername: "testUser",
+			AdminPasswordLength:  32,
+			CredentialsFileName:  "test_credentials.txt",
+		}
+
 		// Create admin user first
+
+		defaultAdminEmail := cfg.DefaultAdminEmail
+		defaultAdminUsername := cfg.DefaultAdminUsername
 		_, err := db.CreateUser(ctx, defaultAdminEmail, "existinghash", defaultAdminUsername)
 		if err != nil {
 			t.Fatalf("CreateUser() returned error: %v", err)
 		}
 
-		err = db.InitializeDefaultAdmin(ctx, tmpDir)
+		err = db.InitializeDefaultAdmin(ctx, tmpDir, cfg)
 		if err != nil {
 			t.Fatalf("InitializeDefaultAdmin() returned error: %v", err)
 		}
 
 		// Check credentials file was not created (since admin already exists)
+		credentialsFileName := cfg.CredentialsFileName
 		filePath := filepath.Join(tmpDir, credentialsFileName)
 		if _, err := os.Stat(filePath); !os.IsNotExist(err) {
 			t.Error("expected credentials file to not exist when admin already exists")
