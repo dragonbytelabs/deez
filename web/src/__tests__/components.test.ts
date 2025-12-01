@@ -10,7 +10,7 @@ describe("Home Component", () => {
 
 describe("Admin Component", () => {
 	it("should export an Admin component", async () => {
-		const { Admin } = await import("../admin");
+		const { Admin } = await import("../Admin");
 		expect(Admin).toBeDefined();
 		expect(typeof Admin).toBe("function");
 	});

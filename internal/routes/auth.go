@@ -134,6 +134,12 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 		sess.Put("email", u.Email)
 		sess.Put("user_id", u.UserHash)
 
+		// Set fresh_install to false after successful login
+		if err := db.SetFreshInstall(r.Context(), false); err != nil {
+			log.Printf("Login: failed to update fresh_install status: %v", err)
+			// Don't fail login for this, just log the error
+		}
+
 		// Ensure timing
 		if time.Since(startTime) < duration {
 			time.Sleep(duration - time.Since(startTime))
