@@ -160,6 +160,16 @@ func GetSession(r *http.Request) *Session {
 	return session
 }
 
+// GetSessionSafe retrieves the session from request context without panicking
+// Returns nil if no session is found
+func GetSessionSafe(r *http.Request) *Session {
+	session, ok := r.Context().Value(sessionContextKey).(*Session)
+	if !ok {
+		return nil
+	}
+	return session
+}
+
 // Custom response writer to ensure cookie is written
 type sessionResponseWriter struct {
 	http.ResponseWriter
