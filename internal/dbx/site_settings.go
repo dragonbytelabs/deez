@@ -80,3 +80,21 @@ func (d *DB) SetPublicRegisterEnabled(ctx context.Context, enabled bool) error {
 	}
 	return d.UpdateSiteSetting(ctx, "public_register_enabled", value)
 }
+
+// IsFreshInstall checks if this is a fresh install
+func (d *DB) IsFreshInstall(ctx context.Context) (bool, error) {
+	value, err := d.GetSiteSetting(ctx, "fresh_install")
+	if err != nil {
+		return false, err
+	}
+	return value == "true", nil
+}
+
+// SetFreshInstall sets the fresh install status
+func (d *DB) SetFreshInstall(ctx context.Context, isFresh bool) error {
+	value := "false"
+	if isFresh {
+		value = "true"
+	}
+	return d.UpdateSiteSetting(ctx, "fresh_install", value)
+}

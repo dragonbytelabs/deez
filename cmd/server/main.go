@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"dragonbytelabs/dz/internal/config"
 	"dragonbytelabs/dz/internal/dbx"
@@ -56,6 +57,18 @@ func setupDB(cfg config.DatabaseConfig) *dbx.DB {
 	if err := db.ApplyMigrations(ctx); err != nil {
 		log.Fatal(err)
 	}
+	
+	// Initialize default admin user on fresh install
+	// Use current working directory as app root
+	appRootDir, err := os.Getwd()
+	if err != nil {
+		log.Printf("Warning: failed to get working directory: %v", err)
+		appRootDir = "."
+	}
+	if err := db.InitializeDefaultAdmin(ctx, appRootDir); err != nil {
+		log.Fatal(err)
+	}
+	
 	return db
 }
 
