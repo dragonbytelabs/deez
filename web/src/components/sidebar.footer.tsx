@@ -227,13 +227,14 @@ export const SidebarFooter: Component = () => {
   const handleManageClick = (event: MouseEvent) => {
     event.stopPropagation();
     closeMenu();
-    // Navigate to team management page (can be updated when route exists)
+    // TODO: Navigate to dedicated team management page when route is created
     navigate("/_/admin/settings");
   };
 
   const handleSettingsClick = (event: MouseEvent) => {
     event.stopPropagation();
     closeMenu();
+    // TODO: Navigate to dedicated team settings page when route is created
     navigate("/_/admin/settings");
   };
 
