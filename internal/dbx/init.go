@@ -20,12 +20,21 @@ const (
 )
 
 // generateSecurePassword generates a cryptographically secure random password
+// It generates enough random bytes to ensure the resulting base64 string is at least
+// the desired length, then returns exactly that many characters.
 func generateSecurePassword(length int) (string, error) {
-	bytes := make([]byte, length)
+	// Calculate bytes needed: base64 encodes 3 bytes to 4 characters
+	// So we need at least (length * 3 / 4) + 1 bytes to get the desired length
+	bytesNeeded := (length*3 + 3) / 4
+	bytes := make([]byte, bytesNeeded)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random password: %w", err)
 	}
-	return base64.RawURLEncoding.EncodeToString(bytes)[:length], nil
+	encoded := base64.RawURLEncoding.EncodeToString(bytes)
+	if len(encoded) < length {
+		return "", fmt.Errorf("failed to generate password of required length")
+	}
+	return encoded[:length], nil
 }
 
 // writeCredentialsFile writes the admin credentials to the specified file
@@ -69,7 +78,7 @@ func (d *DB) InitializeDefaultAdmin(ctx context.Context, appRootDir string) erro
 	// Generate secure password
 	password, err := generateSecurePassword(passwordLength)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate secure password: %w", err)
 	}
 	
 	// Hash the password
@@ -88,7 +97,7 @@ func (d *DB) InitializeDefaultAdmin(ctx context.Context, appRootDir string) erro
 	
 	// Write credentials to file
 	if err := writeCredentialsFile(appRootDir, defaultAdminEmail, password); err != nil {
-		return err
+		return fmt.Errorf("failed to write admin credentials: %w", err)
 	}
 	
 	return nil
