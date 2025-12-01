@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"dragonbytelabs/dz/internal/dbx"
+	"dragonbytelabs/dz/internal/session"
 )
 
 // Theme represents a theme available in dz_content/themes
@@ -402,7 +403,7 @@ func ServeTheme(themesPath string, activeTheme string) http.Handler {
 		if err != nil {
 			// If file doesn't exist and it's not an asset, serve index.html for SPA
 			if os.IsNotExist(err) && !hasAssetExtension(path) {
-				http.ServeFile(w, r, filepath.Join(absThemePath, "index.html"))
+				serveHTMLWithToolbar(w, r, filepath.Join(absThemePath, "index.html"))
 				return
 			}
 			http.NotFound(w, r)
@@ -411,12 +412,55 @@ func ServeTheme(themesPath string, activeTheme string) http.Handler {
 
 		// If it's a directory, serve index.html from that directory
 		if info.IsDir() {
-			http.ServeFile(w, r, filepath.Join(absFilePath, "index.html"))
+			serveHTMLWithToolbar(w, r, filepath.Join(absFilePath, "index.html"))
+			return
+		}
+
+		// Check if this is an HTML file and user is authenticated
+		if isHTMLFile(absFilePath) {
+			serveHTMLWithToolbar(w, r, absFilePath)
 			return
 		}
 
 		http.ServeFile(w, r, absFilePath)
 	})
+}
+
+// isHTMLFile checks if a file path is an HTML file
+func isHTMLFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".html" || ext == ".htm"
+}
+
+// serveHTMLWithToolbar serves an HTML file with the admin toolbar injected for authenticated users
+func serveHTMLWithToolbar(w http.ResponseWriter, r *http.Request, filePath string) {
+	// Check if user is authenticated (safely handle missing session context)
+	sess := session.GetSessionSafe(r)
+	var userID interface{}
+	if sess != nil {
+		userID = sess.Get("user_id")
+	}
+
+	// If not authenticated, serve the file normally
+	if userID == nil {
+		http.ServeFile(w, r, filePath)
+		return
+	}
+
+	// Read the HTML file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Inject the admin toolbar
+	modified := injectAdminToolbar(content)
+
+	// Set headers and serve
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write(modified)
 }
 
 // hasAssetExtension checks if path has a static asset extension
@@ -495,7 +539,7 @@ func ThemePreviewHandler(themesPath string) http.HandlerFunc {
 		info, err := os.Stat(absFilePath)
 		if err != nil {
 			if os.IsNotExist(err) && !hasAssetExtension(rest) {
-				http.ServeFile(w, r, filepath.Join(absThemePath, "index.html"))
+				serveHTMLWithToolbar(w, r, filepath.Join(absThemePath, "index.html"))
 				return
 			}
 			http.NotFound(w, r)
@@ -503,7 +547,13 @@ func ThemePreviewHandler(themesPath string) http.HandlerFunc {
 		}
 
 		if info.IsDir() {
-			http.ServeFile(w, r, filepath.Join(absFilePath, "index.html"))
+			serveHTMLWithToolbar(w, r, filepath.Join(absFilePath, "index.html"))
+			return
+		}
+
+		// Check if this is an HTML file
+		if isHTMLFile(absFilePath) {
+			serveHTMLWithToolbar(w, r, absFilePath)
 			return
 		}
 
