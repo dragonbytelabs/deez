@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -62,23 +63,8 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 		if err != nil {
 			log.Printf("Register: IsFreshInstall error: %v", err)
 			// Don't fail registration for this, just log the error
-		}
-		if isFreshInstall {
-			// Create a team with the user's display name
-			team, err := db.CreateTeam(r.Context(), displayName, nil, nil)
-			if err != nil {
-				log.Printf("Register: CreateTeam error: %v", err)
-				// Don't fail registration for this, just log the error
-			} else {
-				// Add the user as an admin of the team
-				_, err = db.AddTeamMember(r.Context(), team.ID, u.ID, "admin")
-				if err != nil {
-					log.Printf("Register: AddTeamMember error: %v", err)
-					// Don't fail registration for this, just log the error
-				} else {
-					log.Printf("Register: created team '%s' (id=%d) and added user as admin", displayName, team.ID)
-				}
-			}
+		} else if isFreshInstall {
+			createInitialTeam(r.Context(), db, displayName, u.ID)
 		}
 
 		// Get session and migrate it
@@ -198,4 +184,21 @@ func RegisterAuth(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager) {
 			"redirect": "/_/admin/login",
 		})
 	})
+}
+
+// createInitialTeam creates a team for the initial user on fresh install and adds them as admin
+func createInitialTeam(ctx context.Context, db *dbx.DB, teamName string, userID int64) {
+	team, err := db.CreateTeam(ctx, teamName, nil, nil)
+	if err != nil {
+		log.Printf("Register: CreateTeam error: %v", err)
+		return
+	}
+
+	_, err = db.AddTeamMember(ctx, team.ID, userID, "admin")
+	if err != nil {
+		log.Printf("Register: AddTeamMember error: %v", err)
+		return
+	}
+
+	log.Printf("Register: created team '%s' (id=%d) and added user as admin", teamName, team.ID)
 }
