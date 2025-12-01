@@ -22,7 +22,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db := setupDB(cfg.Database)
+	db := setupDB(*cfg)
 	defer db.Close()
 
 	// Create media storage
@@ -48,16 +48,16 @@ func main() {
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
 
-func setupDB(cfg config.DatabaseConfig) *dbx.DB {
+func setupDB(cfg config.Config) *dbx.DB {
 	ctx := context.Background()
-	db, err := dbx.OpenSQLite(cfg.Path)
+	db, err := dbx.OpenSQLite(cfg.Database.Path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	if err := db.ApplyMigrations(ctx); err != nil {
 		log.Fatal(err)
 	}
-	
+
 	// Initialize default admin user on fresh install
 	// Use current working directory as app root
 	appRootDir, err := os.Getwd()
@@ -65,24 +65,24 @@ func setupDB(cfg config.DatabaseConfig) *dbx.DB {
 		log.Printf("Warning: failed to get working directory: %v", err)
 		appRootDir = "."
 	}
-	if err := db.InitializeDefaultAdmin(ctx, appRootDir); err != nil {
+	if err := db.InitializeDefaultAdmin(ctx, appRootDir, &cfg); err != nil {
 		log.Fatal(err)
 	}
-	
+
 	return db
 }
 
 func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, mediaStore storage.Store, mediaCfg config.MediaConfig, contentCfg config.ContentConfig) {
 	// Register uploads route first to ensure it takes priority over static catch-all
 	routes.ServeMediaFiles(mux, mediaCfg.StoragePath)
-	
+
 	// Register theme management API routes
 	routes.RegisterThemes(mux, db, contentCfg.ThemesPath)
-	
+
 	// Register theme preview route
 	mux.Handle("GET /_/preview/{name}/{rest...}", routes.ThemePreviewHandler(contentCfg.ThemesPath))
 	mux.Handle("GET /_/preview/{name}", routes.ThemePreviewHandler(contentCfg.ThemesPath))
-	
+
 	// Register static files for admin (under /_/ prefix)
 	routes.RegisterStatic(mux)
 	routes.RegisterAPI(mux, db)
@@ -94,7 +94,7 @@ func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, med
 	routes.RegisterPlugins(mux, db)
 	routes.RegisterDZForms(mux, db)
 	routes.RegisterPosts(mux, db)
-	
+
 	// Register theme serving at root (after all other routes)
 	routes.RegisterThemeServing(mux, db, contentCfg.ThemesPath)
 }
