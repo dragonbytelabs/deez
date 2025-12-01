@@ -447,7 +447,7 @@ export const Sidebar: Component = () => {
       {/* Sidebar */}
       <div class={sidebar} classList={{ closed: !store.settings.sidebarOpen }}>
         <div class={menuHeader}>
-          <img src="/favicon-32.png" alt="Deez" class={logoIcon} />
+          <img src="/favicon-32.png" alt="Deez logo" class={logoIcon} />
           <span class={logoText}>Deez</span>
         </div>
 
