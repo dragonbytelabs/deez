@@ -1,5 +1,5 @@
 import { Route, Router } from "@solidjs/router";
-import { Admin } from "./admin";
+import { Admin } from "./Admin";
 import { AdminAppearance } from "./admin-appearance";
 import { AdminDZForms } from "./admin-dzforms";
 import { AdminDZFormsNew } from "./admin-dzforms-new";
