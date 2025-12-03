@@ -213,7 +213,8 @@ func generateEmbedJS(formID int64, formName string, fieldsJSON string) string {
         }
       });
       
-      // Show success message (in a real implementation, this would submit to an API)
+      // Show success message (placeholder - form data is collected but not persisted)
+      // TODO: In a future implementation, submit to /api/dzforms/entries endpoint
       var msg = document.getElementById("dz-form-message-" + formId);
       msg.textContent = "Thank you for your submission!";
       msg.className = "dz-form-message dz-form-message-success";
