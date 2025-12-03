@@ -215,6 +215,7 @@ const formTemplates = [
 		icon: "+",
 		bgColor: "#f5f5f5",
 		iconColor: "#666",
+		fields: [],
 	},
 	{
 		id: "advanced-contact",
@@ -316,7 +317,7 @@ export const AdminDZFormsTemplates = () => {
 		setError(null);
 
 		try {
-			const fields = template.id === "blank" ? "[]" : JSON.stringify(template.fields || []);
+			const fields = JSON.stringify(template.fields);
 			const response = await api.createForm(template.name, `Created from ${template.name} template`, fields);
 
 			if (response.ok) {
@@ -332,10 +333,9 @@ export const AdminDZFormsTemplates = () => {
 		}
 	};
 
-	const handlePreview = (e: Event, templateId: string) => {
+	const handlePreview = (e: Event, _templateId: string) => {
 		e.stopPropagation();
-		// For now, preview just logs - could open a modal in future
-		console.log("Preview template:", templateId);
+		// Preview functionality to be implemented in future iteration
 	};
 
 	const handleUseTemplate = (e: Event, template: (typeof formTemplates)[0]) => {
