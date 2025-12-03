@@ -93,6 +93,7 @@ func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, med
 	routes.RegisterMedia(mux, db, mediaStore, mediaCfg.MaxFileSize)
 	routes.RegisterPlugins(mux, db)
 	routes.RegisterDZForms(mux, db)
+	routes.RegisterEmbed(mux, db)
 	routes.RegisterPosts(mux, db)
 
 	// Register theme serving at root (after all other routes)
