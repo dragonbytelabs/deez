@@ -71,3 +71,11 @@ describe("AdminDZFormsEdit Component", () => {
 		expect(typeof AdminDZFormsEdit).toBe("function");
 	});
 });
+
+describe("AdminDZFormsTemplates Component", () => {
+	it("should export an AdminDZFormsTemplates component", async () => {
+		const { AdminDZFormsTemplates } = await import("../admin-dzforms-templates");
+		expect(AdminDZFormsTemplates).toBeDefined();
+		expect(typeof AdminDZFormsTemplates).toBe("function");
+	});
+});
