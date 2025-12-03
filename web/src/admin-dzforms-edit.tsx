@@ -3,6 +3,7 @@ import { createSignal, onMount, Show } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { api, type FormInfo } from "./server/api";
 import { EmbedModal } from "./components/embed-modal";
+import { FormBuilder, type FormField } from "./components/form-builder";
 
 const mainContent = css`
   padding: 40px;
@@ -10,6 +11,19 @@ const mainContent = css`
   @media (max-width: 768px) {
     padding: 20px;
   }
+`;
+
+const headerSection = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+`;
+
+const headerLeft = css`
+  flex: 1;
 `;
 
 const title = css`
@@ -22,31 +36,41 @@ const title = css`
 const subtitle = css`
   font-size: 18px;
   color: var(--gray500);
-  margin-bottom: 30px;
+  margin-bottom: 0;
 `;
 
-const formContainer = css`
+const headerButtons = css`
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+`;
+
+const formDetailsSection = css`
   background: var(--gray800);
   border: 1px solid var(--gray700);
   border-radius: 12px;
-  padding: 24px;
-  max-width: 600px;
+  padding: 20px;
+  margin-bottom: 24px;
 `;
 
-const formField = css`
-  margin-bottom: 20px;
+const formDetailsGrid = css`
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
-const fieldLabel = css`
-  display: block;
+const detailLabel = css`
   font-size: 14px;
   color: var(--gray400);
-  margin-bottom: 8px;
 `;
 
-const fieldInput = css`
-  width: 100%;
-  padding: 12px 16px;
+const detailInput = css`
+  padding: 10px 14px;
   background: var(--gray700);
   border: 1px solid var(--gray600);
   border-radius: 8px;
@@ -61,29 +85,13 @@ const fieldInput = css`
   }
 `;
 
-const fieldTextarea = css`
-  width: 100%;
-  padding: 12px 16px;
+const formIdBadge = css`
+  padding: 8px 14px;
   background: var(--gray700);
   border: 1px solid var(--gray600);
   border-radius: 8px;
-  color: var(--white);
+  color: var(--gray400);
   font-size: 14px;
-  transition: border-color 0.2s;
-  min-height: 100px;
-  resize: vertical;
-  box-sizing: border-box;
-
-  &:focus {
-    outline: none;
-    border-color: var(--primary);
-  }
-`;
-
-const buttonContainer = css`
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
 `;
 
 const submitButton = css`
@@ -95,6 +103,9 @@ const submitButton = css`
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 
   &:hover {
     background: var(--primaryDark);
@@ -106,34 +117,19 @@ const submitButton = css`
   }
 `;
 
-const cancelButton = css`
-  padding: 12px 24px;
-  background: var(--gray700);
-  color: var(--gray300);
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:hover {
-    background: var(--gray600);
-  }
-`;
-
 const previewButton = css`
   padding: 12px 24px;
   background: transparent;
-  color: var(--primary);
-  border: 1px solid var(--primary);
+  color: var(--gray300);
+  border: 1px solid var(--gray600);
   border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: var(--primary);
-    color: white;
+    background: var(--gray700);
+    border-color: var(--gray500);
   }
 `;
 
@@ -156,34 +152,24 @@ const embedButton = css`
 const errorText = css`
   color: #ef4444;
   font-size: 14px;
-  margin-top: 8px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  margin-bottom: 16px;
 `;
 
 const successText = css`
   color: #22c55e;
   font-size: 14px;
-  margin-top: 8px;
+  padding: 12px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 8px;
+  margin-bottom: 16px;
 `;
 
 const loadingText = css`
   color: var(--gray500);
   font-size: 16px;
-`;
-
-const formIdLabel = css`
-  display: block;
-  font-size: 14px;
-  color: var(--gray400);
-  margin-bottom: 8px;
-`;
-
-const formIdValue = css`
-  padding: 12px 16px;
-  background: var(--gray900);
-  border: 1px solid var(--gray700);
-  border-radius: 8px;
-  color: var(--gray500);
-  font-size: 14px;
 `;
 
 export const AdminDZFormsEdit = () => {
@@ -192,8 +178,7 @@ export const AdminDZFormsEdit = () => {
   const [form, setForm] = createSignal<FormInfo | null>(null);
   const [name, setName] = createSignal("");
   const [description, setDescription] = createSignal("");
-  // fields state is maintained for future form builder functionality - currently preserves existing fields on save
-  const [fields, setFields] = createSignal("[]");
+  const [fields, setFields] = createSignal<FormField[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -221,7 +206,13 @@ export const AdminDZFormsEdit = () => {
           setForm(data.form);
           setName(data.form.name || "");
           setDescription(data.form.description || "");
-          setFields(data.form.fields || "[]");
+          // Parse fields from JSON string
+          try {
+            const parsedFields = JSON.parse(data.form.fields || "[]");
+            setFields(parsedFields);
+          } catch {
+            setFields([]);
+          }
         } else {
           setError("Form not found");
         }
@@ -235,8 +226,7 @@ export const AdminDZFormsEdit = () => {
     }
   };
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
+  const handleSave = async () => {
     if (!name().trim()) {
       setError("Form name is required");
       return;
@@ -252,9 +242,10 @@ export const AdminDZFormsEdit = () => {
         setError("Invalid form ID");
         return;
       }
-      const response = await api.updateForm(formId, name(), description(), fields());
+      const fieldsJson = JSON.stringify(fields());
+      const response = await api.updateForm(formId, name(), description(), fieldsJson);
       if (response.ok) {
-        setSuccess("Form updated successfully");
+        setSuccess("Form saved successfully");
         // Update local form state
         const currentForm = form();
         if (currentForm) {
@@ -262,17 +253,23 @@ export const AdminDZFormsEdit = () => {
             ...currentForm,
             name: name(),
             description: description(),
-            fields: fields(),
+            fields: fieldsJson,
           });
         }
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
       } else {
-        setError("Failed to update form");
+        setError("Failed to save form");
       }
     } catch (err) {
-      setError("Failed to update form");
+      setError("Failed to save form");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleFieldsChange = (newFields: FormField[]) => {
+    setFields(newFields);
   };
 
   onMount(() => {
@@ -281,9 +278,6 @@ export const AdminDZFormsEdit = () => {
 
   return (
     <main class={mainContent}>
-      <h1 class={title}>Edit Form</h1>
-      <p class={subtitle}>Modify your form details</p>
-
       <Show when={loading()}>
         <p class={loadingText}>Loading form...</p>
       </Show>
@@ -293,65 +287,64 @@ export const AdminDZFormsEdit = () => {
       </Show>
 
       <Show when={!loading() && form()}>
-        <div class={formContainer}>
-          <form onSubmit={handleSubmit}>
-            <div class={formField}>
-              <label class={formIdLabel}>Form ID</label>
-              <div class={formIdValue}>{form()?.id}</div>
-            </div>
-            <div class={formField}>
-              <label class={fieldLabel}>Form Name *</label>
-              <input
-                type="text"
-                class={fieldInput}
-                value={name()}
-                onInput={(e) => setName(e.currentTarget.value)}
-                placeholder="Enter form name"
-              />
-            </div>
-            <div class={formField}>
-              <label class={fieldLabel}>Description</label>
-              <textarea
-                class={fieldTextarea}
-                value={description()}
-                onInput={(e) => setDescription(e.currentTarget.value)}
-                placeholder="Enter form description (optional)"
-              />
-            </div>
-            {error() && form() && <p class={errorText}>{error()}</p>}
-            {success() && <p class={successText}>{success()}</p>}
-            <div class={buttonContainer}>
-              <button
-                type="submit"
-                class={submitButton}
-                disabled={saving()}
-              >
-                {saving() ? "Saving..." : "Save Changes"}
-              </button>
-              <button
-                type="button"
-                class={previewButton}
-                onClick={() => navigate(`/_/admin/plugins/dzforms/preview/${params.id}`)}
-              >
-                Preview Form
-              </button>
-              <button
-                type="button"
-                class={embedButton}
-                onClick={() => setEmbedModalOpen(true)}
-              >
-                Embed
-              </button>
-              <button
-                type="button"
-                class={cancelButton}
-                onClick={() => navigate("/_/admin/plugins/dzforms/forms")}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+        {/* Header with title and action buttons */}
+        <div class={headerSection}>
+          <div class={headerLeft}>
+            <h1 class={title}>{name() || "Untitled Form"}</h1>
+            <p class={subtitle}>Edit your form fields and settings</p>
+          </div>
+          <div class={headerButtons}>
+            <button
+              type="button"
+              class={embedButton}
+              onClick={() => setEmbedModalOpen(true)}
+            >
+              &lt;/&gt; Embed
+            </button>
+            <button
+              type="button"
+              class={previewButton}
+              onClick={() => navigate(`/_/admin/plugins/dzforms/preview/${params.id}`)}
+            >
+              Preview
+            </button>
+            <button
+              type="button"
+              class={submitButton}
+              disabled={saving()}
+              onClick={handleSave}
+            >
+              {saving() ? "Saving..." : "💾 Save Form"}
+            </button>
+          </div>
         </div>
+
+        {/* Form details section */}
+        <div class={formDetailsSection}>
+          <div class={formDetailsGrid}>
+            <span class={detailLabel}>Form ID:</span>
+            <span class={formIdBadge}>{form()?.id}</span>
+            <span class={detailLabel}>Form Name:</span>
+            <input
+              type="text"
+              class={detailInput}
+              value={name()}
+              onInput={(e) => setName(e.currentTarget.value)}
+              placeholder="Enter form name"
+            />
+          </div>
+        </div>
+
+        {/* Status messages */}
+        {error() && form() && <p class={errorText}>{error()}</p>}
+        {success() && <p class={successText}>{success()}</p>}
+
+        {/* Form Builder */}
+        <FormBuilder
+          fields={fields()}
+          onFieldsChange={handleFieldsChange}
+        />
+
         <EmbedModal
           isOpen={embedModalOpen}
           setIsOpen={setEmbedModalOpen}
