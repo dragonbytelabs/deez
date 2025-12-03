@@ -455,14 +455,18 @@ const fieldTypes = [
 	{ type: "section" as FormFieldType, name: "Section", icon: "—" },
 ];
 
+// Counter for generating unique field names
+let fieldCounter = 0;
+
 // Helper to generate unique IDs
-const generateId = () => `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateId = () => `field_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
 // Helper to get default field
 const createDefaultField = (type: FormFieldType): FormField => {
+	fieldCounter += 1;
 	const baseField = {
 		id: generateId(),
-		name: `field_${Date.now()}`,
+		name: `field_${fieldCounter}`,
 		type,
 		required: false,
 	};
