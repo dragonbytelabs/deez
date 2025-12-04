@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 
+	"dragonbytelabs/dz/dz_content/plugins/dzforms"
 	"dragonbytelabs/dz/internal/config"
 	"dragonbytelabs/dz/internal/dbx"
+	"dragonbytelabs/dz/internal/plugins"
 	"dragonbytelabs/dz/internal/routes"
 	"dragonbytelabs/dz/internal/session"
 	"dragonbytelabs/dz/internal/storage"
@@ -92,9 +94,18 @@ func setupRoutes(mux *http.ServeMux, db *dbx.DB, sm *session.SessionManager, med
 	routes.RegisterCollection(mux, db)
 	routes.RegisterMedia(mux, db, mediaStore, mediaCfg.MaxFileSize)
 	routes.RegisterPlugins(mux, db)
-	routes.RegisterDZForms(mux, db)
 	routes.RegisterEmbed(mux, db)
 	routes.RegisterPosts(mux, db)
+
+	// Create plugin registry and register plugins
+	pluginRegistry := plugins.NewRegistry(mux, db, routes.RequireAuth)
+
+	// Register the DragonByteForm plugin
+	if err := pluginRegistry.Register(dzforms.New()); err != nil {
+		log.Printf("Warning: failed to register dzforms plugin: %v", err)
+	}
+
+	log.Printf("Loaded %d plugins", len(pluginRegistry.List()))
 
 	// Register theme serving at root (after all other routes)
 	routes.RegisterThemeServing(mux, db, contentCfg.ThemesPath)

@@ -31,11 +31,14 @@ tmp
 .env
 uploads/
 
-# Ignore dz_content except for default theme
+# Ignore dz_content except for default theme and plugins
 dz_content/*
 !dz_content/themes/
 dz_content/themes/*
 !dz_content/themes/default/
+!dz_content/plugins/
+dz_content/plugins/*
+!dz_content/plugins/dzforms/
 
 # Go binaries
 server
