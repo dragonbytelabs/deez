@@ -8,10 +8,15 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-!dist/.gitkeep
-!dist/index.html
-!dist/favicon-32.png
+/dist/
+!web/dist/
+web/dist/*
+!web/dist/.gitkeep
+!web/dist/index.html
+!web/dist/favicon-32.png
+!web/dist/favicon.ico
+!web/dist/assets/
+!web/dist/assets/*
 dist-ssr
 *.local
 
