@@ -12,6 +12,7 @@ import { AdminDZFormsImportExport } from "./admin-dzforms-import-export";
 import { AdminDZFormsAddons } from "./admin-dzforms-addons";
 import { AdminDZFormsSystemStatus } from "./admin-dzforms-system-status";
 import { AdminDZFormsHelp } from "./admin-dzforms-help";
+import { AdminDZFormsTemplates } from "./admin-dzforms-templates";
 import { AdminMedia } from "./admin-media";
 import { AdminOnboarding } from "./admin-onboarding";
 import { AdminPlugins } from "./admin-plugins";
@@ -111,6 +112,10 @@ export const Routes = () => {
 			<Route
 				path="/_/admin/plugins/dzforms/help"
 				component={() => (<ProtectedRoute><AdminDZFormsHelp/></ProtectedRoute>)}
+			/>
+			<Route
+				path="/_/admin/plugins/dzforms/templates"
+				component={() => (<ProtectedRoute><AdminDZFormsTemplates/></ProtectedRoute>)}
 			/>
 			<Route
 				path="/_/admin/user/profile"
