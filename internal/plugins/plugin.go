@@ -54,7 +54,6 @@ type PluginInfo struct {
 	DisplayName string `json:"display_name"`
 	Description string `json:"description"`
 	Version     string `json:"version"`
-	IsActive    bool   `json:"is_active"`
 }
 
 // Registry manages the registration and lifecycle of plugins
