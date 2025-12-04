@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"dragonbytelabs/dz/internal/dbx"
 )
@@ -56,8 +57,13 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 	// Create a new post
 	mux.Handle("POST /api/posts", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
-			Title   string `json:"title"`
-			Content string `json:"content"`
+			Title      string  `json:"title"`
+			Content    string  `json:"content"`
+			Status     string  `json:"status"`
+			Visibility string  `json:"visibility"`
+			Format     string  `json:"format"`
+			Excerpt    string  `json:"excerpt"`
+			PublishAt  *string `json:"publish_at"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -71,7 +77,26 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		post, err := db.CreatePost(r.Context(), title, in.Content)
+		// Parse publish_at if provided
+		var publishAt *time.Time
+		if in.PublishAt != nil && *in.PublishAt != "" {
+			t, err := time.Parse(time.RFC3339, *in.PublishAt)
+			if err != nil {
+				http.Error(w, "invalid publish_at format, use RFC3339", http.StatusBadRequest)
+				return
+			}
+			publishAt = &t
+		}
+
+		post, err := db.CreatePost(r.Context(), dbx.PostInput{
+			Title:      title,
+			Content:    in.Content,
+			Status:     in.Status,
+			Visibility: in.Visibility,
+			Format:     in.Format,
+			Excerpt:    in.Excerpt,
+			PublishAt:  publishAt,
+		})
 		if err != nil {
 			log.Printf("CreatePost: error creating post: %v", err)
 			http.Error(w, "could not create post", http.StatusInternalServerError)
@@ -95,8 +120,13 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 		}
 
 		var in struct {
-			Title   string `json:"title"`
-			Content string `json:"content"`
+			Title      string  `json:"title"`
+			Content    string  `json:"content"`
+			Status     string  `json:"status"`
+			Visibility string  `json:"visibility"`
+			Format     string  `json:"format"`
+			Excerpt    string  `json:"excerpt"`
+			PublishAt  *string `json:"publish_at"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -110,7 +140,26 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		post, err := db.UpdatePost(r.Context(), id, title, in.Content)
+		// Parse publish_at if provided
+		var publishAt *time.Time
+		if in.PublishAt != nil && *in.PublishAt != "" {
+			t, err := time.Parse(time.RFC3339, *in.PublishAt)
+			if err != nil {
+				http.Error(w, "invalid publish_at format, use RFC3339", http.StatusBadRequest)
+				return
+			}
+			publishAt = &t
+		}
+
+		post, err := db.UpdatePost(r.Context(), id, dbx.PostInput{
+			Title:      title,
+			Content:    in.Content,
+			Status:     in.Status,
+			Visibility: in.Visibility,
+			Format:     in.Format,
+			Excerpt:    in.Excerpt,
+			PublishAt:  publishAt,
+		})
 		if err != nil {
 			log.Printf("UpdatePost: error updating post: %v", err)
 			http.Error(w, "could not update post", http.StatusInternalServerError)

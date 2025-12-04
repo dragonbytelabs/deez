@@ -96,6 +96,11 @@ export type PostInfo = {
 	id: number;
 	title: string;
 	content: string;
+	status: string;
+	visibility: string;
+	format: string;
+	excerpt: string;
+	publish_at: string | null;
 	created_at: string;
 	updated_at: string;
 };
@@ -408,8 +413,18 @@ const getPostByIdFunc = async (id: number) => {
 	return response;
 };
 
-const createPostFunc = async (title: string, content: string) => {
-	const body = JSON.stringify({ title, content });
+export type PostInput = {
+	title: string;
+	content: string;
+	status?: string;
+	visibility?: string;
+	format?: string;
+	excerpt?: string;
+	publish_at?: string | null;
+};
+
+const createPostFunc = async (input: PostInput) => {
+	const body = JSON.stringify(input);
 	const r = await fetch(routes.posts, {
 		method: methods.POST,
 		headers: {
@@ -421,8 +436,8 @@ const createPostFunc = async (title: string, content: string) => {
 	return r;
 };
 
-const updatePostFunc = async (id: number, title: string, content: string) => {
-	const body = JSON.stringify({ title, content });
+const updatePostFunc = async (id: number, input: PostInput) => {
+	const body = JSON.stringify(input);
 	const r = await fetch(`${routes.posts}/${id}`, {
 		method: methods.PUT,
 		headers: {
@@ -485,8 +500,8 @@ type ApiRoutes = {
 	// Posts functions
 	getPosts: () => Promise<Response>;
 	getPostById: (id: number) => Promise<Response>;
-	createPost: (title: string, content: string) => Promise<Response>;
-	updatePost: (id: number, title: string, content: string) => Promise<Response>;
+	createPost: (input: PostInput) => Promise<Response>;
+	updatePost: (id: number, input: PostInput) => Promise<Response>;
 	deletePost: (id: number) => Promise<Response>;
 };
 
