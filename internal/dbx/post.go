@@ -18,6 +18,19 @@ type PostInput struct {
 	PublishAt  *time.Time
 }
 
+// postInputToArgs converts PostInput to a map for SQL queries
+func postInputToArgs(input PostInput) map[string]any {
+	return map[string]any{
+		"title":      input.Title,
+		"content":    input.Content,
+		"status":     input.Status,
+		"visibility": input.Visibility,
+		"format":     input.Format,
+		"excerpt":    input.Excerpt,
+		"publish_at": input.PublishAt,
+	}
+}
+
 // CreatePost creates a new post
 func (d *DB) CreatePost(ctx context.Context, input PostInput) (*models.Post, error) {
 	q := MustQuery("create_post.sql")
@@ -29,29 +42,7 @@ func (d *DB) CreatePost(ctx context.Context, input PostInput) (*models.Post, err
 	}
 	defer stmt.Close()
 
-	// Set defaults for empty values
-	status := input.Status
-	if status == "" {
-		status = "draft"
-	}
-	visibility := input.Visibility
-	if visibility == "" {
-		visibility = "public"
-	}
-	format := input.Format
-	if format == "" {
-		format = "standard"
-	}
-
-	args := map[string]any{
-		"title":      input.Title,
-		"content":    input.Content,
-		"status":     status,
-		"visibility": visibility,
-		"format":     format,
-		"excerpt":    input.Excerpt,
-		"publish_at": input.PublishAt,
-	}
+	args := postInputToArgs(input)
 
 	if err := stmt.GetContext(ctx, &p, args); err != nil {
 		return nil, err
@@ -114,30 +105,8 @@ func (d *DB) UpdatePost(ctx context.Context, id int64, input PostInput) (*models
 	}
 	defer stmt.Close()
 
-	// Set defaults for empty values
-	status := input.Status
-	if status == "" {
-		status = "draft"
-	}
-	visibility := input.Visibility
-	if visibility == "" {
-		visibility = "public"
-	}
-	format := input.Format
-	if format == "" {
-		format = "standard"
-	}
-
-	args := map[string]any{
-		"id":         id,
-		"title":      input.Title,
-		"content":    input.Content,
-		"status":     status,
-		"visibility": visibility,
-		"format":     format,
-		"excerpt":    input.Excerpt,
-		"publish_at": input.PublishAt,
-	}
+	args := postInputToArgs(input)
+	args["id"] = id
 
 	if err := stmt.GetContext(ctx, &p, args); err != nil {
 		return nil, err

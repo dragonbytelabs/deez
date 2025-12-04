@@ -539,6 +539,31 @@ export const AdminPostsEdit = () => {
         navigate("/_/admin/posts");
     };
 
+    const handleMoveToTrash = async () => {
+        if (isNewPost()) {
+            // For new posts, just navigate away
+            navigate("/_/admin/posts");
+            return;
+        }
+
+        if (!confirm("Are you sure you want to delete this post?")) {
+            return;
+        }
+
+        try {
+            setErrorMsg(null);
+            const id = Number.parseInt(params.id, 10);
+            const response = await api.deletePost(id);
+            if (!response.ok) {
+                throw new Error("Failed to delete post");
+            }
+            navigate("/_/admin/posts");
+        } catch (err) {
+            console.error("Error deleting post:", err);
+            setErrorMsg(err instanceof Error ? err.message : "Failed to delete post");
+        }
+    };
+
     const toggleMobilePreview = () => {
         setShowMobilePreview(!showMobilePreview());
     };
@@ -735,7 +760,7 @@ export const AdminPostsEdit = () => {
                                         </div>
 
                                         <div class={publishActions}>
-                                            <span class={trashLink} onClick={handleCancel}>
+                                            <span class={trashLink} onClick={handleMoveToTrash}>
                                                 Move to Trash
                                             </span>
                                             <div style="display: flex; gap: 8px;">

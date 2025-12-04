@@ -11,6 +11,37 @@ import (
 	"dragonbytelabs/dz/internal/dbx"
 )
 
+// Allowed values for post fields
+var (
+	allowedStatuses     = map[string]bool{"draft": true, "published": true}
+	allowedVisibilities = map[string]bool{"public": true, "private": true, "password": true}
+	allowedFormats      = map[string]bool{"standard": true, "aside": true, "image": true, "video": true, "audio": true, "quote": true, "link": true, "gallery": true}
+)
+
+// validatePostStatus returns a valid status or the default "draft"
+func validatePostStatus(status string) string {
+	if allowedStatuses[status] {
+		return status
+	}
+	return "draft"
+}
+
+// validatePostVisibility returns a valid visibility or the default "public"
+func validatePostVisibility(visibility string) string {
+	if allowedVisibilities[visibility] {
+		return visibility
+	}
+	return "public"
+}
+
+// validatePostFormat returns a valid format or the default "standard"
+func validatePostFormat(format string) string {
+	if allowedFormats[format] {
+		return format
+	}
+	return "standard"
+}
+
 // RegisterPosts registers all posts-related routes
 func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 	// Get all posts
@@ -91,9 +122,9 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 		post, err := db.CreatePost(r.Context(), dbx.PostInput{
 			Title:      title,
 			Content:    in.Content,
-			Status:     in.Status,
-			Visibility: in.Visibility,
-			Format:     in.Format,
+			Status:     validatePostStatus(in.Status),
+			Visibility: validatePostVisibility(in.Visibility),
+			Format:     validatePostFormat(in.Format),
 			Excerpt:    in.Excerpt,
 			PublishAt:  publishAt,
 		})
@@ -154,9 +185,9 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 		post, err := db.UpdatePost(r.Context(), id, dbx.PostInput{
 			Title:      title,
 			Content:    in.Content,
-			Status:     in.Status,
-			Visibility: in.Visibility,
-			Format:     in.Format,
+			Status:     validatePostStatus(in.Status),
+			Visibility: validatePostVisibility(in.Visibility),
+			Format:     validatePostFormat(in.Format),
 			Excerpt:    in.Excerpt,
 			PublishAt:  publishAt,
 		})
