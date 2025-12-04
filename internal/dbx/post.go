@@ -2,12 +2,37 @@ package dbx
 
 import (
 	"context"
+	"time"
 
 	"dragonbytelabs/dz/internal/models"
 )
 
+// PostInput contains the input parameters for creating or updating a post
+type PostInput struct {
+	Title      string
+	Content    string
+	Status     string
+	Visibility string
+	Format     string
+	Excerpt    string
+	PublishAt  *time.Time
+}
+
+// postInputToArgs converts PostInput to a map for SQL queries
+func postInputToArgs(input PostInput) map[string]any {
+	return map[string]any{
+		"title":      input.Title,
+		"content":    input.Content,
+		"status":     input.Status,
+		"visibility": input.Visibility,
+		"format":     input.Format,
+		"excerpt":    input.Excerpt,
+		"publish_at": input.PublishAt,
+	}
+}
+
 // CreatePost creates a new post
-func (d *DB) CreatePost(ctx context.Context, title, content string) (*models.Post, error) {
+func (d *DB) CreatePost(ctx context.Context, input PostInput) (*models.Post, error) {
 	q := MustQuery("create_post.sql")
 
 	var p models.Post
@@ -17,10 +42,7 @@ func (d *DB) CreatePost(ctx context.Context, title, content string) (*models.Pos
 	}
 	defer stmt.Close()
 
-	args := map[string]any{
-		"title":   title,
-		"content": content,
-	}
+	args := postInputToArgs(input)
 
 	if err := stmt.GetContext(ctx, &p, args); err != nil {
 		return nil, err
@@ -73,7 +95,7 @@ func (d *DB) GetAllPosts(ctx context.Context) ([]models.Post, error) {
 }
 
 // UpdatePost updates an existing post
-func (d *DB) UpdatePost(ctx context.Context, id int64, title, content string) (*models.Post, error) {
+func (d *DB) UpdatePost(ctx context.Context, id int64, input PostInput) (*models.Post, error) {
 	q := MustQuery("update_post.sql")
 
 	var p models.Post
@@ -83,11 +105,8 @@ func (d *DB) UpdatePost(ctx context.Context, id int64, title, content string) (*
 	}
 	defer stmt.Close()
 
-	args := map[string]any{
-		"id":      id,
-		"title":   title,
-		"content": content,
-	}
+	args := postInputToArgs(input)
+	args["id"] = id
 
 	if err := stmt.GetContext(ctx, &p, args); err != nil {
 		return nil, err

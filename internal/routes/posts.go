@@ -6,9 +6,41 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"dragonbytelabs/dz/internal/dbx"
 )
+
+// Allowed values for post fields
+var (
+	allowedStatuses     = map[string]bool{"draft": true, "published": true}
+	allowedVisibilities = map[string]bool{"public": true, "private": true, "password": true}
+	allowedFormats      = map[string]bool{"standard": true, "aside": true, "image": true, "video": true, "audio": true, "quote": true, "link": true, "gallery": true}
+)
+
+// validatePostStatus returns a valid status or the default "draft"
+func validatePostStatus(status string) string {
+	if allowedStatuses[status] {
+		return status
+	}
+	return "draft"
+}
+
+// validatePostVisibility returns a valid visibility or the default "public"
+func validatePostVisibility(visibility string) string {
+	if allowedVisibilities[visibility] {
+		return visibility
+	}
+	return "public"
+}
+
+// validatePostFormat returns a valid format or the default "standard"
+func validatePostFormat(format string) string {
+	if allowedFormats[format] {
+		return format
+	}
+	return "standard"
+}
 
 // RegisterPosts registers all posts-related routes
 func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
@@ -56,8 +88,13 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 	// Create a new post
 	mux.Handle("POST /api/posts", RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
-			Title   string `json:"title"`
-			Content string `json:"content"`
+			Title      string  `json:"title"`
+			Content    string  `json:"content"`
+			Status     string  `json:"status"`
+			Visibility string  `json:"visibility"`
+			Format     string  `json:"format"`
+			Excerpt    string  `json:"excerpt"`
+			PublishAt  *string `json:"publish_at"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -71,7 +108,26 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		post, err := db.CreatePost(r.Context(), title, in.Content)
+		// Parse publish_at if provided
+		var publishAt *time.Time
+		if in.PublishAt != nil && *in.PublishAt != "" {
+			t, err := time.Parse(time.RFC3339, *in.PublishAt)
+			if err != nil {
+				http.Error(w, "invalid publish_at format, use RFC3339", http.StatusBadRequest)
+				return
+			}
+			publishAt = &t
+		}
+
+		post, err := db.CreatePost(r.Context(), dbx.PostInput{
+			Title:      title,
+			Content:    in.Content,
+			Status:     validatePostStatus(in.Status),
+			Visibility: validatePostVisibility(in.Visibility),
+			Format:     validatePostFormat(in.Format),
+			Excerpt:    in.Excerpt,
+			PublishAt:  publishAt,
+		})
 		if err != nil {
 			log.Printf("CreatePost: error creating post: %v", err)
 			http.Error(w, "could not create post", http.StatusInternalServerError)
@@ -95,8 +151,13 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 		}
 
 		var in struct {
-			Title   string `json:"title"`
-			Content string `json:"content"`
+			Title      string  `json:"title"`
+			Content    string  `json:"content"`
+			Status     string  `json:"status"`
+			Visibility string  `json:"visibility"`
+			Format     string  `json:"format"`
+			Excerpt    string  `json:"excerpt"`
+			PublishAt  *string `json:"publish_at"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -110,7 +171,26 @@ func RegisterPosts(mux *http.ServeMux, db *dbx.DB) {
 			return
 		}
 
-		post, err := db.UpdatePost(r.Context(), id, title, in.Content)
+		// Parse publish_at if provided
+		var publishAt *time.Time
+		if in.PublishAt != nil && *in.PublishAt != "" {
+			t, err := time.Parse(time.RFC3339, *in.PublishAt)
+			if err != nil {
+				http.Error(w, "invalid publish_at format, use RFC3339", http.StatusBadRequest)
+				return
+			}
+			publishAt = &t
+		}
+
+		post, err := db.UpdatePost(r.Context(), id, dbx.PostInput{
+			Title:      title,
+			Content:    in.Content,
+			Status:     validatePostStatus(in.Status),
+			Visibility: validatePostVisibility(in.Visibility),
+			Format:     validatePostFormat(in.Format),
+			Excerpt:    in.Excerpt,
+			PublishAt:  publishAt,
+		})
 		if err != nil {
 			log.Printf("UpdatePost: error updating post: %v", err)
 			http.Error(w, "could not update post", http.StatusInternalServerError)
