@@ -148,14 +148,3 @@ func MustLoad() *Config {
 	}
 	return cfg
 }
-
-// EnsureContentFolders creates the dz_content directory structure if it doesn't exist
-func (c *ContentConfig) EnsureContentFolders() error {
-	dirs := []string{c.BasePath, c.ThemesPath, c.PluginsPath, c.UploadsPath}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-	}
-	return nil
-}
