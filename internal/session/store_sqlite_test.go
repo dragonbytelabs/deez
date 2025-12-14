@@ -1,34 +1,13 @@
 package session
 
 import (
-	"context"
+	"dragonbytelabs/dz/internal/dbx"
 	"testing"
 	"time"
-
-	"dragonbytelabs/dz/internal/dbx"
 )
 
-// setupTestDB creates a temporary in-memory database for testing
-func setupTestDB(t *testing.T) *dbx.DB {
-	t.Helper()
-
-	// Use in-memory SQLite for tests
-	db, err := dbx.OpenSQLite(":memory:")
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
-
-	// Apply migrations
-	ctx := context.Background()
-	if err := db.ApplyMigrations(ctx); err != nil {
-		t.Fatalf("failed to apply migrations: %v", err)
-	}
-
-	return db
-}
-
 func TestNewSQLiteStore(t *testing.T) {
-	db := setupTestDB(t)
+	db := dbx.SetupTestDB(t)
 	defer db.Close()
 
 	store := NewSQLiteStore(db)
@@ -41,7 +20,7 @@ func TestNewSQLiteStore(t *testing.T) {
 }
 
 func TestSQLiteStore_Read(t *testing.T) {
-	db := setupTestDB(t)
+	db := dbx.SetupTestDB(t)
 	defer db.Close()
 
 	store := NewSQLiteStore(db)
@@ -79,7 +58,7 @@ func TestSQLiteStore_Read(t *testing.T) {
 }
 
 func TestSQLiteStore_Write(t *testing.T) {
-	db := setupTestDB(t)
+	db := dbx.SetupTestDB(t)
 	defer db.Close()
 
 	store := NewSQLiteStore(db)
@@ -124,7 +103,7 @@ func TestSQLiteStore_Write(t *testing.T) {
 }
 
 func TestSQLiteStore_Destroy(t *testing.T) {
-	db := setupTestDB(t)
+	db := dbx.SetupTestDB(t)
 	defer db.Close()
 
 	store := NewSQLiteStore(db)
@@ -154,7 +133,7 @@ func TestSQLiteStore_Destroy(t *testing.T) {
 }
 
 func TestSQLiteStore_GC(t *testing.T) {
-	db := setupTestDB(t)
+	db := dbx.SetupTestDB(t)
 	defer db.Close()
 
 	store := NewSQLiteStore(db)

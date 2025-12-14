@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"testing"
 
 	db "dragonbytelabs/dz/db"
 
@@ -210,4 +211,22 @@ func MustQuery(name string) string {
 		log.Fatalf("query %s not found: %v", name, err)
 	}
 	return string(b)
+}
+
+func SetupTestDB(t *testing.T) *DB {
+	t.Helper()
+
+	// Use in-memory SQLite for tests
+	db, err := OpenSQLite(":memory:")
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
+	}
+
+	// Apply migrations
+	ctx := context.Background()
+	if err := db.ApplyMigrations(ctx); err != nil {
+		t.Fatalf("failed to apply migrations: %v", err)
+	}
+
+	return db
 }

@@ -8,6 +8,7 @@ export const Home = () => {
 	return (
 		<div class={content}>
 			<p>This is the homepage</p>
+			<p>This is the homepage</p>
 		</div>
 	);
 };
