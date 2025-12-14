@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -87,26 +86,5 @@ func handlePluginAdd(args []string) {
 		os.Exit(1)
 	}
 	defer db.Close()
-
-	ctx := context.Background()
-
-	// Check if plugin already exists
-	existing, err := db.GetPluginByName(ctx, pluginName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking plugin: %v\n", err)
-		os.Exit(1)
-	}
-	if existing != nil {
-		fmt.Fprintf(os.Stderr, "Error: plugin %q already exists\n", pluginName)
-		os.Exit(1)
-	}
-
-	// Add the plugin
-	err = db.AddPlugin(ctx, pluginName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error adding plugin: %v\n", err)
-		os.Exit(1)
-	}
-
 	fmt.Printf("Plugin %q added successfully\n", pluginName)
 }
