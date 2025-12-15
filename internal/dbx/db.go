@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -26,6 +27,9 @@ func (d *DB) Close() error { return d.SQL.Close() }
 
 // OpenSQLite opens SQLite with sane defaults for server use.
 func OpenSQLite(path string) (*DB, error) {
+	if dir := filepath.Dir(path); dir != "." {
+		_ = os.MkdirAll(dir, 0o755)
+	}
 	// modernc driver name is "sqlite"
 	// Busy timeout + WAL via pragmas in first migration; we can also pass flags in DSN.
 	// For example: file:app.db?_pragma=busy_timeout(5000)

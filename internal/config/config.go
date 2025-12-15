@@ -28,6 +28,7 @@ type ContentConfig struct {
 	ThemesPath  string // Path to themes folder
 	PluginsPath string // Path to plugins folder
 	UploadsPath string // Path to uploads folder
+	VaultPath   string // Path to vault folder
 }
 
 type AppConfig struct {
@@ -97,6 +98,7 @@ func Load() (*Config, error) {
 			ThemesPath:  getEnv("CONTENT_THEMES_PATH", "dz_content/themes"),
 			PluginsPath: getEnv("CONTENT_PLUGINS_PATH", "dz_content/plugins"),
 			UploadsPath: getEnv("CONTENT_UPLOADS_PATH", "dz_content/uploads"),
+			VaultPath:   getEnv("VAULT_PATH", "dz_content/vault"),
 		},
 		// Admin defaults
 		DefaultAdminEmail:    getEnv("DEFAULT_ADMIN_EMAIL", "admin@localhost.com"),
