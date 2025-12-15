@@ -8,18 +8,29 @@ import (
 	"dragonbytelabs/dz/internal/config"
 	"dragonbytelabs/dz/internal/dbx"
 	"dragonbytelabs/dz/internal/routes"
+	"dragonbytelabs/dz/internal/vault"
 
 	webview "github.com/webview/webview_go"
 )
 
 func main() {
 	cfg := config.MustLoad()
+	appDir, err := config.AppDir("deez")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Resolve relative DB path into appDir
+	cfg.Database.Path = config.ResolveInAppDir(appDir, cfg.Database.Path)
 
 	db := setupDB(*cfg)
 	defer db.Close()
 
 	mux := http.NewServeMux()
-	setupRoutes(mux)
+	vault, err := vault.New(cfg.Content.VaultPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	setupRoutes(mux, vault)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:3000")
 	// ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -60,8 +71,8 @@ func setupDB(cfg config.Config) *dbx.DB {
 	return db
 }
 
-func setupRoutes(mux *http.ServeMux) {
-	routes.RegisterApi(mux)
+func setupRoutes(mux *http.ServeMux, vault *vault.Vault) {
+	routes.RegisterApi(mux, vault)
 	routes.RegisterStatic(mux)
 }
 
