@@ -287,3 +287,61 @@ func (v *Vault) ListEntries(ctx context.Context) ([]Entry, error) {
 
 	return out, nil
 }
+
+// DeleteFile removes a file from the vault
+func (v *Vault) DeleteFile(ctx context.Context, vaultPath string) error {
+	absPath, err := v.resolve(vaultPath)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return err
+	}
+
+	if info.IsDir() {
+		return errors.New("path is a directory, use DeleteFolder instead")
+	}
+
+	return os.Remove(absPath)
+}
+
+// DeleteFolder removes a folder and all its contents from the vault
+func (v *Vault) DeleteFolder(ctx context.Context, vaultPath string) error {
+	absPath, err := v.resolve(vaultPath)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return err
+	}
+
+	if !info.IsDir() {
+		return errors.New("path is not a directory, use DeleteFile instead")
+	}
+
+	return os.RemoveAll(absPath)
+}
+
+// RenameFile renames or moves a file within the vault
+func (v *Vault) RenameFile(ctx context.Context, oldVaultPath, newVaultPath string) error {
+	oldAbs, err := v.resolve(oldVaultPath)
+	if err != nil {
+		return err
+	}
+	newAbs, err := v.resolve(newVaultPath)
+	if err != nil {
+		return err
+	}
+
+	// Create parent directory if it doesn't exist
+	newDir := filepath.Dir(newAbs)
+	if err := os.MkdirAll(newDir, 0755); err != nil {
+		return err
+	}
+
+	return os.Rename(oldAbs, newAbs)
+}

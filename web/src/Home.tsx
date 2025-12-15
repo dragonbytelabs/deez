@@ -10,7 +10,7 @@ import { api, type Entry } from "./server/api";
 const shell = css`
   height: 100vh;
   display: grid;
-  grid-template-columns: 56px 320px 1fr;
+  grid-template-columns: 56px var(--sidebar-width, 320px) 1fr;
 `;
 
 const rail = css`
@@ -55,12 +55,35 @@ const icon = css`
   opacity: 0.9;
 `;
 
+const resizeHandle = css`
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
+  transition: all 0.1s ease;
+
+  &:hover {
+    width: 8px;
+    background: rgba(96, 165, 250, 0.3);
+    border-left: 2px solid #60a5fa;
+  }
+
+  &:active {
+    background: rgba(96, 165, 250, 0.5);
+    border-left: 2px solid #60a5fa;
+  }
+`;
+
 const sidebar = css`
   border-right: 1px solid #e6e6e6;
   display: flex;
   flex-direction: column;
   min-width: 0;
   color: #ffffff;
+  position: relative;
 `;
 
 const header = css`
@@ -158,6 +181,39 @@ const nameInput = css`
   &::placeholder {
     color: rgba(255, 255, 255, 0.5);
   }
+`;
+
+const renameInputWrapper = css`
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 36px;
+
+  &:focus-within {
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.25);
+  }
+`;
+
+const renameInput = css`
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 14px;
+  min-width: 0;
+`;
+
+const renameExtension = css`
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  user-select: none;
+  pointer-events: none;
 `;
 
 const main = css`
@@ -578,7 +634,38 @@ function TreeView(props: {
 	setPendingName: (v: string) => void;
 	commitPending: () => void;
 	cancelPending: () => void;
+
+	onRename: (oldPath: string, newName: string) => void;
+	onDelete: (path: string, kind: "file" | "folder") => void;
 }) {
+	const [renamingPath, setRenamingPath] = createSignal<string>("");
+	const [renameValue, setRenameValue] = createSignal<string>("");
+
+	const startRename = (path: string, currentName: string) => {
+		setRenamingPath(path);
+		// Strip .md extension for editing
+		const nameWithoutExt = currentName.endsWith('.md')
+			? currentName.slice(0, -3)
+			: currentName;
+		setRenameValue(nameWithoutExt);
+	};
+
+	const commitRename = () => {
+		const path = renamingPath();
+		const newName = renameValue().trim();
+		if (path && newName) {
+			// Always append .md extension
+			const newNameWithExt = newName.endsWith('.md') ? newName : `${newName}.md`;
+			props.onRename(path, newNameWithExt);
+			setRenamingPath("");
+		}
+	};
+
+	const cancelRename = () => {
+		setRenamingPath("");
+		setRenameValue("");
+	};
+
 	const renderNodes = (nodes: TreeNode[], depth: number) => (
 		<For each={nodes}>
 			{(n) => (
@@ -642,9 +729,23 @@ function TreeView(props: {
 									</div>
 								}
 							>
-								<span class={caret} />
-								{n.name}
-							</div>
+								<div style={{ "padding-left": `${10 + depth * 14}px`, padding: "6px 8px" }}>
+									<div class={renameInputWrapper}>
+										<input
+											class={renameInput}
+											value={renameValue()}
+											onInput={(e) => setRenameValue(e.currentTarget.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") commitRename();
+												if (e.key === "Escape") cancelRename();
+											}}
+											onBlur={cancelRename}
+											autofocus
+										/>
+										<span class={renameExtension}>.md</span>
+									</div>
+								</div>
+							</Show>
 						}
 					>
 						{(() => {
@@ -1226,7 +1327,7 @@ export const Home = () => {
 	};
 
 	return (
-		<div class={shell}>
+		<div class={shell} style={{ "--sidebar-width": `${sidebarWidth()}px` }}>
 			{/* Left icon rail */}
 			<div class={rail}>
 				<RailButton title="Notes" onClick={() => console.log("Notes")}>
@@ -1334,9 +1435,13 @@ export const Home = () => {
 							setPendingName={setPendingName}
 							commitPending={commitPending}
 							cancelPending={cancelPending}
+							onRename={onRename}
+							onDelete={onDelete}
 						/>
 					</Show>
 				</div>
+
+				<div class={resizeHandle} onMouseDown={handleResizeStart} />
 			</div>
 
 			{/* Main */}
