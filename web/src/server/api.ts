@@ -103,5 +103,20 @@ export const api = {
 		}),
 	writeFile: (path: string, body: WriteFileReq) =>
 		requestJSON<WriteFileRes, WriteFileReq>(routes.file, { method: "PUT", query: { path }, body }),
-    listTree: () => requestJSON<Entry[]>(routes.tree),
+	listTree: () => requestJSON<Entry[]>(routes.tree),
+	rename: (oldPath: string, newPath: string) =>
+		requestJSON<{ ok: true }>("/api/rename", {
+			method: "POST",
+			body: { oldPath, newPath },
+		}),
+	deleteFile: (path: string) =>
+		requestJSON<{ ok: true }>(routes.file, {
+			method: "DELETE",
+			query: { path },
+		}),
+	deleteFolder: (path: string) =>
+		requestJSON<{ ok: true }>(routes.createFolder, {
+			method: "DELETE",
+			query: { path },
+		}),
 };

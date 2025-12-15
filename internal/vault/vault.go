@@ -287,3 +287,66 @@ func (v *Vault) ListEntries(ctx context.Context) ([]Entry, error) {
 
 	return out, nil
 }
+
+// Rename moves/renames a file or folder
+func (v *Vault) Rename(ctx context.Context, oldRel, newRel string) error {
+	oldAbs, err := v.resolve(oldRel)
+	if err != nil {
+		return err
+	}
+
+	newAbs, err := v.resolve(newRel)
+	if err != nil {
+		return err
+	}
+
+	// Ensure parent directory exists for new path
+	if err := os.MkdirAll(filepath.Dir(newAbs), 0o755); err != nil {
+		return err
+	}
+
+	// Check if target already exists
+	if _, err := os.Stat(newAbs); err == nil {
+		return errors.New("target already exists")
+	}
+
+	return os.Rename(oldAbs, newAbs)
+}
+
+// DeleteFile removes a file
+func (v *Vault) DeleteFile(ctx context.Context, rel string) error {
+	abs, err := v.resolve(rel)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(abs)
+	if err != nil {
+		return err
+	}
+
+	if info.IsDir() {
+		return errors.New("path is a directory, not a file")
+	}
+
+	return os.Remove(abs)
+}
+
+// DeleteFolder removes a folder and all its contents
+func (v *Vault) DeleteFolder(ctx context.Context, rel string) error {
+	abs, err := v.resolve(rel)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(abs)
+	if err != nil {
+		return err
+	}
+
+	if !info.IsDir() {
+		return errors.New("path is a file, not a folder")
+	}
+
+	return os.RemoveAll(abs)
+}

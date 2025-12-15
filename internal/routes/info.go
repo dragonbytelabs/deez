@@ -102,6 +102,54 @@ func RegisterApi(mux *http.ServeMux, v *vault.Vault) {
 		writeJSON(w, entries)
 	})
 
+	mux.HandleFunc("POST /api/rename", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			OldPath string `json:"oldPath"`
+			NewPath string `json:"newPath"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid json body", 400)
+			return
+		}
+
+		if err := v.Rename(r.Context(), req.OldPath, req.NewPath); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	mux.HandleFunc("DELETE /api/file", func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Query().Get("path")
+		if p == "" {
+			http.Error(w, "path required", 400)
+			return
+		}
+
+		if err := v.DeleteFile(r.Context(), p); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
+	mux.HandleFunc("DELETE /api/folder", func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Query().Get("path")
+		if p == "" {
+			http.Error(w, "path required", 400)
+			return
+		}
+
+		if err := v.DeleteFolder(r.Context(), p); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

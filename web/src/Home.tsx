@@ -9,7 +9,7 @@ import { api, type Entry } from "./server/api";
 const shell = css`
   height: 100vh;
   display: grid;
-  grid-template-columns: 56px 320px 1fr;
+  grid-template-columns: 56px var(--sidebar-width, 320px) 1fr;
 `;
 
 const rail = css`
@@ -60,6 +60,29 @@ const sidebar = css`
   flex-direction: column;
   min-width: 0;
   color: #ffffff;
+  position: relative;
+`;
+
+const resizeHandle = css`
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
+  transition: all 0.1s ease;
+
+  &:hover {
+    width: 8px;
+    background: rgba(96, 165, 250, 0.3);
+    border-left: 2px solid #60a5fa;
+  }
+
+  &:active {
+    background: rgba(96, 165, 250, 0.5);
+    border-left: 2px solid #60a5fa;
+  }
 `;
 
 const header = css`
@@ -159,10 +182,71 @@ const nameInput = css`
   }
 `;
 
+const renameInputWrapper = css`
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 36px;
+
+  &:focus-within {
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.25);
+  }
+`;
+
+const renameInput = css`
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 14px;
+  min-width: 0;
+`;
+
+const renameExtension = css`
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  user-select: none;
+  pointer-events: none;
+`;
+
 const main = css`
   padding: 12px;
   overflow: auto;
   color: #ffffff;
+`;
+
+const actionBtn = css`
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+`;
+
+const rowWithActions = css`
+  position: relative;
+  
+  & .actions {
+    opacity: 0;
+  }
+
+  &:hover .actions {
+    opacity: 1;
+  }
 `;
 
 const editor = css`
@@ -303,7 +387,38 @@ function TreeView(props: {
 	setPendingName: (v: string) => void;
 	commitPending: () => void;
 	cancelPending: () => void;
+
+	onRename: (oldPath: string, newName: string) => void;
+	onDelete: (path: string, kind: "file" | "folder") => void;
 }) {
+	const [renamingPath, setRenamingPath] = createSignal<string>("");
+	const [renameValue, setRenameValue] = createSignal<string>("");
+
+	const startRename = (path: string, currentName: string) => {
+		setRenamingPath(path);
+		// Strip .md extension for editing
+		const nameWithoutExt = currentName.endsWith('.md')
+			? currentName.slice(0, -3)
+			: currentName;
+		setRenameValue(nameWithoutExt);
+	};
+
+	const commitRename = () => {
+		const path = renamingPath();
+		const newName = renameValue().trim();
+		if (path && newName) {
+			// Always append .md extension
+			const newNameWithExt = newName.endsWith('.md') ? newName : `${newName}.md`;
+			props.onRename(path, newNameWithExt);
+			setRenamingPath("");
+		}
+	};
+
+	const cancelRename = () => {
+		setRenamingPath("");
+		setRenameValue("");
+	};
+
 	const renderNodes = (nodes: TreeNode[], depth: number) => (
 		<For each={nodes}>
 			{(n) => (
@@ -311,21 +426,79 @@ function TreeView(props: {
 					<Show
 						when={n.kind === "folder"}
 						fallback={
-							<div
-								class={`${row} ${
-									props.newlyCreatedFile === n.path
-										? rowNew
-										: props.selectedFile === n.path
-											? rowActive
-											: ""
-								}`}
-								style={{ "padding-left": `${10 + depth * 14}px` }}
-								onClick={() => props.onSelectFile(n.path)}
-								title={n.path}
+							<Show
+								when={renamingPath() === n.path}
+								fallback={
+									<div
+										class={`${row} ${rowWithActions} ${props.newlyCreatedFile === n.path
+											? rowNew
+											: props.selectedFile === n.path
+												? rowActive
+												: ""
+											}`}
+										style={{ "padding-left": `${10 + depth * 14}px`, display: "flex", "justify-content": "space-between" }}
+										onClick={() => props.onSelectFile(n.path)}
+										onKeyDown={(e) => {
+											if (e.key === "F2") {
+												e.preventDefault();
+												startRename(n.path, n.name);
+											}
+											if (e.key === "Delete") {
+												e.preventDefault();
+												props.onDelete(n.path, "file");
+											}
+										}}
+										tabIndex={0}
+										title={n.path}
+									>
+										<span style={{ display: "flex", "align-items": "center", gap: "6px", flex: 1, "min-width": 0 }}>
+											<span class={caret} />
+											<span style={{ overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap" }}>
+												{n.name}
+											</span>
+										</span>
+										<span class="actions" style={{ display: "flex", gap: "4px", "margin-left": "8px" }}>
+											<button
+												class={actionBtn}
+												onClick={(e) => {
+													e.stopPropagation();
+													startRename(n.path, n.name);
+												}}
+												title="Rename (F2)"
+											>
+												F2
+											</button>
+											<button
+												class={actionBtn}
+												onClick={(e) => {
+													e.stopPropagation();
+													props.onDelete(n.path, "file");
+												}}
+												title="Delete"
+											>
+												Del
+											</button>
+										</span>
+									</div>
+								}
 							>
-								<span class={caret} />
-								{n.name}
-							</div>
+								<div style={{ "padding-left": `${10 + depth * 14}px`, padding: "6px 8px" }}>
+									<div class={renameInputWrapper}>
+										<input
+											class={renameInput}
+											value={renameValue()}
+											onInput={(e) => setRenameValue(e.currentTarget.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") commitRename();
+												if (e.key === "Escape") cancelRename();
+											}}
+											onBlur={cancelRename}
+											autofocus
+										/>
+										<span class={renameExtension}>.md</span>
+									</div>
+								</div>
+							</Show>
 						}
 					>
 						{(() => {
@@ -414,9 +587,20 @@ export const Home = () => {
 
 	const [draft, setDraft] = createSignal("");
 	const [lastHash, setLastHash] = createSignal<string | undefined>(undefined);
+	const [savedContent, setSavedContent] = createSignal("");
+	const [isSaving, setIsSaving] = createSignal(false);
 
 	const [pending, setPending] = createSignal<PendingCreate>(null);
 	const [pendingName, setPendingName] = createSignal("");
+
+	const [sidebarWidth, setSidebarWidth] = createSignal(320);
+	const [isResizing, setIsResizing] = createSignal(false);
+
+	// Dirty state: has unsaved changes
+	const isDirty = createMemo(() => {
+		if (!selectedFile()) return false;
+		return draft() !== savedContent();
+	});
 
 	const [file] = createResource(
 		() => selectedFile() || null,
@@ -430,6 +614,7 @@ export const Home = () => {
 		const f = file();
 		if (!f) return;
 		setDraft(f.content);
+		setSavedContent(f.content);
 		setLastHash(f.sha256);
 	});
 
@@ -530,14 +715,157 @@ export const Home = () => {
 
 	const save = async () => {
 		const p = selectedFile();
-		if (!p) return;
-		const res = await api.writeFile(p, { content: draft(), ifMatch: lastHash() });
-		setLastHash(res.sha256);
-		await refetchTree();
+		if (!p || isSaving()) return;
+
+		try {
+			setIsSaving(true);
+			const res = await api.writeFile(p, { content: draft(), ifMatch: lastHash() });
+			setLastHash(res.sha256);
+			setSavedContent(draft());
+			await refetchTree();
+		} catch (e) {
+			console.error("Save failed:", e);
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	// Auto-save: debounce 800ms after typing stops
+	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	createEffect(() => {
+		const content = draft();
+		const file = selectedFile();
+
+		if (!file || !isDirty()) return;
+
+		if (autoSaveTimer) clearTimeout(autoSaveTimer);
+		autoSaveTimer = setTimeout(() => {
+			save();
+		}, 800);
+	});
+
+	// Sidebar resize handlers
+	const handleResizeStart = (e: MouseEvent) => {
+		e.preventDefault();
+		setIsResizing(true);
+
+		const handleResize = (e: MouseEvent) => {
+			const newWidth = Math.max(200, Math.min(600, e.clientX));
+			setSidebarWidth(newWidth);
+		};
+
+		const handleResizeEnd = () => {
+			setIsResizing(false);
+			document.removeEventListener('mousemove', handleResize);
+			document.removeEventListener('mouseup', handleResizeEnd);
+		};
+
+		document.addEventListener('mousemove', handleResize);
+		document.addEventListener('mouseup', handleResizeEnd);
+	};
+
+	// Keyboard shortcuts
+	createEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+			const mod = isMac ? e.metaKey : e.ctrlKey;
+
+			// Cmd/Ctrl+Shift+N: New folder (check this first before regular N)
+			if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
+				console.log('Cmd+Shift+N triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+				onNewFolder();
+				return false;
+			}
+
+			// Cmd/Ctrl+N: New note
+			if (mod && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+				console.log('Cmd+N triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+				onNewNote();
+				return false;
+			}
+
+			// Cmd/Ctrl+S: Save
+			if (mod && e.key === 's') {
+				console.log('Cmd+S triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				save();
+				return false;
+			}
+
+			// Cmd/Ctrl+P: Command palette
+			if (mod && e.key === 'p') {
+				console.log('Cmd+P triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				console.log('Command palette');
+				return false;
+			}
+		};
+
+		// Use window instead of document, and capture phase
+		window.addEventListener('keydown', handleKeyDown, { capture: true });
+		return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+	});
+
+	const onRename = async (oldPath: string, newName: string) => {
+		console.log('onRename called:', { oldPath, newName });
+		try {
+			const dir = oldPath.lastIndexOf("/") === -1 ? "" : oldPath.slice(0, oldPath.lastIndexOf("/"));
+			const newPath = joinPath(dir, newName);
+
+			console.log('Renaming to:', newPath);
+			await api.rename(oldPath, newPath);
+			await refetchTree();
+
+			// If the renamed file was selected, update selection
+			if (selectedFile() === oldPath) {
+				setSelectedFile(newPath);
+			}
+		} catch (e) {
+			console.error("Rename failed:", e);
+			alert(`Rename failed: ${e}`);
+		}
+	};
+
+	const onDelete = async (path: string, kind: "file" | "folder") => {
+		console.log('onDelete called:', { path, kind });
+		const confirmMsg = kind === "folder"
+			? `Delete folder "${path}" and all its contents?`
+			: `Delete file "${path}"?`;
+
+		if (!confirm(confirmMsg)) return;
+
+		try {
+			if (kind === "file") {
+				await api.deleteFile(path);
+			} else {
+				await api.deleteFolder(path);
+			}
+
+			await refetchTree();
+
+			// If the deleted file was selected, clear selection
+			if (selectedFile() === path || selectedFile().startsWith(path + "/")) {
+				setSelectedFile("");
+				setDraft("");
+				setSavedContent("");
+				setLastHash(undefined);
+			}
+		} catch (e) {
+			console.error("Delete failed:", e);
+			alert(`Delete failed: ${e}`);
+		}
 	};
 
 	return (
-		<div class={shell}>
+		<div class={shell} style={{ "--sidebar-width": `${sidebarWidth()}px` }}>
 			{/* Left icon rail */}
 			<div class={rail}>
 				<RailButton title="Notes" onClick={() => console.log("Notes")}>
@@ -614,7 +942,12 @@ export const Home = () => {
 			{/* Sidebar */}
 			<div class={sidebar}>
 				<div class={header}>
-					<strong>Notes</strong>
+					<strong>
+						Notes
+						<Show when={isDirty()}>
+							<span style={{ color: "#60a5fa", "margin-left": "6px" }}>●</span>
+						</Show>
+					</strong>
 					<div class={headerActions}>
 						<button class={tinyBtn} title="New note" onClick={onNewNote}>
 							✎
@@ -645,9 +978,13 @@ export const Home = () => {
 							setPendingName={setPendingName}
 							commitPending={commitPending}
 							cancelPending={cancelPending}
+							onRename={onRename}
+							onDelete={onDelete}
 						/>
 					</Show>
 				</div>
+
+				<div class={resizeHandle} onMouseDown={handleResizeStart} />
 			</div>
 
 			{/* Main */}
