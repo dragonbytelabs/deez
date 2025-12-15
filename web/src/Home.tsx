@@ -1,5 +1,6 @@
 import { css } from "@linaria/core";
 import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
+import { marked } from "marked";
 import { api, type Entry } from "./server/api";
 
 /* =======================
@@ -160,17 +161,291 @@ const nameInput = css`
 `;
 
 const main = css`
-  padding: 12px;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   color: #ffffff;
+`;
+
+const tabsBar = css`
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  overflow-x: auto;
+  flex-shrink: 0;
+`;
+
+const tab = css`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  padding-top: 8px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-top: 2px solid transparent;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: all 0.15s;
+  max-width: 200px;
+  min-width: 120px;
+  position: relative;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+  }
+  
+  &:hover .tab-close-x {
+    display: flex;
+  }
+  
+  &:hover .tab-dirty-dot {
+    display: none;
+  }
+`;
+
+const tabFileName = css`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  padding-right: 24px;
+`;
+
+const tabActions = css`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  right: 8px;
+  background: inherit;
+  padding-left: 8px;
+`;
+
+const tabActive = css`
+  background: rgba(255, 255, 255, 0.15);
+  border-top-color: #007acc;
+  color: #ffffff;
+`;
+
+const tabClose = css`
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  opacity: 0.7;
+  transition: all 0.15s;
+  font-size: 18px;
+  line-height: 1;
+  display: none;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+const toolbar = css`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+`;
+
+const toolBtn = css`
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.15);
+  }
+`;
+
+const toolSeparator = css`
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+`;
+
+const editorWrapper = css`
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+`;
+
+const preview = css`
+  width: 100%;
+  min-height: 100%;
+  padding: 20px;
+  color: #ffffff;
+  line-height: 1.6;
+
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #ffffff;
+  }
+
+  h1 { font-size: 2em; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 8px; }
+  h2 { font-size: 1.5em; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 6px; }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: rgba(255, 255, 255, 0.7); }
+
+  p {
+    margin-top: 0;
+    margin-bottom: 16px;
+  }
+
+  a {
+    color: #60a5fa;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9em;
+  }
+
+  pre {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin-bottom: 16px;
+
+    code {
+      background: transparent;
+      padding: 0;
+    }
+  }
+
+  blockquote {
+    margin: 0;
+    padding-left: 16px;
+    border-left: 4px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 16px;
+  }
+
+  ul, ol {
+    padding-left: 24px;
+    margin-bottom: 16px;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin: 24px 0;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  th, td {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 8px 12px;
+    text-align: left;
+  }
+
+  th {
+    background: rgba(255, 255, 255, 0.1);
+    font-weight: 600;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  input[type="checkbox"] {
+    margin-right: 8px;
+  }
+`;
+
+const actionBtn = css`
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+`;
+
+const rowWithActions = css`
+  position: relative;
+  
+  & .actions {
+    opacity: 0;
+  }
+
+  &:hover .actions {
+    opacity: 1;
+  }
 `;
 
 const editor = css`
   width: 100%;
-  height: 70vh;
+  min-height: 100%;
   padding: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: #ffffff;
 `;
 
 /* =======================
@@ -294,7 +569,7 @@ function TreeView(props: {
 	toggleFolder: (path: string) => void;
 
 	selectedFile: string;
-	onSelectFile: (path: string) => void;
+	onOpenFile: (path: string) => void;
 
 	newlyCreatedFile: string;
 
@@ -311,17 +586,61 @@ function TreeView(props: {
 					<Show
 						when={n.kind === "folder"}
 						fallback={
-							<div
-								class={`${row} ${
-									props.newlyCreatedFile === n.path
-										? rowNew
-										: props.selectedFile === n.path
-											? rowActive
-											: ""
-								}`}
-								style={{ "padding-left": `${10 + depth * 14}px` }}
-								onClick={() => props.onSelectFile(n.path)}
-								title={n.path}
+							<Show
+								when={renamingPath() === n.path}
+								fallback={
+									<div
+										class={`${row} ${rowWithActions} ${props.newlyCreatedFile === n.path
+											? rowNew
+											: props.selectedFile === n.path
+												? rowActive
+												: ""
+											}`}
+										style={{ "padding-left": `${10 + depth * 14}px`, display: "flex", "justify-content": "space-between" }}
+										onClick={() => props.onOpenFile(n.path)}
+										onKeyDown={(e) => {
+											if (e.key === "F2") {
+												e.preventDefault();
+												startRename(n.path, n.name);
+											}
+											if (e.key === "Delete") {
+												e.preventDefault();
+												props.onDelete(n.path, "file");
+											}
+										}}
+										tabIndex={0}
+										title={n.path}
+									>
+										<span style={{ display: "flex", "align-items": "center", gap: "6px", flex: 1, "min-width": 0 }}>
+											<span class={caret} />
+											<span style={{ overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap" }}>
+												{n.name}
+											</span>
+										</span>
+										<span class="actions" style={{ display: "flex", gap: "4px", "margin-left": "8px" }}>
+											<button
+												class={actionBtn}
+												onClick={(e) => {
+													e.stopPropagation();
+													startRename(n.path, n.name);
+												}}
+												title="Rename (F2)"
+											>
+												F2
+											</button>
+											<button
+												class={actionBtn}
+												onClick={(e) => {
+													e.stopPropagation();
+													props.onDelete(n.path, "file");
+												}}
+												title="Delete"
+											>
+												Del
+											</button>
+										</span>
+									</div>
+								}
 							>
 								<span class={caret} />
 								{n.name}
@@ -412,11 +731,70 @@ export const Home = () => {
 	const [selectedFile, setSelectedFile] = createSignal<string>("");
 	const [newlyCreatedFile, setNewlyCreatedFile] = createSignal<string>("");
 
-	const [draft, setDraft] = createSignal("");
-	const [lastHash, setLastHash] = createSignal<string | undefined>(undefined);
+	const [isSaving, setIsSaving] = createSignal(false);
 
 	const [pending, setPending] = createSignal<PendingCreate>(null);
 	const [pendingName, setPendingName] = createSignal("");
+
+	const [sidebarWidth, setSidebarWidth] = createSignal(320);
+
+	const [openTabs, setOpenTabs] = createSignal<string[]>([]);
+	const [viewMode, setViewMode] = createSignal<"edit" | "preview">("edit");
+
+	// Track saved content for each file (from server)
+	const [savedContentMap, setSavedContentMap] = createSignal<Map<string, string>>(new Map());
+	// Track current draft content for each file (user edits)
+	const [draftContentMap, setDraftContentMap] = createSignal<Map<string, string>>(new Map());
+	// Track last hash for each file
+	const [hashMap, setHashMap] = createSignal<Map<string, string>>(new Map());
+
+	// Computed: current file's draft content
+	const draft = createMemo(() => {
+		const file = selectedFile();
+		if (!file) return "";
+		return draftContentMap().get(file) || "";
+	});
+
+	// Legacy setters for compatibility (used in effects)
+	const setDraft = (content: string) => {
+		const file = selectedFile();
+		if (!file) return;
+		const newMap = new Map(draftContentMap());
+		newMap.set(file, content);
+		setDraftContentMap(newMap);
+	};
+
+	const setSavedContent = (content: string) => {
+		const file = selectedFile();
+		if (!file) return;
+		const newMap = new Map(savedContentMap());
+		newMap.set(file, content);
+		setSavedContentMap(newMap);
+	};
+
+	const setLastHash = (hash: string | undefined) => {
+		const file = selectedFile();
+		if (!file || hash === undefined) return;
+		const newMap = new Map(hashMap());
+		newMap.set(file, hash);
+		setHashMap(newMap);
+	};
+
+	const isFileDirty = (filePath: string) => {
+		const saved = savedContentMap().get(filePath);
+		const draft = draftContentMap().get(filePath);
+		if (saved === undefined || draft === undefined) return false;
+		return draft !== saved;
+	};
+
+	const previewHtml = createMemo(() => {
+		if (!selectedFile() || viewMode() !== "preview") return "";
+		return marked(draft(), { 
+			async: false,
+			breaks: true,
+			gfm: true
+		}) as string;
+	});
 
 	const [file] = createResource(
 		() => selectedFile() || null,
@@ -429,7 +807,33 @@ export const Home = () => {
 	createEffect(() => {
 		const f = file();
 		if (!f) return;
-		setDraft(f.content);
+		
+		const currentFile = selectedFile();
+		if (!currentFile) return;
+		
+		// Check if we already have draft content for this file
+		const existingDraft = draftContentMap().get(currentFile);
+		
+		if (existingDraft === undefined) {
+			// File not yet loaded, initialize with server content
+			const newDraftMap = new Map(draftContentMap());
+			newDraftMap.set(currentFile, f.content);
+			setDraftContentMap(newDraftMap);
+		}
+		// If draft exists, keep it (user may have made edits)
+		
+		// Always update saved content from server
+		const newSavedMap = new Map(savedContentMap());
+		newSavedMap.set(currentFile, f.content);
+		setSavedContentMap(newSavedMap);
+		
+		// Update hash
+		const newHashMap = new Map(hashMap());
+		newHashMap.set(currentFile, f.sha256);
+		setHashMap(newHashMap);
+		
+		// Update legacy signals for compatibility
+		setSavedContent(f.content);
 		setLastHash(f.sha256);
 	});
 
@@ -441,6 +845,21 @@ export const Home = () => {
 	};
 
 	const collapseAll = () => setOpenFolders(new Set<string>());
+
+	// Helper to initialize a file's draft content
+	const initializeDraft = (filePath: string, content: string) => {
+		const newDraftMap = new Map(draftContentMap());
+		newDraftMap.set(filePath, content);
+		setDraftContentMap(newDraftMap);
+		
+		const newSavedMap = new Map(savedContentMap());
+		newSavedMap.set(filePath, content);
+		setSavedContentMap(newSavedMap);
+		
+		// Legacy signals
+		setDraft(content);
+		setSavedContent(content);
+	};
 
 	// v1 parent dir: directory of selected file, else root
 	const currentDir = () => {
@@ -472,15 +891,13 @@ export const Home = () => {
 			await api.createFile(filePath, "");
 			await refetchTree();
 
-			// Mark as newly created and clear after 2 seconds
-			setNewlyCreatedFile(filePath);
-			setTimeout(() => setNewlyCreatedFile(""), 2000);
+		// Mark as newly created and clear after 2 seconds
+		setNewlyCreatedFile(filePath);
+		setTimeout(() => setNewlyCreatedFile(""), 2000);
 
-			// Select it and show empty editor
-			setSelectedFile(filePath);
-			setDraft("");
-			setLastHash(undefined);
-
+		// Open in tab
+		openInTab(filePath);
+		initializeDraft(filePath, "");
 			if (parentDir) {
 				const next = new Set(openFolders());
 				next.add(parentDir);
@@ -516,9 +933,8 @@ export const Home = () => {
 			await api.createFile(filePath, "");
 			await refetchTree();
 
-			setSelectedFile(filePath);
-			setDraft("");
-			setLastHash(undefined);
+			openInTab(filePath);
+			initializeDraft(filePath, "");
 
 			setPending(null);
 		} catch (e) {
@@ -530,10 +946,283 @@ export const Home = () => {
 
 	const save = async () => {
 		const p = selectedFile();
-		if (!p) return;
-		const res = await api.writeFile(p, { content: draft(), ifMatch: lastHash() });
-		setLastHash(res.sha256);
-		await refetchTree();
+		if (!p || isSaving()) return;
+
+		const currentDraft = draftContentMap().get(p);
+		const currentHash = hashMap().get(p);
+		if (currentDraft === undefined) return;
+
+		try {
+			setIsSaving(true);
+			const res = await api.writeFile(p, { content: currentDraft, ifMatch: currentHash });
+			
+			// Update hash
+			const newHashMap = new Map(hashMap());
+			newHashMap.set(p, res.sha256);
+			setHashMap(newHashMap);
+			
+			// Update saved content to match draft
+			const newSavedMap = new Map(savedContentMap());
+			newSavedMap.set(p, currentDraft);
+			setSavedContentMap(newSavedMap);
+			
+			// Legacy signals for compatibility
+			setLastHash(res.sha256);
+			setSavedContent(currentDraft);
+			
+			await refetchTree();
+		} catch (e) {
+			console.error("Save failed:", e);
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const openInTab = (filePath: string) => {
+		if (!openTabs().includes(filePath)) {
+			setOpenTabs([...openTabs(), filePath]);
+		}
+		setSelectedFile(filePath);
+	};
+
+	const closeTab = async (filePath: string, e?: MouseEvent) => {
+		e?.stopPropagation();
+
+		// Check if file has unsaved changes
+		const fileIsDirty = isFileDirty(filePath);
+		if (fileIsDirty) {
+			const result = confirm(`"${filePath.split('/').pop()}" has unsaved changes. Do you want to save them?\n\nYour changes will be lost if you don't save them.`);
+			
+			if (result) {
+				// User wants to save
+				if (selectedFile() === filePath) {
+					// File is currently selected, save it
+					await save();
+				} else {
+					// File is not selected, we need to switch to it, save, then close
+					setSelectedFile(filePath);
+					// Wait a tick for the file to load
+					await new Promise(resolve => setTimeout(resolve, 100));
+					await save();
+				}
+			} else {
+				// User doesn't want to save (revert changes)
+				const saved = savedContentMap().get(filePath);
+				if (saved !== undefined) {
+					const newDraftMap = new Map(draftContentMap());
+					newDraftMap.set(filePath, saved);
+					setDraftContentMap(newDraftMap);
+				}
+			}
+		}
+
+		const tabs = openTabs().filter(p => p !== filePath);
+		setOpenTabs(tabs);
+		
+		// Remove from both maps
+		const newSavedMap = new Map(savedContentMap());
+		newSavedMap.delete(filePath);
+		setSavedContentMap(newSavedMap);
+		
+		const newDraftMap = new Map(draftContentMap());
+		newDraftMap.delete(filePath);
+		setDraftContentMap(newDraftMap);
+		
+		// If closing the selected file, select the next tab or clear
+		if (selectedFile() === filePath) {
+			const idx = openTabs().indexOf(filePath);
+			if (tabs.length > 0) {
+				const nextTab = tabs[Math.min(idx, tabs.length - 1)];
+				setSelectedFile(nextTab);
+			} else {
+				setSelectedFile("");
+				// Legacy signals
+				setDraft("");
+				setSavedContent("");
+				setLastHash(undefined);
+			}
+		}
+	};
+
+	const insertMarkdown = (before: string, after: string = "") => {
+		const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+		if (!textarea) return;
+
+		const file = selectedFile();
+		if (!file) return;
+
+		const start = textarea.selectionStart;
+		const end = textarea.selectionEnd;
+		const currentDraft = draft();
+		const selectedText = currentDraft.substring(start, end);
+		const newText = currentDraft.substring(0, start) + before + selectedText + after + currentDraft.substring(end);
+		
+		// Update draft map
+		const newDraftMap = new Map(draftContentMap());
+		newDraftMap.set(file, newText);
+		setDraftContentMap(newDraftMap);
+		
+		// Restore cursor position
+		setTimeout(() => {
+			const newCursorPos = start + before.length + selectedText.length + after.length;
+			textarea.selectionStart = newCursorPos;
+			textarea.selectionEnd = newCursorPos;
+			textarea.focus();
+		}, 0);
+	};
+
+	// Auto-save: DISABLED - manual save only
+	// let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	// createEffect(() => {
+	// 	const file = selectedFile();
+	// 	if (!file || !isDirty()) return;
+	// 	if (autoSaveTimer) clearTimeout(autoSaveTimer);
+	// 	autoSaveTimer = setTimeout(() => {
+	// 		save();
+	// 	}, 800);
+	// });
+
+	// Sidebar resize handlers
+	const handleResizeStart = (e: MouseEvent) => {
+		e.preventDefault();
+
+		const handleResize = (e: MouseEvent) => {
+			const newWidth = Math.max(200, Math.min(600, e.clientX));
+			setSidebarWidth(newWidth);
+		};
+
+		const handleResizeEnd = () => {
+			document.removeEventListener('mousemove', handleResize);
+			document.removeEventListener('mouseup', handleResizeEnd);
+		};
+
+		document.addEventListener('mousemove', handleResize);
+		document.addEventListener('mouseup', handleResizeEnd);
+	};
+
+	// Keyboard shortcuts
+	createEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+			const mod = isMac ? e.metaKey : e.ctrlKey;
+
+			// Cmd/Ctrl+Shift+N: New folder (check this first before regular N)
+			if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
+				console.log('Cmd+Shift+N triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+				onNewFolder();
+				return false;
+			}
+
+			// Cmd/Ctrl+N: New note
+			if (mod && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+				console.log('Cmd+N triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+				onNewNote();
+				return false;
+			}
+
+			// Cmd/Ctrl+S: Save
+			if (mod && e.key === 's') {
+				console.log('Cmd+S triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				save();
+				return false;
+			}
+
+			// Cmd/Ctrl+B: Bold
+			if (mod && e.key === 'b' && selectedFile()) {
+				e.preventDefault();
+				e.stopPropagation();
+				insertMarkdown("**", "**");
+				return false;
+			}
+
+			// Cmd/Ctrl+I: Italic
+			if (mod && e.key === 'i' && selectedFile()) {
+				e.preventDefault();
+				e.stopPropagation();
+				insertMarkdown("*", "*");
+				return false;
+			}
+
+			// Cmd/Ctrl+E: Toggle preview
+			if (mod && e.key === 'e' && selectedFile()) {
+				e.preventDefault();
+				e.stopPropagation();
+				setViewMode(viewMode() === "edit" ? "preview" : "edit");
+				return false;
+			}
+
+			// Cmd/Ctrl+P: Command palette
+			if (mod && e.key === 'p') {
+				console.log('Cmd+P triggered');
+				e.preventDefault();
+				e.stopPropagation();
+				console.log('Command palette');
+				return false;
+			}
+		};
+
+		// Use window instead of document, and capture phase
+		window.addEventListener('keydown', handleKeyDown, { capture: true });
+		return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+	});
+
+	const onRename = async (oldPath: string, newName: string) => {
+		console.log('onRename called:', { oldPath, newName });
+		try {
+			const dir = oldPath.lastIndexOf("/") === -1 ? "" : oldPath.slice(0, oldPath.lastIndexOf("/"));
+			const newPath = joinPath(dir, newName);
+
+			console.log('Renaming to:', newPath);
+			await api.rename(oldPath, newPath);
+			await refetchTree();
+
+			// If the renamed file was selected, update selection
+			if (selectedFile() === oldPath) {
+				setSelectedFile(newPath);
+			}
+		} catch (e) {
+			console.error("Rename failed:", e);
+			alert(`Rename failed: ${e}`);
+		}
+	};
+
+	const onDelete = async (path: string, kind: "file" | "folder") => {
+		console.log('onDelete called:', { path, kind });
+		const confirmMsg = kind === "folder"
+			? `Delete folder "${path}" and all its contents?`
+			: `Delete file "${path}"?`;
+
+		if (!confirm(confirmMsg)) return;
+
+		try {
+			if (kind === "file") {
+				await api.deleteFile(path);
+			} else {
+				await api.deleteFolder(path);
+			}
+
+			await refetchTree();
+
+			// If the deleted file was selected, clear selection
+			if (selectedFile() === path || selectedFile().startsWith(path + "/")) {
+				setSelectedFile("");
+				// Legacy signals
+				setDraft("");
+				setSavedContent("");
+				setLastHash(undefined);
+			}
+		} catch (e) {
+			console.error("Delete failed:", e);
+			alert(`Delete failed: ${e}`);
+		}
 	};
 
 	return (
@@ -638,7 +1327,7 @@ export const Home = () => {
 							openFolders={openFolders()}
 							toggleFolder={toggleFolder}
 							selectedFile={selectedFile()}
-							onSelectFile={setSelectedFile}
+							onOpenFile={openInTab}
 							newlyCreatedFile={newlyCreatedFile()}
 							pending={pending()}
 							pendingName={pendingName()}
@@ -652,19 +1341,134 @@ export const Home = () => {
 
 			{/* Main */}
 			<div class={main}>
-				<Show when={selectedFile() || pending()?.kind === "file"} fallback={<p>Select a note.</p>}>
-					<textarea
-						class={editor}
-						value={draft()}
-						onInput={(e) => setDraft(e.currentTarget.value)}
-						placeholder="Start writing…"
-					/>
-					<div style={{ "margin-top": "8px" }}>
-						<button onClick={save} disabled={!selectedFile()}>
-							Save
+				{/* Tabs Bar */}
+				<Show when={openTabs().length > 0}>
+					<div class={tabsBar}>
+						<For each={openTabs()}>
+							{(filePath) => {
+								const fileName = filePath.split('/').pop() || filePath;
+								const isActive = selectedFile() === filePath;
+								const dirty = isFileDirty(filePath);
+								return (
+									<div
+										class={`${tab} ${isActive ? tabActive : ""}`}
+										onClick={() => setSelectedFile(filePath)}
+										title={filePath}
+									>
+										<span class={tabFileName}>{fileName}</span>
+										<div class={tabActions}>
+											<Show when={dirty}>
+												<div class="tab-dirty-dot" style={{
+													width: "8px",
+													height: "8px",
+													"border-radius": "50%",
+													background: "#ffffff",
+													opacity: "0.9"
+												}} title="Unsaved changes" />
+											</Show>
+											<div
+												class={`${tabClose} tab-close-x`}
+												style={{ display: dirty ? "none" : "flex" }}
+												onClick={(e) => closeTab(filePath, e)}
+												title="Close"
+											>
+												×
+											</div>
+										</div>
+									</div>
+								);
+							}}
+						</For>
+					</div>
+				</Show>
+
+				{/* Markdown Toolbar */}
+				<Show when={selectedFile()}>
+					<div class={toolbar}>
+						<button class={toolBtn} onClick={() => insertMarkdown("**", "**")} title="Bold (Cmd+B)">
+							<strong>B</strong>
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("*", "*")} title="Italic (Cmd+I)">
+							<em>I</em>
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("~~", "~~")} title="Strikethrough">
+							<s>S</s>
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("# ")} title="Heading 1">
+							H1
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("## ")} title="Heading 2">
+							H2
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("### ")} title="Heading 3">
+							H3
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("[", "](url)")} title="Link">
+							🔗
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("`", "`")} title="Code">
+							{"</>"}
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("```\n", "\n```")} title="Code Block">
+							{"{ }"}
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("- ")} title="Bullet List">
+							•
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("1. ")} title="Numbered List">
+							1.
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("- [ ] ")} title="Task List">
+							☑
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("> ")} title="Quote">
+							"
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("---\n")} title="Horizontal Rule">
+							─
+						</button>
+						<div class={toolSeparator} />
+						<button 
+							class={toolBtn} 
+							onClick={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
+							style={{ "background": viewMode() === "preview" ? "rgba(96, 165, 250, 0.2)" : undefined }}
+							title={viewMode() === "edit" ? "Preview" : "Edit"}
+						>
+							{viewMode() === "edit" ? "👁️" : "✎"}
 						</button>
 					</div>
 				</Show>
+
+				{/* Editor / Preview */}
+				<div class={editorWrapper}>
+					<Show when={selectedFile()} fallback={<p>Select a note from the sidebar or create a new one.</p>}>
+						<Show
+							when={viewMode() === "edit"}
+							fallback={
+								<div class={preview} innerHTML={previewHtml()} />
+							}
+						>
+							<textarea
+								class={editor}
+								value={draft()}
+								onInput={(e) => {
+									const newContent = e.currentTarget.value;
+									const file = selectedFile();
+									if (file) {
+										const newMap = new Map(draftContentMap());
+										newMap.set(file, newContent);
+										setDraftContentMap(newMap);
+									}
+								}}
+								placeholder="Start writing…"
+							/>
+						</Show>
+					</Show>
+				</div>
 			</div>
 		</div>
 	);
