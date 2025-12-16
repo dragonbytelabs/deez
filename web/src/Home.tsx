@@ -1452,17 +1452,15 @@ export const Home = () => {
 						<For each={openTabs()}>
 							{(filePath) => {
 								const fileName = filePath.split('/').pop() || filePath;
-								const isActive = selectedFile() === filePath;
-								const dirty = isFileDirty(filePath);
 								return (
 									<div
-										class={`${tab} ${isActive ? tabActive : ""}`}
+										class={`${tab} ${selectedFile() === filePath ? tabActive : ""}`}
 										onClick={() => setSelectedFile(filePath)}
 										title={filePath}
 									>
 										<span class={tabFileName}>{fileName}</span>
 										<div class={tabActions}>
-											<Show when={dirty}>
+											<Show when={isFileDirty(filePath)}>
 												<div class="tab-dirty-dot" style={{
 													width: "8px",
 													height: "8px",
@@ -1473,7 +1471,7 @@ export const Home = () => {
 											</Show>
 											<div
 												class={`${tabClose} tab-close-x`}
-												style={{ display: dirty ? "none" : "flex" }}
+												style={{ display: isFileDirty(filePath) ? "none" : "flex" }}
 												onClick={(e) => closeTab(filePath, e)}
 												title="Close"
 											>
