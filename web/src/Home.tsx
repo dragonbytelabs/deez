@@ -1,5 +1,5 @@
 import { css } from "@linaria/core";
-import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { marked } from "marked";
 import { api, type Entry } from "./server/api";
@@ -291,6 +291,11 @@ const tabActive = css`
   background: rgba(255, 255, 255, 0.15);
   border-top-color: #007acc;
   color: #ffffff;
+`;
+
+const tabPreview = css`
+  font-style: italic;
+  opacity: 0.85;
 `;
 
 const tabClose = css`
@@ -748,7 +753,7 @@ function CommandPalette(props: {
 	// Build combined list of actions + files
 	const items = createMemo((): PaletteItem[] => {
 		const q = query().toLowerCase();
-		
+
 		// Actions (always shown at top)
 		const actions: PaletteAction[] = [
 			{
@@ -827,7 +832,7 @@ function CommandPalette(props: {
 
 	const handleKeyDown = (e: KeyboardEvent) => {
 		const itemsCount = items().length;
-		
+
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
 			setSelectedIndex((selectedIndex() + 1) % itemsCount);
@@ -949,7 +954,7 @@ function TreeView(props: {
 	toggleFolder: (path: string) => void;
 
 	selectedFile: string;
-	onOpenFile: (path: string) => void;
+	onOpenFile: (path: string, isPreview?: boolean) => void;
 
 	newlyCreatedFile: string;
 
@@ -1016,13 +1021,12 @@ function TreeView(props: {
 								when={renamingPath() === n.path}
 								fallback={
 									<div
-										class={`${row} ${rowWithActions} ${
-											props.draggedFile === n.path ? rowDragging : ""
-										} ${props.newlyCreatedFile === n.path
-											? rowNew
-											: props.selectedFile === n.path
-												? rowActive
-												: ""
+										class={`${row} ${rowWithActions} ${props.draggedFile === n.path ? rowDragging : ""
+											} ${props.newlyCreatedFile === n.path
+												? rowNew
+												: props.selectedFile === n.path
+													? rowActive
+													: ""
 											}`}
 										style={{ "padding-left": `${10 + depth * 14}px`, display: "flex", "justify-content": "space-between" }}
 										draggable={true}
@@ -1034,7 +1038,15 @@ function TreeView(props: {
 											props.setDraggedFile("");
 											props.setDropTarget("");
 										}}
-										onClick={() => props.onOpenFile(n.path)}
+										onClick={(e) => {
+											if (e.detail === 1) {
+												// Single-click: preview
+												props.onOpenFile(n.path, true);
+											} else if (e.detail === 2) {
+												// Double-click: persist
+												props.onOpenFile(n.path, false);
+											}
+										}}
 										onKeyDown={(e) => {
 											if (e.key === "F2") {
 												e.preventDefault();
@@ -1106,13 +1118,22 @@ function TreeView(props: {
 							return (
 								<>
 									<div
-										class={`${row} ${
-											props.dropTarget === folder.path ? rowDropTarget : ""
-										} ${
-											props.activeFolder === folder.path ? rowActiveFolder : ""
-										}`}
-										style={{ "padding-left": `${10 + depth * 14}px` }}
+										class={`${row} ${rowWithActions} ${props.dropTarget === folder.path ? rowDropTarget : ""
+											} ${props.activeFolder === folder.path ? rowActiveFolder : ""
+											}`}
+										style={{ "padding-left": `${10 + depth * 14}px`, display: "flex", "justify-content": "space-between" }}
 										onClick={() => props.toggleFolder(folder.path)}
+										onKeyDown={(e) => {
+											if (e.key === "F2") {
+												e.preventDefault();
+												startRename(folder.path, folder.name);
+											}
+											if (e.key === "Delete") {
+												e.preventDefault();
+												props.onDelete(folder.path, "folder");
+											}
+										}}
+										tabIndex={0}
 										onDragOver={(e) => {
 											if (props.draggedFile && props.draggedFile !== folder.path) {
 												e.preventDefault();
@@ -1131,26 +1152,73 @@ function TreeView(props: {
 												props.setDropTarget("");
 											}
 										}}
-										title={folder.path}
-									>
-										<span class={caret}>{isOpen ? "▾" : ">"}</span>
-										<strong>{folder.name}</strong>
-									</div>
+											title={folder.path}
+										>
+											<span style={{ display: "flex", "align-items": "center", gap: "6px", flex: 1, "min-width": 0 }}>
+												<span class={caret}>{isOpen ? "▾" : ">"}</span>
+												<strong style={{ overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap" }}>{folder.name}</strong>
+											</span>
+											<span class="actions" style={{ display: "flex", gap: "4px", "margin-left": "8px" }}>
+												<button
+													class={actionBtn}
+													onClick={(e) => {
+														e.stopPropagation();
+														startRename(folder.path, folder.name);
+													}}
+													title="Rename (F2)"
+												>
+													F2
+												</button>
+												<button
+													class={actionBtn}
+													onClick={(e) => {
+														e.stopPropagation();
+														props.onDelete(folder.path, "folder");
+													}}
+													title="Delete"
+												>
+													Del
+												</button>
+											</span>
+										</div>
 
-					<Show when={isPendingHere}>
-						<div style={{ "padding-left": `${10 + (depth + 1) * 14}px`, padding: "6px 8px" }}>
-							<input
-								ref={pendingInputRef}
-								class={nameInput}
-								value={props.pendingName}
-								onInput={(e) => props.setPendingName(e.currentTarget.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") props.commitPending();
-									if (e.key === "Escape") props.cancelPending();
-								}}
-							/>
-						</div>
-					</Show>									<Show when={isOpen}>{renderNodes(folder.children, depth + 1)}</Show>
+									<Show when={renamingPath() === folder.path}>
+										<div style={{ "padding-left": `${10 + depth * 14}px`, padding: "6px 8px" }}>
+											<input
+												class={nameInput}
+												value={renameValue()}
+												onInput={(e) => setRenameValue(e.currentTarget.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") {
+														const path = renamingPath();
+														const newName = renameValue().trim();
+														if (path && newName) {
+															props.onRename(path, newName);
+															setRenamingPath("");
+														}
+													}
+													if (e.key === "Escape") cancelRename();
+												}}
+												onBlur={cancelRename}
+												autofocus
+											/>
+										</div>
+									</Show>
+
+									<Show when={isPendingHere}>
+										<div style={{ "padding-left": `${10 + (depth + 1) * 14}px`, padding: "6px 8px" }}>
+											<input
+												ref={pendingInputRef}
+												class={nameInput}
+												value={props.pendingName}
+												onInput={(e) => props.setPendingName(e.currentTarget.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") props.commitPending();
+													if (e.key === "Escape") props.cancelPending();
+												}}
+											/>
+										</div>
+									</Show>									<Show when={isOpen}>{renderNodes(folder.children, depth + 1)}</Show>
 								</>
 							);
 						})()}
@@ -1164,40 +1232,40 @@ function TreeView(props: {
 
 	return (
 		<>
-		<Show when={showPendingInRoot()}>
-			<div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.08)", "border-radius": "8px", "margin-bottom": "8px" }}>
-				<input
-					ref={pendingInputRef}
-					class={nameInput}
-					value={props.pendingName}
-					onInput={(e) => props.setPendingName(e.currentTarget.value)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter") props.commitPending();
-						if (e.key === "Escape") props.cancelPending();
-					}}
-					placeholder={props.pending?.kind === "folder" ? "Folder name..." : "Note name..."}
-				/>
-			</div>
-		</Show>
-		<div
-			onDragOver={(e) => {
-				if (props.draggedFile) {
+			<Show when={showPendingInRoot()}>
+				<div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.08)", "border-radius": "8px", "margin-bottom": "8px" }}>
+					<input
+						ref={pendingInputRef}
+						class={nameInput}
+						value={props.pendingName}
+						onInput={(e) => props.setPendingName(e.currentTarget.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") props.commitPending();
+							if (e.key === "Escape") props.cancelPending();
+						}}
+						placeholder={props.pending?.kind === "folder" ? "Folder name..." : "Note name..."}
+					/>
+				</div>
+			</Show>
+			<div
+				onDragOver={(e) => {
+					if (props.draggedFile) {
+						e.preventDefault();
+						e.dataTransfer!.dropEffect = "move";
+					}
+				}}
+				onDrop={(e) => {
 					e.preventDefault();
-					e.dataTransfer!.dropEffect = "move";
-				}
-			}}
-			onDrop={(e) => {
-				e.preventDefault();
-				if (props.draggedFile) {
-					// Drop to root level
-					props.onMove(props.draggedFile, "");
-					props.setDraggedFile("");
-					props.setDropTarget("");
-				}
-			}}
-		>
-			{renderNodes(props.nodes, 0)}
-		</div>
+					if (props.draggedFile) {
+						// Drop to root level
+						props.onMove(props.draggedFile, "");
+						props.setDraggedFile("");
+						props.setDropTarget("");
+					}
+				}}
+			>
+				{renderNodes(props.nodes, 0)}
+			</div>
 		</>
 	);
 }
@@ -1256,6 +1324,9 @@ export const Home = () => {
 	const [draggedFile, setDraggedFile] = createSignal<string>("");
 	const [dropTarget, setDropTarget] = createSignal<string>("");
 
+	// Preview tab state (VS Code-style single-click preview)
+	const [previewTab, setPreviewTab] = createSignal<string>("");
+
 	// Persist UI state to localStorage
 	createEffect(() => {
 		const state = {
@@ -1285,7 +1356,12 @@ export const Home = () => {
 	const setDraft = (content: string) => {
 		const file = selectedFile();
 		if (!file) return;
-		
+
+		// Editing a preview tab promotes it to permanent
+		if (previewTab() === file) {
+			setPreviewTab("");
+		}
+
 		setFileStore(produce((store) => {
 			if (!store[file]) {
 				store[file] = { savedContent: "", draftContent: content, hash: "" };
@@ -1304,7 +1380,7 @@ export const Home = () => {
 
 	const previewHtml = createMemo(() => {
 		if (!selectedFile() || viewMode() !== "preview") return "";
-		return marked(draft(), { 
+		return marked(draft(), {
 			async: false,
 			breaks: true,
 			gfm: true
@@ -1323,10 +1399,10 @@ export const Home = () => {
 	createEffect(() => {
 		const f = file();
 		if (!f) return;
-		
+
 		const currentFile = selectedFile();
 		if (!currentFile) return;
-		
+
 		setFileStore(produce((store) => {
 			// Always reset to server content when loading a file
 			// This ensures opening a file doesn't show it as dirty
@@ -1367,7 +1443,7 @@ export const Home = () => {
 	const currentDir = () => {
 		const active = activeFolder();
 		if (active) return active;
-		
+
 		const p = selectedFile();
 		if (!p) return "";
 		const idx = p.lastIndexOf("/");
@@ -1396,13 +1472,13 @@ export const Home = () => {
 			await api.createFile(filePath, "");
 			await refetchTree();
 
-		// Mark as newly created and clear after 2 seconds
-		setNewlyCreatedFile(filePath);
-		setTimeout(() => setNewlyCreatedFile(""), 2000);
+			// Mark as newly created and clear after 2 seconds
+			setNewlyCreatedFile(filePath);
+			setTimeout(() => setNewlyCreatedFile(""), 2000);
 
-		// Open in tab and initialize store
-		openInTab(filePath);
-		initializeFile(filePath, "");
+			// Open in tab and initialize store
+			openInTab(filePath);
+			initializeFile(filePath, "");
 			if (parentDir) {
 				const next = new Set(openFolders());
 				next.add(parentDir);
@@ -1458,11 +1534,11 @@ export const Home = () => {
 
 		try {
 			setIsSaving(true);
-			const res = await api.writeFile(p, { 
-				content: state.draftContent, 
-				ifMatch: state.hash 
+			const res = await api.writeFile(p, {
+				content: state.draftContent,
+				ifMatch: state.hash
 			});
-			
+
 			// Update store: saved content now matches draft, update hash
 			setFileStore(produce((store) => {
 				if (store[p]) {
@@ -1470,7 +1546,7 @@ export const Home = () => {
 					store[p].hash = res.sha256;
 				}
 			}));
-			
+
 			await refetchTree();
 		} catch (e) {
 			console.error("Save failed:", e);
@@ -1479,10 +1555,54 @@ export const Home = () => {
 		}
 	};
 
-	const openInTab = (filePath: string) => {
-		if (!openTabs().includes(filePath)) {
-			setOpenTabs([...openTabs(), filePath]);
+	const openInTab = (filePath: string, isPreview: boolean = false) => {
+		const currentPreview = previewTab();
+		const tabs = openTabs();
+		const isAlreadyOpen = tabs.includes(filePath);
+		const isPermanent = isAlreadyOpen && currentPreview !== filePath;
+		
+		if (isPreview) {
+			// If file is already open as permanent tab, just select it
+			if (isPermanent) {
+				setSelectedFile(filePath);
+				return;
+			}
+			
+			// Single-click: open as preview
+			if (currentPreview && currentPreview !== filePath) {
+				// Replace existing preview tab
+				const previewIdx = tabs.indexOf(currentPreview);
+				if (previewIdx !== -1) {
+					// Replace preview tab with new file
+					const newTabs = [...tabs];
+					newTabs[previewIdx] = filePath;
+					setOpenTabs(newTabs);
+					
+					// Clean up old preview file from store
+					setFileStore(produce((store) => {
+						delete store[currentPreview];
+					}));
+				} else {
+					// Preview tab was already promoted, just add new preview
+					if (!isAlreadyOpen) {
+						setOpenTabs([...tabs, filePath]);
+					}
+				}
+			} else if (!isAlreadyOpen) {
+				// No existing preview, just add new tab
+				setOpenTabs([...tabs, filePath]);
+			}
+			setPreviewTab(filePath);
+		} else {
+			// Double-click: persist tab (remove from preview mode)
+			if (!isAlreadyOpen) {
+				setOpenTabs([...tabs, filePath]);
+			}
+			if (previewTab() === filePath) {
+				setPreviewTab(""); // Promote to permanent tab
+			}
 		}
+		
 		setSelectedFile(filePath);
 	};
 
@@ -1493,7 +1613,7 @@ export const Home = () => {
 		const fileIsDirty = isFileDirty(filePath);
 		if (fileIsDirty) {
 			const result = confirm(`"${filePath.split('/').pop()}" has unsaved changes. Do you want to save them?\n\nYour changes will be lost if you don't save them.`);
-			
+
 			if (result) {
 				// User wants to save
 				if (selectedFile() === filePath) {
@@ -1523,12 +1643,12 @@ export const Home = () => {
 		const currentIdx = openTabs().indexOf(filePath);
 		const tabs = openTabs().filter(p => p !== filePath);
 		setOpenTabs(tabs);
-		
+
 		// Remove from store
 		setFileStore(produce((store) => {
 			delete store[filePath];
 		}));
-		
+
 		// If closing the selected file, select an appropriate tab
 		if (selectedFile() === filePath) {
 			if (tabs.length > 0) {
@@ -1553,10 +1673,10 @@ export const Home = () => {
 		const currentDraft = draft();
 		const selectedText = currentDraft.substring(start, end);
 		const newText = currentDraft.substring(0, start) + before + selectedText + after + currentDraft.substring(end);
-		
+
 		// Update draft using setDraft helper
 		setDraft(newText);
-		
+
 		// Restore cursor position
 		setTimeout(() => {
 			const newCursorPos = start + before.length + selectedText.length + after.length;
@@ -1565,17 +1685,6 @@ export const Home = () => {
 			textarea.focus();
 		}, 0);
 	};
-
-	// Auto-save: DISABLED - manual save only
-	// let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
-	// createEffect(() => {
-	// 	const file = selectedFile();
-	// 	if (!file || !isDirty()) return;
-	// 	if (autoSaveTimer) clearTimeout(autoSaveTimer);
-	// 	autoSaveTimer = setTimeout(() => {
-	// 		save();
-	// 	}, 800);
-	// });
 
 	// Sidebar resize handlers
 	const handleResizeStart = (e: MouseEvent) => {
@@ -1659,20 +1768,45 @@ export const Home = () => {
 		}
 	};
 
-	// Register keyboard shortcuts once
-	window.addEventListener('keydown', handleKeyDown, { capture: true });
-	// Note: In a real app, you'd use onCleanup() to remove the listener
-	// but for a single-page app that runs for the entire session, this is fine
+	onMount(() => {
+		window.addEventListener("keydown", handleKeyDown, { capture: true });
+		onCleanup(() => window.removeEventListener("keydown", handleKeyDown, { capture: true } as any));
+	});
 
 	const onRename = async (oldPath: string, newName: string) => {
 		console.log('onRename called:', { oldPath, newName });
 		try {
 			const dir = oldPath.lastIndexOf("/") === -1 ? "" : oldPath.slice(0, oldPath.lastIndexOf("/"));
-			const newPath = joinPath(dir, newName);
+			
+			// Determine if this is a file or folder by checking entries
+			const allEntries = entries() ?? [];
+			const entry = allEntries.find(e => e.path === oldPath);
+			const isFolder = entry?.kind === "folder";
+			
+			// For files, ensure .md extension; for folders, use name as-is
+			const finalName = isFolder ? newName : (newName.endsWith('.md') ? newName : `${newName}.md`);
+			const newPath = joinPath(dir, finalName);
 
 			console.log('Renaming to:', newPath);
 			await api.rename(oldPath, newPath);
 			await refetchTree();
+
+			// Update tabs if the file is open
+			const tabs = openTabs();
+			const tabIndex = tabs.indexOf(oldPath);
+			if (tabIndex !== -1) {
+				const newTabs = [...tabs];
+				newTabs[tabIndex] = newPath;
+				setOpenTabs(newTabs);
+			}
+
+			// Update file store (move the file state to new path)
+			setFileStore(produce((store) => {
+				if (store[oldPath]) {
+					store[newPath] = store[oldPath];
+					delete store[oldPath];
+				}
+			}));
 
 			// If the renamed file was selected, update selection
 			if (selectedFile() === oldPath) {
@@ -1686,9 +1820,33 @@ export const Home = () => {
 
 	const onDelete = async (path: string, kind: "file" | "folder") => {
 		console.log('onDelete called:', { path, kind });
-		const confirmMsg = kind === "folder"
-			? `Delete folder "${path}" and all its contents?`
-			: `Delete file "${path}"?`;
+		
+		let confirmMsg: string;
+		if (kind === "folder") {
+			// Count files in this folder
+			const allEntries = entries() ?? [];
+			const filesInFolder = allEntries.filter(e => 
+				e.kind === "file" && e.path.startsWith(path + "/")
+			);
+			const foldersInFolder = allEntries.filter(e => 
+				e.kind === "folder" && e.path.startsWith(path + "/")
+			);
+			
+			if (filesInFolder.length > 0 || foldersInFolder.length > 0) {
+				const parts = [];
+				if (filesInFolder.length > 0) {
+					parts.push(`${filesInFolder.length} file${filesInFolder.length === 1 ? '' : 's'}`);
+				}
+				if (foldersInFolder.length > 0) {
+					parts.push(`${foldersInFolder.length} folder${foldersInFolder.length === 1 ? '' : 's'}`);
+				}
+				confirmMsg = `Delete folder "${path.split('/').pop()}"?\n\nThis will permanently delete ${parts.join(' and ')}.`;
+			} else {
+				confirmMsg = `Delete empty folder "${path.split('/').pop()}"?`;
+			}
+		} else {
+			confirmMsg = `Delete file "${path.split('/').pop()}"?`;
+		}
 
 		if (!confirm(confirmMsg)) return;
 
@@ -1714,13 +1872,13 @@ export const Home = () => {
 	const onMove = async (filePath: string, targetFolder: string) => {
 		const fileName = filePath.split("/").pop()!;
 		const newPath = joinPath(targetFolder, fileName);
-		
+
 		if (filePath === newPath) return; // No change
-		
+
 		try {
 			await api.rename(filePath, newPath);
 			await refetchTree();
-			
+
 			// Update tabs and selection
 			const tabs = openTabs();
 			const idx = tabs.indexOf(filePath);
@@ -1728,12 +1886,12 @@ export const Home = () => {
 				const newTabs = [...tabs];
 				newTabs[idx] = newPath;
 				setOpenTabs(newTabs);
-				
+
 				if (selectedFile() === filePath) {
 					setSelectedFile(newPath);
 				}
 			}
-			
+
 			// Update file store
 			setFileStore(produce((store) => {
 				if (store[filePath]) {
@@ -1741,7 +1899,7 @@ export const Home = () => {
 					delete store[filePath];
 				}
 			}));
-			
+
 			// Ensure target folder is expanded
 			if (targetFolder) {
 				const next = new Set(openFolders());
@@ -1887,8 +2045,13 @@ export const Home = () => {
 								const fileName = filePath.split('/').pop() || filePath;
 								return (
 									<div
-										class={`${tab} ${selectedFile() === filePath ? tabActive : ""}`}
+										class={`${tab} ${selectedFile() === filePath ? tabActive : ""} ${previewTab() === filePath ? tabPreview : ""}`}
 										onClick={() => setSelectedFile(filePath)}
+										onDblClick={() => {
+											if (previewTab() === filePath) {
+												setPreviewTab("");
+											}
+										}}
 										title={filePath}
 									>
 										<span class={tabFileName}>{fileName}</span>
@@ -1968,8 +2131,8 @@ export const Home = () => {
 							─
 						</button>
 						<div class={toolSeparator} />
-						<button 
-							class={toolBtn} 
+						<button
+							class={toolBtn}
 							onClick={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
 							style={{ "background": viewMode() === "preview" ? "rgba(96, 165, 250, 0.2)" : undefined }}
 							title={viewMode() === "edit" ? "Preview" : "Edit"}
