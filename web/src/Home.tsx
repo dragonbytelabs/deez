@@ -911,19 +911,13 @@ export const Home = () => {
 		if (!currentFile) return;
 		
 		setFileStore(produce((store) => {
-			if (!store[currentFile]) {
-				// File not yet loaded, initialize with server content
-				store[currentFile] = {
-					savedContent: f.content,
-					draftContent: f.content,
-					hash: f.sha256
-				};
-			} else {
-				// File exists, update saved content from server
-				// Keep draft content (user may have unsaved edits)
-				store[currentFile].savedContent = f.content;
-				store[currentFile].hash = f.sha256;
-			}
+			// Always reset to server content when loading a file
+			// This ensures opening a file doesn't show it as dirty
+			store[currentFile] = {
+				savedContent: f.content,
+				draftContent: f.content,
+				hash: f.sha256
+			};
 		}));
 	});
 
@@ -1100,6 +1094,8 @@ export const Home = () => {
 			}
 		}
 
+		// Get current index before removing
+		const currentIdx = openTabs().indexOf(filePath);
 		const tabs = openTabs().filter(p => p !== filePath);
 		setOpenTabs(tabs);
 		
@@ -1108,12 +1104,12 @@ export const Home = () => {
 			delete store[filePath];
 		}));
 		
-		// If closing the selected file, select the next tab or clear
+		// If closing the selected file, select an appropriate tab
 		if (selectedFile() === filePath) {
-			const idx = openTabs().indexOf(filePath);
 			if (tabs.length > 0) {
-				const nextTab = tabs[Math.min(idx, tabs.length - 1)];
-				setSelectedFile(nextTab);
+				// Try to select the tab to the right, or the one to the left if at the end
+				const nextIdx = currentIdx >= tabs.length ? tabs.length - 1 : currentIdx;
+				setSelectedFile(tabs[nextIdx]);
 			} else {
 				setSelectedFile("");
 			}
