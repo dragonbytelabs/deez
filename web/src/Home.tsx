@@ -1,5 +1,6 @@
 import { css } from "@linaria/core";
 import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
+import { createStore, produce } from "solid-js/store";
 import { marked } from "marked";
 import { api, type Entry } from "./server/api";
 
@@ -599,6 +600,17 @@ function buildTreeFromEntries(entries: Entry[]): TreeNode[] {
    Icon helpers
 ======================= */
 
+// File state management types
+type FileState = {
+	savedContent: string;  // Content from server (source of truth)
+	draftContent: string;  // User's current edits
+	hash: string;          // SHA256 hash from server
+};
+
+type FileStore = {
+	[filePath: string]: FileState;
+};
+
 function Icon(props: { children: any }) {
 	return (
 		<svg class={icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -842,50 +854,35 @@ export const Home = () => {
 	const [openTabs, setOpenTabs] = createSignal<string[]>([]);
 	const [viewMode, setViewMode] = createSignal<"edit" | "preview">("edit");
 
-	// Track saved content for each file (from server)
-	const [savedContentMap, setSavedContentMap] = createSignal<Map<string, string>>(new Map());
-	// Track current draft content for each file (user edits)
-	const [draftContentMap, setDraftContentMap] = createSignal<Map<string, string>>(new Map());
-	// Track last hash for each file
-	const [hashMap, setHashMap] = createSignal<Map<string, string>>(new Map());
+	// File state store - the single source of truth for all file content
+	const [fileStore, setFileStore] = createStore<FileStore>({});
 
 	// Computed: current file's draft content
 	const draft = createMemo(() => {
 		const file = selectedFile();
 		if (!file) return "";
-		return draftContentMap().get(file) || "";
+		return fileStore[file]?.draftContent || "";
 	});
 
-	// Legacy setters for compatibility (used in effects)
+	// Update draft content for current file
 	const setDraft = (content: string) => {
 		const file = selectedFile();
 		if (!file) return;
-		const newMap = new Map(draftContentMap());
-		newMap.set(file, content);
-		setDraftContentMap(newMap);
+		
+		setFileStore(produce((store) => {
+			if (!store[file]) {
+				store[file] = { savedContent: "", draftContent: content, hash: "" };
+			} else {
+				store[file].draftContent = content;
+			}
+		}));
 	};
 
-	const setSavedContent = (content: string) => {
-		const file = selectedFile();
-		if (!file) return;
-		const newMap = new Map(savedContentMap());
-		newMap.set(file, content);
-		setSavedContentMap(newMap);
-	};
-
-	const setLastHash = (hash: string | undefined) => {
-		const file = selectedFile();
-		if (!file || hash === undefined) return;
-		const newMap = new Map(hashMap());
-		newMap.set(file, hash);
-		setHashMap(newMap);
-	};
-
+	// Check if a file has unsaved changes
 	const isFileDirty = (filePath: string) => {
-		const saved = savedContentMap().get(filePath);
-		const draft = draftContentMap().get(filePath);
-		if (saved === undefined || draft === undefined) return false;
-		return draft !== saved;
+		const state = fileStore[filePath];
+		if (!state) return false;
+		return state.draftContent !== state.savedContent;
 	};
 
 	const previewHtml = createMemo(() => {
@@ -905,6 +902,7 @@ export const Home = () => {
 		}
 	);
 
+	// Load file content from server and update store
 	createEffect(() => {
 		const f = file();
 		if (!f) return;
@@ -912,30 +910,21 @@ export const Home = () => {
 		const currentFile = selectedFile();
 		if (!currentFile) return;
 		
-		// Check if we already have draft content for this file
-		const existingDraft = draftContentMap().get(currentFile);
-		
-		if (existingDraft === undefined) {
-			// File not yet loaded, initialize with server content
-			const newDraftMap = new Map(draftContentMap());
-			newDraftMap.set(currentFile, f.content);
-			setDraftContentMap(newDraftMap);
-		}
-		// If draft exists, keep it (user may have made edits)
-		
-		// Always update saved content from server
-		const newSavedMap = new Map(savedContentMap());
-		newSavedMap.set(currentFile, f.content);
-		setSavedContentMap(newSavedMap);
-		
-		// Update hash
-		const newHashMap = new Map(hashMap());
-		newHashMap.set(currentFile, f.sha256);
-		setHashMap(newHashMap);
-		
-		// Update legacy signals for compatibility
-		setSavedContent(f.content);
-		setLastHash(f.sha256);
+		setFileStore(produce((store) => {
+			if (!store[currentFile]) {
+				// File not yet loaded, initialize with server content
+				store[currentFile] = {
+					savedContent: f.content,
+					draftContent: f.content,
+					hash: f.sha256
+				};
+			} else {
+				// File exists, update saved content from server
+				// Keep draft content (user may have unsaved edits)
+				store[currentFile].savedContent = f.content;
+				store[currentFile].hash = f.sha256;
+			}
+		}));
 	});
 
 	const toggleFolder = (p: string) => {
@@ -947,19 +936,15 @@ export const Home = () => {
 
 	const collapseAll = () => setOpenFolders(new Set<string>());
 
-	// Helper to initialize a file's draft content
-	const initializeDraft = (filePath: string, content: string) => {
-		const newDraftMap = new Map(draftContentMap());
-		newDraftMap.set(filePath, content);
-		setDraftContentMap(newDraftMap);
-		
-		const newSavedMap = new Map(savedContentMap());
-		newSavedMap.set(filePath, content);
-		setSavedContentMap(newSavedMap);
-		
-		// Legacy signals
-		setDraft(content);
-		setSavedContent(content);
+	// Helper to initialize a new file's content in the store
+	const initializeFile = (filePath: string, content: string = "") => {
+		setFileStore(produce((store) => {
+			store[filePath] = {
+				savedContent: content,
+				draftContent: content,
+				hash: ""
+			};
+		}));
 	};
 
 	// v1 parent dir: directory of selected file, else root
@@ -996,9 +981,9 @@ export const Home = () => {
 		setNewlyCreatedFile(filePath);
 		setTimeout(() => setNewlyCreatedFile(""), 2000);
 
-		// Open in tab
+		// Open in tab and initialize store
 		openInTab(filePath);
-		initializeDraft(filePath, "");
+		initializeFile(filePath, "");
 			if (parentDir) {
 				const next = new Set(openFolders());
 				next.add(parentDir);
@@ -1035,7 +1020,7 @@ export const Home = () => {
 			await refetchTree();
 
 			openInTab(filePath);
-			initializeDraft(filePath, "");
+			initializeFile(filePath, "");
 
 			setPending(null);
 		} catch (e) {
@@ -1049,27 +1034,23 @@ export const Home = () => {
 		const p = selectedFile();
 		if (!p || isSaving()) return;
 
-		const currentDraft = draftContentMap().get(p);
-		const currentHash = hashMap().get(p);
-		if (currentDraft === undefined) return;
+		const state = fileStore[p];
+		if (!state) return;
 
 		try {
 			setIsSaving(true);
-			const res = await api.writeFile(p, { content: currentDraft, ifMatch: currentHash });
+			const res = await api.writeFile(p, { 
+				content: state.draftContent, 
+				ifMatch: state.hash 
+			});
 			
-			// Update hash
-			const newHashMap = new Map(hashMap());
-			newHashMap.set(p, res.sha256);
-			setHashMap(newHashMap);
-			
-			// Update saved content to match draft
-			const newSavedMap = new Map(savedContentMap());
-			newSavedMap.set(p, currentDraft);
-			setSavedContentMap(newSavedMap);
-			
-			// Legacy signals for compatibility
-			setLastHash(res.sha256);
-			setSavedContent(currentDraft);
+			// Update store: saved content now matches draft, update hash
+			setFileStore(produce((store) => {
+				if (store[p]) {
+					store[p].savedContent = store[p].draftContent;
+					store[p].hash = res.sha256;
+				}
+			}));
 			
 			await refetchTree();
 		} catch (e) {
@@ -1107,12 +1088,14 @@ export const Home = () => {
 					await save();
 				}
 			} else {
-				// User doesn't want to save (revert changes)
-				const saved = savedContentMap().get(filePath);
-				if (saved !== undefined) {
-					const newDraftMap = new Map(draftContentMap());
-					newDraftMap.set(filePath, saved);
-					setDraftContentMap(newDraftMap);
+				// User doesn't want to save (revert changes to saved version)
+				const state = fileStore[filePath];
+				if (state) {
+					setFileStore(produce((store) => {
+						if (store[filePath]) {
+							store[filePath].draftContent = store[filePath].savedContent;
+						}
+					}));
 				}
 			}
 		}
@@ -1120,14 +1103,10 @@ export const Home = () => {
 		const tabs = openTabs().filter(p => p !== filePath);
 		setOpenTabs(tabs);
 		
-		// Remove from both maps
-		const newSavedMap = new Map(savedContentMap());
-		newSavedMap.delete(filePath);
-		setSavedContentMap(newSavedMap);
-		
-		const newDraftMap = new Map(draftContentMap());
-		newDraftMap.delete(filePath);
-		setDraftContentMap(newDraftMap);
+		// Remove from store
+		setFileStore(produce((store) => {
+			delete store[filePath];
+		}));
 		
 		// If closing the selected file, select the next tab or clear
 		if (selectedFile() === filePath) {
@@ -1137,10 +1116,6 @@ export const Home = () => {
 				setSelectedFile(nextTab);
 			} else {
 				setSelectedFile("");
-				// Legacy signals
-				setDraft("");
-				setSavedContent("");
-				setLastHash(undefined);
 			}
 		}
 	};
@@ -1158,10 +1133,8 @@ export const Home = () => {
 		const selectedText = currentDraft.substring(start, end);
 		const newText = currentDraft.substring(0, start) + before + selectedText + after + currentDraft.substring(end);
 		
-		// Update draft map
-		const newDraftMap = new Map(draftContentMap());
-		newDraftMap.set(file, newText);
-		setDraftContentMap(newDraftMap);
+		// Update draft using setDraft helper
+		setDraft(newText);
 		
 		// Restore cursor position
 		setTimeout(() => {
@@ -1315,10 +1288,6 @@ export const Home = () => {
 			// If the deleted file was selected, clear selection
 			if (selectedFile() === path || selectedFile().startsWith(path + "/")) {
 				setSelectedFile("");
-				// Legacy signals
-				setDraft("");
-				setSavedContent("");
-				setLastHash(undefined);
 			}
 		} catch (e) {
 			console.error("Delete failed:", e);
@@ -1560,12 +1529,7 @@ export const Home = () => {
 								value={draft()}
 								onInput={(e) => {
 									const newContent = e.currentTarget.value;
-									const file = selectedFile();
-									if (file) {
-										const newMap = new Map(draftContentMap());
-										newMap.set(file, newContent);
-										setDraftContentMap(newMap);
-									}
+									setDraft(newContent);
 								}}
 								placeholder="Start writing…"
 							/>
