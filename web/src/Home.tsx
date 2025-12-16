@@ -1,5 +1,7 @@
 import { css } from "@linaria/core";
-import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createStore, produce } from "solid-js/store";
+import { marked } from "marked";
 import { api, type Entry } from "./server/api";
 
 /* =======================
@@ -9,7 +11,7 @@ import { api, type Entry } from "./server/api";
 const shell = css`
   height: 100vh;
   display: grid;
-  grid-template-columns: 56px 320px 1fr;
+  grid-template-columns: 56px var(--sidebar-width, 320px) 1fr;
 `;
 
 const rail = css`
@@ -54,12 +56,35 @@ const icon = css`
   opacity: 0.9;
 `;
 
+const resizeHandle = css`
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
+  transition: all 0.1s ease;
+
+  &:hover {
+    width: 8px;
+    background: rgba(96, 165, 250, 0.3);
+    border-left: 2px solid #60a5fa;
+  }
+
+  &:active {
+    background: rgba(96, 165, 250, 0.5);
+    border-left: 2px solid #60a5fa;
+  }
+`;
+
 const sidebar = css`
   border-right: 1px solid #e6e6e6;
   display: flex;
   flex-direction: column;
   min-width: 0;
   color: #ffffff;
+  position: relative;
 `;
 
 const header = css`
@@ -159,18 +184,346 @@ const nameInput = css`
   }
 `;
 
-const main = css`
-  padding: 12px;
-  overflow: auto;
+const renameInputWrapper = css`
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 36px;
+
+  &:focus-within {
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.25);
+  }
+`;
+
+const renameInput = css`
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
   color: #ffffff;
+  font-size: 14px;
+  min-width: 0;
+`;
+
+const renameExtension = css`
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  user-select: none;
+  pointer-events: none;
+`;
+
+const main = css`
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #ffffff;
+`;
+
+const tabsBar = css`
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  overflow-x: auto;
+  flex-shrink: 0;
+`;
+
+const tab = css`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  padding-top: 8px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-top: 2px solid transparent;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: all 0.15s;
+  max-width: 200px;
+  min-width: 120px;
+  position: relative;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+  }
+  
+  &:hover .tab-close-x {
+    display: flex;
+  }
+  
+  &:hover .tab-dirty-dot {
+    display: none;
+  }
+`;
+
+const tabFileName = css`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  padding-right: 24px;
+`;
+
+const tabActions = css`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  right: 8px;
+  background: inherit;
+  padding-left: 8px;
+`;
+
+const tabActive = css`
+  background: rgba(255, 255, 255, 0.15);
+  border-top-color: #007acc;
+  color: #ffffff;
+`;
+
+const tabPreview = css`
+  font-style: italic;
+  opacity: 0.85;
+`;
+
+const tabClose = css`
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  opacity: 0.7;
+  transition: all 0.15s;
+  font-size: 18px;
+  line-height: 1;
+  display: none;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+const toolbar = css`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+`;
+
+const toolBtn = css`
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.15);
+  }
+`;
+
+const toolSeparator = css`
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+`;
+
+const editorWrapper = css`
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+`;
+
+const preview = css`
+  width: 100%;
+  min-height: 100%;
+  padding: 20px;
+  color: #ffffff;
+  line-height: 1.6;
+
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #ffffff;
+  }
+
+  h1 { font-size: 2em; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 8px; }
+  h2 { font-size: 1.5em; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 6px; }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: rgba(255, 255, 255, 0.7); }
+
+  p {
+    margin-top: 0;
+    margin-bottom: 16px;
+  }
+
+  a {
+    color: #60a5fa;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9em;
+  }
+
+  pre {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin-bottom: 16px;
+
+    code {
+      background: transparent;
+      padding: 0;
+    }
+  }
+
+  blockquote {
+    margin: 0;
+    padding-left: 16px;
+    border-left: 4px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 16px;
+  }
+
+  ul, ol {
+    padding-left: 24px;
+    margin-bottom: 16px;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin: 24px 0;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  th, td {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 8px 12px;
+    text-align: left;
+  }
+
+  th {
+    background: rgba(255, 255, 255, 0.1);
+    font-weight: 600;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  input[type="checkbox"] {
+    margin-right: 8px;
+  }
+`;
+
+const actionBtn = css`
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+`;
+
+const rowWithActions = css`
+  position: relative;
+  
+  & .actions {
+    opacity: 0;
+  }
+
+  &:hover .actions {
+    opacity: 1;
+  }
+`;
+
+const rowDragging = css`
+  opacity: 0.4;
+  cursor: grabbing;
+`;
+
+const rowDropTarget = css`
+  background: rgba(96, 165, 250, 0.2) !important;
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  border-radius: 4px;
+`;
+
+const rowActiveFolder = css`
+  background: rgba(96, 165, 250, 0.15);
+  font-weight: 500;
 `;
 
 const editor = css`
   width: 100%;
-  height: 70vh;
+  min-height: 100%;
   padding: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: #ffffff;
 `;
 
 /* =======================
@@ -265,8 +618,315 @@ function buildTreeFromEntries(entries: Entry[]): TreeNode[] {
 }
 
 /* =======================
+   Command Palette
+======================= */
+
+const paletteOverlay = css`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  z-index: 1000;
+`;
+
+const paletteModal = css`
+  width: 90%;
+  max-width: 600px;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+`;
+
+const paletteInput = css`
+  width: 100%;
+  padding: 16px 20px;
+  background: #1e1e1e;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 16px;
+  outline: none;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+`;
+
+const paletteResults = css`
+  max-height: 400px;
+  overflow-y: auto;
+`;
+
+const paletteItem = css`
+  padding: 12px 20px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.1s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+`;
+
+const paletteItemActive = css`
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+`;
+
+const paletteItemIcon = css`
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+  flex-shrink: 0;
+`;
+
+const paletteItemLabel = css`
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const paletteItemKind = css`
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const paletteEmpty = css`
+  padding: 40px 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+`;
+
+type PaletteAction = {
+	type: 'action';
+	id: string;
+	label: string;
+	icon: string;
+	onSelect: () => void;
+};
+
+type PaletteFile = {
+	type: 'file';
+	path: string;
+	name: string;
+};
+
+type PaletteItem = PaletteAction | PaletteFile;
+
+function CommandPalette(props: {
+	isOpen: boolean;
+	onClose: () => void;
+	files: Entry[];
+	onOpenFile: (path: string) => void;
+	onNewNote: () => void;
+	onNewFolder: () => void;
+	onTogglePreview: () => void;
+	onCollapseAll: () => void;
+}) {
+	const [query, setQuery] = createSignal("");
+	const [selectedIndex, setSelectedIndex] = createSignal(0);
+	let inputRef: HTMLInputElement | undefined;
+
+	// Focus input when palette opens
+	createEffect(() => {
+		if (props.isOpen && inputRef) {
+			setTimeout(() => inputRef?.focus(), 0);
+		}
+	});
+
+	// Build combined list of actions + files
+	const items = createMemo((): PaletteItem[] => {
+		const q = query().toLowerCase();
+
+		// Actions (always shown at top)
+		const actions: PaletteAction[] = [
+			{
+				type: 'action',
+				id: 'new-note',
+				label: 'New Note',
+				icon: '📝',
+				onSelect: () => {
+					props.onClose();
+					props.onNewNote();
+				}
+			},
+			{
+				type: 'action',
+				id: 'new-folder',
+				label: 'New Folder',
+				icon: '📁',
+				onSelect: () => {
+					props.onClose();
+					props.onNewFolder();
+				}
+			},
+			{
+				type: 'action',
+				id: 'toggle-preview',
+				label: 'Toggle Preview',
+				icon: '👁',
+				onSelect: () => {
+					props.onClose();
+					props.onTogglePreview();
+				}
+			},
+			{
+				type: 'action',
+				id: 'collapse-all',
+				label: 'Collapse All Folders',
+				icon: '⬆',
+				onSelect: () => {
+					props.onClose();
+					props.onCollapseAll();
+				}
+			}
+		];
+
+		// Filter files by query
+		const files: PaletteFile[] = props.files
+			.filter(e => e.kind === 'file')
+			.filter(e => !q || e.path.toLowerCase().includes(q) || e.name.toLowerCase().includes(q))
+			.map(e => ({
+				type: 'file' as const,
+				path: e.path,
+				name: e.name
+			}));
+
+		// If there's a query, show only matching files; otherwise show actions + all files
+		if (q) {
+			return files;
+		}
+		return [...actions, ...files];
+	});
+
+	// Reset selected index when items change
+	createEffect(() => {
+		items(); // Track dependency
+		setSelectedIndex(0);
+	});
+
+	// Scroll selected item into view
+	createEffect(() => {
+		const idx = selectedIndex();
+		const element = document.querySelector(`[data-palette-index="${idx}"]`);
+		if (element) {
+			element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		}
+	});
+
+	const handleKeyDown = (e: KeyboardEvent) => {
+		const itemsCount = items().length;
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			setSelectedIndex((selectedIndex() + 1) % itemsCount);
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			setSelectedIndex((selectedIndex() - 1 + itemsCount) % itemsCount);
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			const item = items()[selectedIndex()];
+			if (item) {
+				if (item.type === 'action') {
+					item.onSelect();
+				} else {
+					props.onClose();
+					props.onOpenFile(item.path);
+				}
+			}
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			props.onClose();
+		}
+	};
+
+	return (
+		<Show when={props.isOpen}>
+			<div class={paletteOverlay} onClick={props.onClose}>
+				<div class={paletteModal} onClick={(e) => e.stopPropagation()}>
+					<input
+						ref={inputRef}
+						class={paletteInput}
+						type="text"
+						placeholder="Type to search files or choose an action..."
+						value={query()}
+						onInput={(e) => setQuery(e.currentTarget.value)}
+						onKeyDown={handleKeyDown}
+					/>
+					<div class={paletteResults}>
+						<Show
+							when={items().length > 0}
+							fallback={
+								<div class={paletteEmpty}>
+									No results found
+								</div>
+							}
+						>
+							<For each={items()}>
+								{(item, index) => (
+									<div
+										data-palette-index={index()}
+										class={`${paletteItem} ${selectedIndex() === index() ? paletteItemActive : ""}`}
+										onClick={() => {
+											if (item.type === 'action') {
+												item.onSelect();
+											} else {
+												props.onClose();
+												props.onOpenFile(item.path);
+											}
+										}}
+										onMouseEnter={() => setSelectedIndex(index())}
+									>
+										<span class={paletteItemIcon}>
+											{item.type === 'action' ? item.icon : '📄'}
+										</span>
+										<span class={paletteItemLabel}>
+											{item.type === 'action' ? item.label : item.name}
+										</span>
+										<span class={paletteItemKind}>
+											{item.type === 'action' ? 'action' : item.type === 'file' ? 'file' : ''}
+										</span>
+									</div>
+								)}
+							</For>
+						</Show>
+					</div>
+				</div>
+			</div>
+		</Show>
+	);
+}
+
+/* =======================
    Icon helpers
 ======================= */
+
+// File state management types
+type FileState = {
+	savedContent: string;  // Content from server (source of truth)
+	draftContent: string;  // User's current edits
+	hash: string;          // SHA256 hash from server
+};
+
+type FileStore = {
+	[filePath: string]: FileState;
+};
 
 function Icon(props: { children: any }) {
 	return (
@@ -294,7 +954,7 @@ function TreeView(props: {
 	toggleFolder: (path: string) => void;
 
 	selectedFile: string;
-	onSelectFile: (path: string) => void;
+	onOpenFile: (path: string, isPreview?: boolean) => void;
 
 	newlyCreatedFile: string;
 
@@ -303,7 +963,53 @@ function TreeView(props: {
 	setPendingName: (v: string) => void;
 	commitPending: () => void;
 	cancelPending: () => void;
+
+	onRename: (oldPath: string, newName: string) => void;
+	onDelete: (path: string, kind: "file" | "folder") => void;
+
+	activeFolder: string;
+	draggedFile: string;
+	setDraggedFile: (path: string) => void;
+	dropTarget: string;
+	setDropTarget: (path: string) => void;
+	onMove: (filePath: string, targetFolder: string) => void;
 }) {
+	const [renamingPath, setRenamingPath] = createSignal<string>("");
+	const [renameValue, setRenameValue] = createSignal<string>("");
+	let pendingInputRef: HTMLInputElement | undefined;
+
+	// Auto-focus pending input when it appears
+	createEffect(() => {
+		if (props.pending && pendingInputRef) {
+			setTimeout(() => pendingInputRef?.focus(), 0);
+		}
+	});
+
+	const startRename = (path: string, currentName: string) => {
+		setRenamingPath(path);
+		// Strip .md extension for editing
+		const nameWithoutExt = currentName.endsWith('.md')
+			? currentName.slice(0, -3)
+			: currentName;
+		setRenameValue(nameWithoutExt);
+	};
+
+	const commitRename = () => {
+		const path = renamingPath();
+		const newName = renameValue().trim();
+		if (path && newName) {
+			// Always append .md extension
+			const newNameWithExt = newName.endsWith('.md') ? newName : `${newName}.md`;
+			props.onRename(path, newNameWithExt);
+			setRenamingPath("");
+		}
+	};
+
+	const cancelRename = () => {
+		setRenamingPath("");
+		setRenameValue("");
+	};
+
 	const renderNodes = (nodes: TreeNode[], depth: number) => (
 		<For each={nodes}>
 			{(n) => (
@@ -311,21 +1017,97 @@ function TreeView(props: {
 					<Show
 						when={n.kind === "folder"}
 						fallback={
-							<div
-								class={`${row} ${
-									props.newlyCreatedFile === n.path
-										? rowNew
-										: props.selectedFile === n.path
-											? rowActive
-											: ""
-								}`}
-								style={{ "padding-left": `${10 + depth * 14}px` }}
-								onClick={() => props.onSelectFile(n.path)}
-								title={n.path}
+							<Show
+								when={renamingPath() === n.path}
+								fallback={
+									<div
+										class={`${row} ${rowWithActions} ${props.draggedFile === n.path ? rowDragging : ""
+											} ${props.newlyCreatedFile === n.path
+												? rowNew
+												: props.selectedFile === n.path
+													? rowActive
+													: ""
+											}`}
+										style={{ "padding-left": `${10 + depth * 14}px`, display: "flex", "justify-content": "space-between" }}
+										draggable={true}
+										onDragStart={(e) => {
+											props.setDraggedFile(n.path);
+											e.dataTransfer!.effectAllowed = "move";
+										}}
+										onDragEnd={() => {
+											props.setDraggedFile("");
+											props.setDropTarget("");
+										}}
+										onClick={(e) => {
+											if (e.detail === 1) {
+												// Single-click: preview
+												props.onOpenFile(n.path, true);
+											} else if (e.detail === 2) {
+												// Double-click: persist
+												props.onOpenFile(n.path, false);
+											}
+										}}
+										onKeyDown={(e) => {
+											if (e.key === "F2") {
+												e.preventDefault();
+												startRename(n.path, n.name);
+											}
+											if (e.key === "Delete") {
+												e.preventDefault();
+												props.onDelete(n.path, "file");
+											}
+										}}
+										tabIndex={0}
+										title={n.path}
+									>
+										<span style={{ display: "flex", "align-items": "center", gap: "6px", flex: 1, "min-width": 0 }}>
+											<span class={caret} />
+											<span style={{ overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap" }}>
+												{n.name}
+											</span>
+										</span>
+										<span class="actions" style={{ display: "flex", gap: "4px", "margin-left": "8px" }}>
+											<button
+												class={actionBtn}
+												onClick={(e) => {
+													e.stopPropagation();
+													startRename(n.path, n.name);
+												}}
+												title="Rename (F2)"
+											>
+												F2
+											</button>
+											<button
+												class={actionBtn}
+												onClick={(e) => {
+													e.stopPropagation();
+													props.onDelete(n.path, "file");
+												}}
+												title="Delete"
+											>
+												Del
+											</button>
+										</span>
+									</div>
+								}
 							>
-								<span class={caret} />
-								{n.name}
-							</div>
+								<div style={{ "padding-left": `${10 + depth * 14}px`, padding: "6px 8px" }}>
+									<div class={renameInputWrapper}>
+										<input
+											class={renameInput}
+											value={renameValue()}
+											onInput={(e) => setRenameValue(e.currentTarget.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") commitRename();
+												if (e.key === "Escape") cancelRename();
+											}}
+											onBlur={cancelRename}
+											autofocus
+										/>
+										<span class={renameExtension}>.md</span>
+									</div>
+								</div>
+							</Show>
 						}
 					>
 						{(() => {
@@ -336,18 +1118,97 @@ function TreeView(props: {
 							return (
 								<>
 									<div
-										class={row}
-										style={{ "padding-left": `${10 + depth * 14}px` }}
+										class={`${row} ${rowWithActions} ${props.dropTarget === folder.path ? rowDropTarget : ""
+											} ${props.activeFolder === folder.path ? rowActiveFolder : ""
+											}`}
+										style={{ "padding-left": `${10 + depth * 14}px`, display: "flex", "justify-content": "space-between" }}
 										onClick={() => props.toggleFolder(folder.path)}
-										title={folder.path}
-									>
-										<span class={caret}>{isOpen ? "▾" : ">"}</span>
-										<strong>{folder.name}</strong>
-									</div>
+										onKeyDown={(e) => {
+											if (e.key === "F2") {
+												e.preventDefault();
+												startRename(folder.path, folder.name);
+											}
+											if (e.key === "Delete") {
+												e.preventDefault();
+												props.onDelete(folder.path, "folder");
+											}
+										}}
+										tabIndex={0}
+										onDragOver={(e) => {
+											if (props.draggedFile && props.draggedFile !== folder.path) {
+												e.preventDefault();
+												e.dataTransfer!.dropEffect = "move";
+												props.setDropTarget(folder.path);
+											}
+										}}
+										onDragLeave={() => {
+											props.setDropTarget("");
+										}}
+										onDrop={(e) => {
+											e.preventDefault();
+											if (props.draggedFile) {
+												props.onMove(props.draggedFile, folder.path);
+												props.setDraggedFile("");
+												props.setDropTarget("");
+											}
+										}}
+											title={folder.path}
+										>
+											<span style={{ display: "flex", "align-items": "center", gap: "6px", flex: 1, "min-width": 0 }}>
+												<span class={caret}>{isOpen ? "▾" : ">"}</span>
+												<strong style={{ overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap" }}>{folder.name}</strong>
+											</span>
+											<span class="actions" style={{ display: "flex", gap: "4px", "margin-left": "8px" }}>
+												<button
+													class={actionBtn}
+													onClick={(e) => {
+														e.stopPropagation();
+														startRename(folder.path, folder.name);
+													}}
+													title="Rename (F2)"
+												>
+													F2
+												</button>
+												<button
+													class={actionBtn}
+													onClick={(e) => {
+														e.stopPropagation();
+														props.onDelete(folder.path, "folder");
+													}}
+													title="Delete"
+												>
+													Del
+												</button>
+											</span>
+										</div>
+
+									<Show when={renamingPath() === folder.path}>
+										<div style={{ "padding-left": `${10 + depth * 14}px`, padding: "6px 8px" }}>
+											<input
+												class={nameInput}
+												value={renameValue()}
+												onInput={(e) => setRenameValue(e.currentTarget.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") {
+														const path = renamingPath();
+														const newName = renameValue().trim();
+														if (path && newName) {
+															props.onRename(path, newName);
+															setRenamingPath("");
+														}
+													}
+													if (e.key === "Escape") cancelRename();
+												}}
+												onBlur={cancelRename}
+												autofocus
+											/>
+										</div>
+									</Show>
 
 									<Show when={isPendingHere}>
 										<div style={{ "padding-left": `${10 + (depth + 1) * 14}px`, padding: "6px 8px" }}>
 											<input
+												ref={pendingInputRef}
 												class={nameInput}
 												value={props.pendingName}
 												onInput={(e) => props.setPendingName(e.currentTarget.value)}
@@ -355,12 +1216,9 @@ function TreeView(props: {
 													if (e.key === "Enter") props.commitPending();
 													if (e.key === "Escape") props.cancelPending();
 												}}
-												autofocus
 											/>
 										</div>
-									</Show>
-
-									<Show when={isOpen}>{renderNodes(folder.children, depth + 1)}</Show>
+									</Show>									<Show when={isOpen}>{renderNodes(folder.children, depth + 1)}</Show>
 								</>
 							);
 						})()}
@@ -370,13 +1228,14 @@ function TreeView(props: {
 		</For>
 	);
 
-	const showPendingInRoot = props.pending && props.pending.parentDir === "";
+	const showPendingInRoot = createMemo(() => props.pending && props.pending.parentDir === "");
 
 	return (
 		<>
-			<Show when={showPendingInRoot}>
+			<Show when={showPendingInRoot()}>
 				<div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.08)", "border-radius": "8px", "margin-bottom": "8px" }}>
 					<input
+						ref={pendingInputRef}
 						class={nameInput}
 						value={props.pendingName}
 						onInput={(e) => props.setPendingName(e.currentTarget.value)}
@@ -384,13 +1243,29 @@ function TreeView(props: {
 							if (e.key === "Enter") props.commitPending();
 							if (e.key === "Escape") props.cancelPending();
 						}}
-						autofocus
 						placeholder={props.pending?.kind === "folder" ? "Folder name..." : "Note name..."}
 					/>
 				</div>
 			</Show>
-
-			{renderNodes(props.nodes, 0)}
+			<div
+				onDragOver={(e) => {
+					if (props.draggedFile) {
+						e.preventDefault();
+						e.dataTransfer!.dropEffect = "move";
+					}
+				}}
+				onDrop={(e) => {
+					e.preventDefault();
+					if (props.draggedFile) {
+						// Drop to root level
+						props.onMove(props.draggedFile, "");
+						props.setDraggedFile("");
+						props.setDropTarget("");
+					}
+				}}
+			>
+				{renderNodes(props.nodes, 0)}
+			</div>
 		</>
 	);
 }
@@ -408,15 +1283,109 @@ export const Home = () => {
 
 	const treeNodes = createMemo(() => buildTreeFromEntries(entries() ?? []));
 
-	const [openFolders, setOpenFolders] = createSignal<Set<string>>(new Set());
-	const [selectedFile, setSelectedFile] = createSignal<string>("");
+	// Load persisted state from localStorage
+	const loadPersistedState = () => {
+		try {
+			const stored = localStorage.getItem('deez-ui-state');
+			if (stored) {
+				return JSON.parse(stored);
+			}
+		} catch (e) {
+			console.error('Failed to load persisted state:', e);
+		}
+		return null;
+	};
+
+	const persistedState = loadPersistedState();
+
+	const [openFolders, setOpenFolders] = createSignal<Set<string>>(
+		persistedState?.openFolders ? new Set(persistedState.openFolders) : new Set()
+	);
+	const [selectedFile, setSelectedFile] = createSignal<string>(persistedState?.selectedFile || "");
 	const [newlyCreatedFile, setNewlyCreatedFile] = createSignal<string>("");
 
-	const [draft, setDraft] = createSignal("");
-	const [lastHash, setLastHash] = createSignal<string | undefined>(undefined);
+	const [isSaving, setIsSaving] = createSignal(false);
 
 	const [pending, setPending] = createSignal<PendingCreate>(null);
 	const [pendingName, setPendingName] = createSignal("");
+
+	const [sidebarWidth, setSidebarWidth] = createSignal(persistedState?.sidebarWidth || 320);
+
+	const [openTabs, setOpenTabs] = createSignal<string[]>(persistedState?.openTabs || []);
+	const [viewMode, setViewMode] = createSignal<"edit" | "preview">("edit");
+
+	// Command palette state
+	const [paletteOpen, setPaletteOpen] = createSignal(false);
+
+	// Active folder for context (used when creating new files)
+	const [activeFolder, setActiveFolder] = createSignal<string>("");
+
+	// Drag and drop state
+	const [draggedFile, setDraggedFile] = createSignal<string>("");
+	const [dropTarget, setDropTarget] = createSignal<string>("");
+
+	// Preview tab state (VS Code-style single-click preview)
+	const [previewTab, setPreviewTab] = createSignal<string>("");
+
+	// Persist UI state to localStorage
+	createEffect(() => {
+		const state = {
+			sidebarWidth: sidebarWidth(),
+			openFolders: Array.from(openFolders()),
+			openTabs: openTabs(),
+			selectedFile: selectedFile()
+		};
+		try {
+			localStorage.setItem('deez-ui-state', JSON.stringify(state));
+		} catch (e) {
+			console.error('Failed to persist state:', e);
+		}
+	});
+
+	// File state store - the single source of truth for all file content
+	const [fileStore, setFileStore] = createStore<FileStore>({});
+
+	// Computed: current file's draft content
+	const draft = createMemo(() => {
+		const file = selectedFile();
+		if (!file) return "";
+		return fileStore[file]?.draftContent || "";
+	});
+
+	// Update draft content for current file
+	const setDraft = (content: string) => {
+		const file = selectedFile();
+		if (!file) return;
+
+		// Editing a preview tab promotes it to permanent
+		if (previewTab() === file) {
+			setPreviewTab("");
+		}
+
+		setFileStore(produce((store) => {
+			if (!store[file]) {
+				store[file] = { savedContent: "", draftContent: content, hash: "" };
+			} else {
+				store[file].draftContent = content;
+			}
+		}));
+	};
+
+	// Check if a file has unsaved changes
+	const isFileDirty = (filePath: string) => {
+		const state = fileStore[filePath];
+		if (!state) return false;
+		return state.draftContent !== state.savedContent;
+	};
+
+	const previewHtml = createMemo(() => {
+		if (!selectedFile() || viewMode() !== "preview") return "";
+		return marked(draft(), {
+			async: false,
+			breaks: true,
+			gfm: true
+		}) as string;
+	});
 
 	const [file] = createResource(
 		() => selectedFile() || null,
@@ -426,24 +1395,55 @@ export const Home = () => {
 		}
 	);
 
+	// Load file content from server and update store
 	createEffect(() => {
 		const f = file();
 		if (!f) return;
-		setDraft(f.content);
-		setLastHash(f.sha256);
+
+		const currentFile = selectedFile();
+		if (!currentFile) return;
+
+		setFileStore(produce((store) => {
+			// Always reset to server content when loading a file
+			// This ensures opening a file doesn't show it as dirty
+			store[currentFile] = {
+				savedContent: f.content,
+				draftContent: f.content,
+				hash: f.sha256
+			};
+		}));
 	});
 
 	const toggleFolder = (p: string) => {
 		const next = new Set(openFolders());
-		if (next.has(p)) next.delete(p);
-		else next.add(p);
+		if (next.has(p)) {
+			next.delete(p);
+			if (activeFolder() === p) setActiveFolder("");
+		} else {
+			next.add(p);
+			setActiveFolder(p); // Set as active when expanding
+		}
 		setOpenFolders(next);
 	};
 
 	const collapseAll = () => setOpenFolders(new Set<string>());
 
-	// v1 parent dir: directory of selected file, else root
+	// Helper to initialize a new file's content in the store
+	const initializeFile = (filePath: string, content: string = "") => {
+		setFileStore(produce((store) => {
+			store[filePath] = {
+				savedContent: content,
+				draftContent: content,
+				hash: ""
+			};
+		}));
+	};
+
+	// Parent dir: use activeFolder if set, else directory of selected file, else root
 	const currentDir = () => {
+		const active = activeFolder();
+		if (active) return active;
+
 		const p = selectedFile();
 		if (!p) return "";
 		const idx = p.lastIndexOf("/");
@@ -476,11 +1476,9 @@ export const Home = () => {
 			setNewlyCreatedFile(filePath);
 			setTimeout(() => setNewlyCreatedFile(""), 2000);
 
-			// Select it and show empty editor
-			setSelectedFile(filePath);
-			setDraft("");
-			setLastHash(undefined);
-
+			// Open in tab and initialize store
+			openInTab(filePath);
+			initializeFile(filePath, "");
 			if (parentDir) {
 				const next = new Set(openFolders());
 				next.add(parentDir);
@@ -516,9 +1514,8 @@ export const Home = () => {
 			await api.createFile(filePath, "");
 			await refetchTree();
 
-			setSelectedFile(filePath);
-			setDraft("");
-			setLastHash(undefined);
+			openInTab(filePath);
+			initializeFile(filePath, "");
 
 			setPending(null);
 		} catch (e) {
@@ -530,14 +1527,392 @@ export const Home = () => {
 
 	const save = async () => {
 		const p = selectedFile();
-		if (!p) return;
-		const res = await api.writeFile(p, { content: draft(), ifMatch: lastHash() });
-		setLastHash(res.sha256);
-		await refetchTree();
+		if (!p || isSaving()) return;
+
+		const state = fileStore[p];
+		if (!state) return;
+
+		try {
+			setIsSaving(true);
+			const res = await api.writeFile(p, {
+				content: state.draftContent,
+				ifMatch: state.hash
+			});
+
+			// Update store: saved content now matches draft, update hash
+			setFileStore(produce((store) => {
+				if (store[p]) {
+					store[p].savedContent = store[p].draftContent;
+					store[p].hash = res.sha256;
+				}
+			}));
+
+			await refetchTree();
+		} catch (e) {
+			console.error("Save failed:", e);
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const openInTab = (filePath: string, isPreview: boolean = false) => {
+		const currentPreview = previewTab();
+		const tabs = openTabs();
+		const isAlreadyOpen = tabs.includes(filePath);
+		const isPermanent = isAlreadyOpen && currentPreview !== filePath;
+		
+		if (isPreview) {
+			// If file is already open as permanent tab, just select it
+			if (isPermanent) {
+				setSelectedFile(filePath);
+				return;
+			}
+			
+			// Single-click: open as preview
+			if (currentPreview && currentPreview !== filePath) {
+				// Replace existing preview tab
+				const previewIdx = tabs.indexOf(currentPreview);
+				if (previewIdx !== -1) {
+					// Replace preview tab with new file
+					const newTabs = [...tabs];
+					newTabs[previewIdx] = filePath;
+					setOpenTabs(newTabs);
+					
+					// Clean up old preview file from store
+					setFileStore(produce((store) => {
+						delete store[currentPreview];
+					}));
+				} else {
+					// Preview tab was already promoted, just add new preview
+					if (!isAlreadyOpen) {
+						setOpenTabs([...tabs, filePath]);
+					}
+				}
+			} else if (!isAlreadyOpen) {
+				// No existing preview, just add new tab
+				setOpenTabs([...tabs, filePath]);
+			}
+			setPreviewTab(filePath);
+		} else {
+			// Double-click: persist tab (remove from preview mode)
+			if (!isAlreadyOpen) {
+				setOpenTabs([...tabs, filePath]);
+			}
+			if (previewTab() === filePath) {
+				setPreviewTab(""); // Promote to permanent tab
+			}
+		}
+		
+		setSelectedFile(filePath);
+	};
+
+	const closeTab = async (filePath: string, e?: MouseEvent) => {
+		e?.stopPropagation();
+
+		// Check if file has unsaved changes
+		const fileIsDirty = isFileDirty(filePath);
+		if (fileIsDirty) {
+			const result = confirm(`"${filePath.split('/').pop()}" has unsaved changes. Do you want to save them?\n\nYour changes will be lost if you don't save them.`);
+
+			if (result) {
+				// User wants to save
+				if (selectedFile() === filePath) {
+					// File is currently selected, save it
+					await save();
+				} else {
+					// File is not selected, we need to switch to it, save, then close
+					setSelectedFile(filePath);
+					// Wait a tick for the file to load
+					await new Promise(resolve => setTimeout(resolve, 100));
+					await save();
+				}
+			} else {
+				// User doesn't want to save (revert changes to saved version)
+				const state = fileStore[filePath];
+				if (state) {
+					setFileStore(produce((store) => {
+						if (store[filePath]) {
+							store[filePath].draftContent = store[filePath].savedContent;
+						}
+					}));
+				}
+			}
+		}
+
+		// Get current index before removing
+		const currentIdx = openTabs().indexOf(filePath);
+		const tabs = openTabs().filter(p => p !== filePath);
+		setOpenTabs(tabs);
+
+		// Remove from store
+		setFileStore(produce((store) => {
+			delete store[filePath];
+		}));
+
+		// If closing the selected file, select an appropriate tab
+		if (selectedFile() === filePath) {
+			if (tabs.length > 0) {
+				// Try to select the tab to the right, or the one to the left if at the end
+				const nextIdx = currentIdx >= tabs.length ? tabs.length - 1 : currentIdx;
+				setSelectedFile(tabs[nextIdx]);
+			} else {
+				setSelectedFile("");
+			}
+		}
+	};
+
+	const insertMarkdown = (before: string, after: string = "") => {
+		const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+		if (!textarea) return;
+
+		const file = selectedFile();
+		if (!file) return;
+
+		const start = textarea.selectionStart;
+		const end = textarea.selectionEnd;
+		const currentDraft = draft();
+		const selectedText = currentDraft.substring(start, end);
+		const newText = currentDraft.substring(0, start) + before + selectedText + after + currentDraft.substring(end);
+
+		// Update draft using setDraft helper
+		setDraft(newText);
+
+		// Restore cursor position
+		setTimeout(() => {
+			const newCursorPos = start + before.length + selectedText.length + after.length;
+			textarea.selectionStart = newCursorPos;
+			textarea.selectionEnd = newCursorPos;
+			textarea.focus();
+		}, 0);
+	};
+
+	// Sidebar resize handlers
+	const handleResizeStart = (e: MouseEvent) => {
+		e.preventDefault();
+
+		const handleResize = (e: MouseEvent) => {
+			const newWidth = Math.max(200, Math.min(600, e.clientX));
+			setSidebarWidth(newWidth);
+		};
+
+		const handleResizeEnd = () => {
+			document.removeEventListener('mousemove', handleResize);
+			document.removeEventListener('mouseup', handleResizeEnd);
+		};
+
+		document.addEventListener('mousemove', handleResize);
+		document.addEventListener('mouseup', handleResizeEnd);
+	};
+
+	// Keyboard shortcuts - setup once on mount
+	const handleKeyDown = (e: KeyboardEvent) => {
+		const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+		const mod = isMac ? e.metaKey : e.ctrlKey;
+
+		// Cmd/Ctrl+Shift+N: New folder (check this first before regular N)
+		if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
+			e.preventDefault();
+			e.stopPropagation();
+			e.stopImmediatePropagation();
+			onNewFolder();
+			return false;
+		}
+
+		// Cmd/Ctrl+N: New note
+		if (mod && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+			e.preventDefault();
+			e.stopPropagation();
+			e.stopImmediatePropagation();
+			onNewNote();
+			return false;
+		}
+
+		// Cmd/Ctrl+S: Save
+		if (mod && e.key === 's') {
+			e.preventDefault();
+			e.stopPropagation();
+			save();
+			return false;
+		}
+
+		// Cmd/Ctrl+B: Bold
+		if (mod && e.key === 'b' && selectedFile()) {
+			e.preventDefault();
+			e.stopPropagation();
+			insertMarkdown("**", "**");
+			return false;
+		}
+
+		// Cmd/Ctrl+I: Italic
+		if (mod && e.key === 'i' && selectedFile()) {
+			e.preventDefault();
+			e.stopPropagation();
+			insertMarkdown("*", "*");
+			return false;
+		}
+
+		// Cmd/Ctrl+E: Toggle preview
+		if (mod && e.key === 'e' && selectedFile()) {
+			e.preventDefault();
+			e.stopPropagation();
+			setViewMode(viewMode() === "edit" ? "preview" : "edit");
+			return false;
+		}
+
+		// Cmd/Ctrl+P: Command palette
+		if (mod && e.key === 'p') {
+			e.preventDefault();
+			e.stopPropagation();
+			setPaletteOpen(true);
+			return false;
+		}
+	};
+
+	onMount(() => {
+		window.addEventListener("keydown", handleKeyDown, { capture: true });
+		onCleanup(() => window.removeEventListener("keydown", handleKeyDown, { capture: true } as any));
+	});
+
+	const onRename = async (oldPath: string, newName: string) => {
+		console.log('onRename called:', { oldPath, newName });
+		try {
+			const dir = oldPath.lastIndexOf("/") === -1 ? "" : oldPath.slice(0, oldPath.lastIndexOf("/"));
+			
+			// Determine if this is a file or folder by checking entries
+			const allEntries = entries() ?? [];
+			const entry = allEntries.find(e => e.path === oldPath);
+			const isFolder = entry?.kind === "folder";
+			
+			// For files, ensure .md extension; for folders, use name as-is
+			const finalName = isFolder ? newName : (newName.endsWith('.md') ? newName : `${newName}.md`);
+			const newPath = joinPath(dir, finalName);
+
+			console.log('Renaming to:', newPath);
+			await api.rename(oldPath, newPath);
+			await refetchTree();
+
+			// Update tabs if the file is open
+			const tabs = openTabs();
+			const tabIndex = tabs.indexOf(oldPath);
+			if (tabIndex !== -1) {
+				const newTabs = [...tabs];
+				newTabs[tabIndex] = newPath;
+				setOpenTabs(newTabs);
+			}
+
+			// Update file store (move the file state to new path)
+			setFileStore(produce((store) => {
+				if (store[oldPath]) {
+					store[newPath] = store[oldPath];
+					delete store[oldPath];
+				}
+			}));
+
+			// If the renamed file was selected, update selection
+			if (selectedFile() === oldPath) {
+				setSelectedFile(newPath);
+			}
+		} catch (e) {
+			console.error("Rename failed:", e);
+			alert(`Rename failed: ${e}`);
+		}
+	};
+
+	const onDelete = async (path: string, kind: "file" | "folder") => {
+		console.log('onDelete called:', { path, kind });
+		
+		let confirmMsg: string;
+		if (kind === "folder") {
+			// Count files in this folder
+			const allEntries = entries() ?? [];
+			const filesInFolder = allEntries.filter(e => 
+				e.kind === "file" && e.path.startsWith(path + "/")
+			);
+			const foldersInFolder = allEntries.filter(e => 
+				e.kind === "folder" && e.path.startsWith(path + "/")
+			);
+			
+			if (filesInFolder.length > 0 || foldersInFolder.length > 0) {
+				const parts = [];
+				if (filesInFolder.length > 0) {
+					parts.push(`${filesInFolder.length} file${filesInFolder.length === 1 ? '' : 's'}`);
+				}
+				if (foldersInFolder.length > 0) {
+					parts.push(`${foldersInFolder.length} folder${foldersInFolder.length === 1 ? '' : 's'}`);
+				}
+				confirmMsg = `Delete folder "${path.split('/').pop()}"?\n\nThis will permanently delete ${parts.join(' and ')}.`;
+			} else {
+				confirmMsg = `Delete empty folder "${path.split('/').pop()}"?`;
+			}
+		} else {
+			confirmMsg = `Delete file "${path.split('/').pop()}"?`;
+		}
+
+		if (!confirm(confirmMsg)) return;
+
+		try {
+			if (kind === "file") {
+				await api.deleteFile(path);
+			} else {
+				await api.deleteFolder(path);
+			}
+
+			await refetchTree();
+
+			// If the deleted file was selected, clear selection
+			if (selectedFile() === path || selectedFile().startsWith(path + "/")) {
+				setSelectedFile("");
+			}
+		} catch (e) {
+			console.error("Delete failed:", e);
+			alert(`Delete failed: ${e}`);
+		}
+	};
+
+	const onMove = async (filePath: string, targetFolder: string) => {
+		const fileName = filePath.split("/").pop()!;
+		const newPath = joinPath(targetFolder, fileName);
+
+		if (filePath === newPath) return; // No change
+
+		try {
+			await api.rename(filePath, newPath);
+			await refetchTree();
+
+			// Update tabs and selection
+			const tabs = openTabs();
+			const idx = tabs.indexOf(filePath);
+			if (idx !== -1) {
+				const newTabs = [...tabs];
+				newTabs[idx] = newPath;
+				setOpenTabs(newTabs);
+
+				if (selectedFile() === filePath) {
+					setSelectedFile(newPath);
+				}
+			}
+
+			// Update file store
+			setFileStore(produce((store) => {
+				if (store[filePath]) {
+					store[newPath] = store[filePath];
+					delete store[filePath];
+				}
+			}));
+
+			// Ensure target folder is expanded
+			if (targetFolder) {
+				const next = new Set(openFolders());
+				next.add(targetFolder);
+				setOpenFolders(next);
+			}
+		} catch (e) {
+			console.error("Move failed:", e);
+		}
 	};
 
 	return (
-		<div class={shell}>
+		<div class={shell} style={{ "--sidebar-width": `${sidebarWidth()}px` }}>
 			{/* Left icon rail */}
 			<div class={rail}>
 				<RailButton title="Notes" onClick={() => console.log("Notes")}>
@@ -638,34 +2013,169 @@ export const Home = () => {
 							openFolders={openFolders()}
 							toggleFolder={toggleFolder}
 							selectedFile={selectedFile()}
-							onSelectFile={setSelectedFile}
+							onOpenFile={openInTab}
 							newlyCreatedFile={newlyCreatedFile()}
 							pending={pending()}
 							pendingName={pendingName()}
 							setPendingName={setPendingName}
 							commitPending={commitPending}
 							cancelPending={cancelPending}
+							onRename={onRename}
+							onDelete={onDelete}
+							activeFolder={activeFolder()}
+							draggedFile={draggedFile()}
+							setDraggedFile={setDraggedFile}
+							dropTarget={dropTarget()}
+							setDropTarget={setDropTarget}
+							onMove={onMove}
 						/>
 					</Show>
 				</div>
+
+				<div class={resizeHandle} onMouseDown={handleResizeStart} />
 			</div>
 
 			{/* Main */}
 			<div class={main}>
-				<Show when={selectedFile() || pending()?.kind === "file"} fallback={<p>Select a note.</p>}>
-					<textarea
-						class={editor}
-						value={draft()}
-						onInput={(e) => setDraft(e.currentTarget.value)}
-						placeholder="Start writing…"
-					/>
-					<div style={{ "margin-top": "8px" }}>
-						<button onClick={save} disabled={!selectedFile()}>
-							Save
+				{/* Tabs Bar */}
+				<Show when={openTabs().length > 0}>
+					<div class={tabsBar}>
+						<For each={openTabs()}>
+							{(filePath) => {
+								const fileName = filePath.split('/').pop() || filePath;
+								return (
+									<div
+										class={`${tab} ${selectedFile() === filePath ? tabActive : ""} ${previewTab() === filePath ? tabPreview : ""}`}
+										onClick={() => setSelectedFile(filePath)}
+										onDblClick={() => {
+											if (previewTab() === filePath) {
+												setPreviewTab("");
+											}
+										}}
+										title={filePath}
+									>
+										<span class={tabFileName}>{fileName}</span>
+										<div class={tabActions}>
+											<Show when={isFileDirty(filePath)}>
+												<div class="tab-dirty-dot" style={{
+													width: "8px",
+													height: "8px",
+													"border-radius": "50%",
+													background: "#ffffff",
+													opacity: "0.9"
+												}} title="Unsaved changes" />
+											</Show>
+											<div
+												class={`${tabClose} tab-close-x`}
+												style={{ display: isFileDirty(filePath) ? "none" : "flex" }}
+												onClick={(e) => closeTab(filePath, e)}
+												title="Close"
+											>
+												×
+											</div>
+										</div>
+									</div>
+								);
+							}}
+						</For>
+					</div>
+				</Show>
+
+				{/* Markdown Toolbar */}
+				<Show when={selectedFile()}>
+					<div class={toolbar}>
+						<button class={toolBtn} onClick={() => insertMarkdown("**", "**")} title="Bold (Cmd+B)">
+							<strong>B</strong>
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("*", "*")} title="Italic (Cmd+I)">
+							<em>I</em>
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("~~", "~~")} title="Strikethrough">
+							<s>S</s>
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("# ")} title="Heading 1">
+							H1
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("## ")} title="Heading 2">
+							H2
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("### ")} title="Heading 3">
+							H3
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("[", "](url)")} title="Link">
+							🔗
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("`", "`")} title="Code">
+							{"</>"}
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("```\n", "\n```")} title="Code Block">
+							{"{ }"}
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("- ")} title="Bullet List">
+							•
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("1. ")} title="Numbered List">
+							1.
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("- [ ] ")} title="Task List">
+							☑
+						</button>
+						<div class={toolSeparator} />
+						<button class={toolBtn} onClick={() => insertMarkdown("> ")} title="Quote">
+							"
+						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("---\n")} title="Horizontal Rule">
+							─
+						</button>
+						<div class={toolSeparator} />
+						<button
+							class={toolBtn}
+							onClick={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
+							style={{ "background": viewMode() === "preview" ? "rgba(96, 165, 250, 0.2)" : undefined }}
+							title={viewMode() === "edit" ? "Preview" : "Edit"}
+						>
+							{viewMode() === "edit" ? "👁️" : "✎"}
 						</button>
 					</div>
 				</Show>
+
+				{/* Editor / Preview */}
+				<div class={editorWrapper}>
+					<Show when={selectedFile()} fallback={<p>Select a note from the sidebar or create a new one.</p>}>
+						<Show
+							when={viewMode() === "edit"}
+							fallback={
+								<div class={preview} innerHTML={previewHtml()} />
+							}
+						>
+							<textarea
+								class={editor}
+								value={draft()}
+								onInput={(e) => {
+									const newContent = e.currentTarget.value;
+									setDraft(newContent);
+								}}
+								placeholder="Start writing…"
+							/>
+						</Show>
+					</Show>
+				</div>
 			</div>
+
+			{/* Command Palette */}
+			<CommandPalette
+				isOpen={paletteOpen()}
+				onClose={() => setPaletteOpen(false)}
+				files={entries() ?? []}
+				onOpenFile={openInTab}
+				onNewNote={onNewNote}
+				onNewFolder={onNewFolder}
+				onTogglePreview={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
+				onCollapseAll={collapseAll}
+			/>
 		</div>
 	);
 };

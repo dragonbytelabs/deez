@@ -1,4 +1,4 @@
-type Method = "GET" | "POST" | "PUT" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 const routes = {
 	info: "/api/info",
@@ -103,5 +103,14 @@ export const api = {
 		}),
 	writeFile: (path: string, body: WriteFileReq) =>
 		requestJSON<WriteFileRes, WriteFileReq>(routes.file, { method: "PUT", query: { path }, body }),
+	deleteFile: (path: string) =>
+		requestJSON<{ ok: true }>(routes.file, { method: "DELETE", query: { path } }),
+	deleteFolder: (path: string) =>
+		requestJSON<{ ok: true }>(routes.createFolder, { method: "DELETE", query: { path } }),
+	rename: (oldPath: string, newPath: string) =>
+		requestJSON<{ ok: true }, { oldPath: string; newPath: string }>(routes.file, {
+			method: "PATCH",
+			body: { oldPath, newPath },
+		}),
     listTree: () => requestJSON<Entry[]>(routes.tree),
 };
