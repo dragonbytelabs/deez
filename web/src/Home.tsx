@@ -887,6 +887,1554 @@ interface Plugin {
 	hooks: PluginHooks;
 }
 
+/* =======================
+   DEEZ Vault Specification
+======================= */
+
+/**
+ * DEEZ Vault Format v1.0
+ * 
+ * A canonical specification for distributed, portable vaults.
+ */
+
+interface VaultManifest {
+	version: string;           // Spec version (e.g., "1.0.0")
+	id: string;                // Unique vault ID (UUID or similar)
+	name: string;              // Human-readable vault name
+	created: string;           // ISO8601 timestamp
+	updated: string;           // ISO8601 timestamp
+	encryption?: {
+		enabled: boolean;
+		algorithm: 'AES-256-GCM' | 'none';
+		keyDerivation: 'PBKDF2' | 'none';
+	};
+	plugins?: string[];        // Plugin IDs that should be enabled
+	settings?: Record<string, any>; // Vault-specific settings
+}
+
+/**
+ * Required frontmatter keys for all notes in a DEEZ vault
+ */
+const REQUIRED_FRONTMATTER_KEYS = ['id', 'created'] as const;
+
+/**
+ * Standard frontmatter keys (recommended but not required)
+ */
+export const STANDARD_FRONTMATTER_KEYS = ['title', 'updated', 'tags', 'aliases', 'status', 'type'] as const;
+
+/**
+ * Link resolution order:
+ * 1. Exact ID match (frontmatter.id)
+ * 2. Exact filename match (without .md)
+ * 3. Exact title match (frontmatter.title)
+ * 4. Alias match (frontmatter.aliases[])
+ */
+export type LinkResolutionStrategy = 'id' | 'filename' | 'title' | 'alias';
+
+export interface VaultStructure {
+	'.deez/': {
+		'manifest.json': VaultManifest;
+		'index.json'?: Record<string, NoteMetadata>; // Cached index
+		'plugins/'?: Record<string, any>; // Plugin data
+	};
+	'notes/': Record<string, string>; // All markdown files
+	'attachments/'?: Record<string, Blob>; // Media files
+}
+
+/**
+ * Validates a note's frontmatter against DEEZ spec
+ */
+export function validateNoteFrontmatter(frontmatter: Frontmatter | null, filePath: string): { valid: boolean; errors: string[] } {
+	const errors: string[] = [];
+	
+	if (!frontmatter) {
+		errors.push(`${filePath}: Missing frontmatter`);
+		return { valid: false, errors };
+	}
+	
+	// Check required keys
+	for (const key of REQUIRED_FRONTMATTER_KEYS) {
+		if (!frontmatter[key]) {
+			errors.push(`${filePath}: Missing required frontmatter key: ${key}`);
+		}
+	}
+	
+	// Validate ID format (timestamp-based)
+	if (frontmatter.id && !/^\d{14}-[a-z0-9]{3}$/.test(frontmatter.id)) {
+		errors.push(`${filePath}: Invalid ID format. Expected YYYYMMDDHHMMSS-xxx`);
+	}
+	
+	// Validate timestamp formats
+	if (frontmatter.created && isNaN(Date.parse(frontmatter.created))) {
+		errors.push(`${filePath}: Invalid 'created' timestamp`);
+	}
+	if (frontmatter.updated && isNaN(Date.parse(frontmatter.updated))) {
+		errors.push(`${filePath}: Invalid 'updated' timestamp`);
+	}
+	
+	return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Validates entire vault structure
+ */
+export function validateVault(entries: Entry[], manifest: VaultManifest | null): { valid: boolean; errors: string[] } {
+	const errors: string[] = [];
+	
+	if (!manifest) {
+		errors.push('Missing .deez/manifest.json');
+		return { valid: false, errors };
+	}
+	
+	// Validate manifest
+	if (!manifest.version || !manifest.id || !manifest.name) {
+		errors.push('Manifest missing required fields: version, id, name');
+	}
+	
+	// Check for duplicate IDs across all notes (requires async file reading)
+	// This will be implemented in the import/export phase
+	if (entries.length === 0) {
+		errors.push('Vault contains no entries');
+	}
+	
+	return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Creates a default vault manifest
+ */
+export function createVaultManifest(name: string): VaultManifest {
+	return {
+		version: '1.0.0',
+		id: generateZettelId(), // Reuse ID generator for vault ID
+		name,
+		created: new Date().toISOString(),
+		updated: new Date().toISOString(),
+		encryption: {
+			enabled: false,
+			algorithm: 'none',
+			keyDerivation: 'none'
+		},
+		plugins: ['core.zettelkasten'],
+		settings: {}
+	};
+}
+
+/* =======================
+   Vault Export/Import
+======================= */
+
+/**
+ * Exports entire vault as a zip file
+ * Preserves IDs, paths, hashes, and structure
+ */
+export async function exportVault(
+	vaultName: string,
+	entries: Entry[],
+	api: { readFile: (path: string) => Promise<{ content: string; sha256: string }> },
+	notesIndex: Record<string, NoteMetadata>
+): Promise<Blob> {
+	const JSZip = (await import('jszip')).default;
+	const zip = new JSZip();
+	
+	// Create .deez directory
+	const deezDir = zip.folder('.deez')!;
+	
+	// Create and add manifest
+	const manifest = createVaultManifest(vaultName);
+	deezDir.file('manifest.json', JSON.stringify(manifest, null, 2));
+	
+	// Add cached index
+	deezDir.file('index.json', JSON.stringify(notesIndex, null, 2));
+	
+	// Export all files with their content
+	for (const entry of entries) {
+		if (entry.kind === 'file') {
+			try {
+				const { content } = await api.readFile(entry.path);
+				zip.file(entry.path, content);
+			} catch (e) {
+				console.error(`Failed to read ${entry.path}:`, e);
+			}
+		}
+	}
+	
+	// Generate zip blob
+	return await zip.generateAsync({ type: 'blob' });
+}
+
+/**
+ * Imports a vault from a zip file
+ * Validates structure and frontmatter before importing
+ */
+export async function importVault(
+	zipBlob: Blob,
+	api: {
+		createFile: (path: string, content: string) => Promise<any>;
+		createFolder: (path: string) => Promise<any>;
+	}
+): Promise<{ success: boolean; errors: string[]; manifest: VaultManifest | null }> {
+	const JSZip = (await import('jszip')).default;
+	const errors: string[] = [];
+	
+	try {
+		const zip = await JSZip.loadAsync(zipBlob);
+		
+		// Read and validate manifest
+		const manifestFile = zip.file('.deez/manifest.json');
+		if (!manifestFile) {
+			errors.push('Missing .deez/manifest.json - not a valid DEEZ vault');
+			return { success: false, errors, manifest: null };
+		}
+		
+		const manifestContent = await manifestFile.async('text');
+		const manifest: VaultManifest = JSON.parse(manifestContent);
+		
+		// Validate manifest structure
+		if (!manifest.version || !manifest.id || !manifest.name) {
+			errors.push('Invalid manifest: missing required fields');
+			return { success: false, errors, manifest: null };
+		}
+		
+		// Collect all folders first
+		const folders = new Set<string>();
+		zip.forEach((relativePath, file) => {
+			if (file.dir) {
+				folders.add(relativePath.replace(/\/$/, ''));
+			} else {
+				// Extract parent folders from file paths
+				const parts = relativePath.split('/');
+				for (let i = 1; i < parts.length; i++) {
+					const folderPath = parts.slice(0, i).join('/');
+					if (folderPath && !folderPath.startsWith('.deez')) {
+						folders.add(folderPath);
+					}
+				}
+			}
+		});
+		
+		// Create folders
+		for (const folder of Array.from(folders).sort()) {
+			if (!folder.startsWith('.deez')) {
+				try {
+					await api.createFolder(folder);
+				} catch (e) {
+					// Folder might already exist, continue
+					console.warn(`Folder creation warning for ${folder}:`, e);
+				}
+			}
+		}
+		
+		// Import all markdown files
+		let fileCount = 0;
+		const filePromises: Promise<void>[] = [];
+		
+		zip.forEach((relativePath, file) => {
+			if (!file.dir && !relativePath.startsWith('.deez/') && relativePath.endsWith('.md')) {
+				filePromises.push(
+					(async () => {
+						try {
+							const content = await file.async('text');
+							
+							// Validate frontmatter
+							const parsed = parseFrontmatter(content);
+							const validation = validateNoteFrontmatter(parsed.frontmatter, relativePath);
+							
+							if (!validation.valid) {
+								errors.push(...validation.errors);
+								return;
+							}
+							
+							await api.createFile(relativePath, content);
+							fileCount++;
+						} catch (e) {
+							errors.push(`Failed to import ${relativePath}: ${e}`);
+						}
+					})()
+				);
+			}
+		});
+		
+		await Promise.all(filePromises);
+		
+		console.log(`Imported ${fileCount} files from vault: ${manifest.name}`);
+		
+		return {
+			success: errors.length === 0,
+			errors,
+			manifest
+		};
+	} catch (e) {
+		errors.push(`Failed to read zip file: ${e}`);
+		return { success: false, errors, manifest: null };
+	}
+}
+
+/* =======================
+   Remote Store Abstraction
+======================= */
+
+/**
+ * Remote file metadata
+ */
+export interface RemoteFileInfo {
+	path: string;
+	hash: string;
+	size: number;
+	modified: string; // ISO8601 timestamp
+}
+
+/**
+ * Remote vault index
+ */
+export interface RemoteIndex {
+	vaultId: string;
+	updated: string; // ISO8601 timestamp
+	files: RemoteFileInfo[];
+}
+
+/**
+ * Storage backend interface
+ * Implementations: S3, R2, Git, HTTP, WebDAV
+ */
+export interface RemoteStore {
+	// Metadata operations
+	name: string;
+	
+	// Read operations
+	getIndex(): Promise<RemoteIndex>;
+	readFile(path: string): Promise<{ content: string; hash: string }>;
+	fileExists(path: string): Promise<boolean>;
+	
+	// Write operations (single-writer mode)
+	writeFile(path: string, content: string, previousHash?: string): Promise<{ hash: string }>;
+	deleteFile(path: string): Promise<void>;
+	
+	// Batch operations
+	uploadFiles(files: Array<{ path: string; content: string }>): Promise<void>;
+	downloadFiles(paths: string[]): Promise<Array<{ path: string; content: string; hash: string }>>;
+	
+	// Sync operations
+	pushIndex(index: RemoteIndex): Promise<void>;
+}
+
+/**
+ * HTTP-based remote store implementation
+ * Works with any HTTP server exposing the vault API
+ */
+export class HttpRemoteStore implements RemoteStore {
+	name = 'HTTP';
+	private baseUrl: string;
+	private authToken?: string;
+	
+	constructor(baseUrl: string, authToken?: string) {
+		this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+		this.authToken = authToken;
+	}
+	
+	private async fetch(path: string, options: RequestInit = {}): Promise<Response> {
+		const headers: Record<string, string> = {
+			...(options.headers as Record<string, string> || {}),
+		};
+		
+		if (this.authToken) {
+			headers['Authorization'] = `Bearer ${this.authToken}`;
+		}
+		
+		const response = await fetch(`${this.baseUrl}${path}`, {
+			...options,
+			headers
+		});
+		
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+		}
+		
+		return response;
+	}
+	
+	async getIndex(): Promise<RemoteIndex> {
+		const response = await this.fetch('/.deez/index.json');
+		return await response.json();
+	}
+	
+	async readFile(path: string): Promise<{ content: string; hash: string }> {
+		const response = await this.fetch(`/${encodeURIComponent(path)}`);
+		const content = await response.text();
+		const hash = response.headers.get('ETag') || '';
+		return { content, hash };
+	}
+	
+	async fileExists(path: string): Promise<boolean> {
+		try {
+			await this.fetch(`/${encodeURIComponent(path)}`, { method: 'HEAD' });
+			return true;
+		} catch {
+			return false;
+		}
+	}
+	
+	async writeFile(path: string, content: string, previousHash?: string): Promise<{ hash: string }> {
+		const headers: HeadersInit = { 'Content-Type': 'text/markdown' };
+		if (previousHash) {
+			headers['If-Match'] = previousHash;
+		}
+		
+		const response = await this.fetch(`/${encodeURIComponent(path)}`, {
+			method: 'PUT',
+			headers,
+			body: content
+		});
+		
+		const hash = response.headers.get('ETag') || '';
+		return { hash };
+	}
+	
+	async deleteFile(path: string): Promise<void> {
+		await this.fetch(`/${encodeURIComponent(path)}`, { method: 'DELETE' });
+	}
+	
+	async uploadFiles(files: Array<{ path: string; content: string }>): Promise<void> {
+		await Promise.all(files.map(f => this.writeFile(f.path, f.content)));
+	}
+	
+	async downloadFiles(paths: string[]): Promise<Array<{ path: string; content: string; hash: string }>> {
+		const results = await Promise.all(
+			paths.map(async (path) => {
+				const { content, hash } = await this.readFile(path);
+				return { path, content, hash };
+			})
+		);
+		return results;
+	}
+	
+	async pushIndex(index: RemoteIndex): Promise<void> {
+		await this.fetch('/.deez/index.json', {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(index, null, 2)
+		});
+	}
+}
+
+/**
+ * In-memory remote store (for testing/demos)
+ */
+export class MemoryRemoteStore implements RemoteStore {
+	name = 'Memory';
+	private files = new Map<string, { content: string; hash: string; modified: string }>();
+	private index: RemoteIndex = {
+		vaultId: 'memory-vault',
+		updated: new Date().toISOString(),
+		files: []
+	};
+	
+	async getIndex(): Promise<RemoteIndex> {
+		return { ...this.index };
+	}
+	
+	async readFile(path: string): Promise<{ content: string; hash: string }> {
+		const file = this.files.get(path);
+		if (!file) throw new Error(`File not found: ${path}`);
+		return { content: file.content, hash: file.hash };
+	}
+	
+	async fileExists(path: string): Promise<boolean> {
+		return this.files.has(path);
+	}
+	
+	async writeFile(path: string, content: string, previousHash?: string): Promise<{ hash: string }> {
+		const existing = this.files.get(path);
+		if (previousHash && existing && existing.hash !== previousHash) {
+			throw new Error(`Hash mismatch for ${path}`);
+		}
+		
+		const hash = `hash-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+		const modified = new Date().toISOString();
+		
+		this.files.set(path, { content, hash, modified });
+		this.updateIndex();
+		
+		return { hash };
+	}
+	
+	async deleteFile(path: string): Promise<void> {
+		this.files.delete(path);
+		this.updateIndex();
+	}
+	
+	async uploadFiles(files: Array<{ path: string; content: string }>): Promise<void> {
+		await Promise.all(files.map(f => this.writeFile(f.path, f.content)));
+	}
+	
+	async downloadFiles(paths: string[]): Promise<Array<{ path: string; content: string; hash: string }>> {
+		return paths.map(path => {
+			const file = this.files.get(path);
+			if (!file) throw new Error(`File not found: ${path}`);
+			return { path, content: file.content, hash: file.hash };
+		});
+	}
+	
+	async pushIndex(index: RemoteIndex): Promise<void> {
+		this.index = { ...index };
+	}
+	
+	private updateIndex(): void {
+		this.index.updated = new Date().toISOString();
+		this.index.files = Array.from(this.files.entries()).map(([path, file]) => ({
+			path,
+			hash: file.hash,
+			size: file.content.length,
+			modified: file.modified
+		}));
+	}
+}
+
+/* =======================
+   Sync Operations (Single-Writer)
+======================= */
+
+export interface SyncStatus {
+	lastSync?: string; // ISO8601 timestamp
+	remoteStore?: RemoteStore;
+	isSyncing: boolean;
+}
+
+export interface SyncResult {
+	pulled: string[]; // Files downloaded from remote
+	pushed: string[]; // Files uploaded to remote
+	conflicts: string[]; // Files with hash conflicts (shouldn't happen in single-writer)
+	errors: string[];
+}
+
+/**
+ * Compare local and remote indexes to determine sync operations
+ */
+export function computeSyncDiff(
+	localFiles: Array<{ path: string; hash: string }>,
+	remoteFiles: RemoteFileInfo[]
+): {
+	toPull: string[]; // Files that exist remotely but not locally, or have different hashes
+	toPush: string[]; // Files that exist locally but not remotely, or have different hashes
+	conflicts: string[]; // Files that differ on both sides (shouldn't happen in single-writer)
+} {
+	const localMap = new Map(localFiles.map(f => [f.path, f.hash]));
+	const remoteMap = new Map(remoteFiles.map(f => [f.path, f.hash]));
+	
+	const toPull: string[] = [];
+	const toPush: string[] = [];
+	const conflicts: string[] = [];
+	
+	// Check remote files
+	for (const [path, remoteHash] of remoteMap) {
+		const localHash = localMap.get(path);
+		
+		if (!localHash) {
+			// Remote file doesn't exist locally - pull it
+			toPull.push(path);
+		} else if (localHash !== remoteHash) {
+			// File exists on both sides with different hashes
+			// In single-writer mode, this shouldn't happen - but handle it
+			conflicts.push(path);
+		}
+	}
+	
+	// Check local files
+	for (const [path] of localMap) {
+		if (!remoteMap.has(path)) {
+			// Local file doesn't exist remotely - push it
+			toPush.push(path);
+		}
+	}
+	
+	return { toPull, toPush, conflicts };
+}
+
+/**
+ * Pull files from remote store
+ */
+export async function pullFromRemote(
+	remoteStore: RemoteStore,
+	localApi: {
+		createFile: (path: string, content: string) => Promise<any>;
+		writeFile: (path: string, options: { content: string }) => Promise<any>;
+		readFile: (path: string) => Promise<{ content: string; sha256: string }>;
+	},
+	onProgress?: (current: number, total: number, path: string) => void
+): Promise<{ pulled: string[]; errors: string[] }> {
+	const errors: string[] = [];
+	const pulled: string[] = [];
+	
+	try {
+		// Get remote index
+		const remoteIndex = await remoteStore.getIndex();
+		
+		// Get local file list
+		const localFiles: Array<{ path: string; hash: string }> = [];
+		// Note: In real implementation, we'd need to list local files
+		// For now, this is a placeholder that will be filled by the caller
+		
+		const diff = computeSyncDiff(localFiles, remoteIndex.files);
+		
+		// Download files that need pulling
+		for (let i = 0; i < diff.toPull.length; i++) {
+			const path = diff.toPull[i]!;
+			try {
+				if (onProgress) onProgress(i + 1, diff.toPull.length, path);
+				
+				const { content } = await remoteStore.readFile(path);
+				
+				// Check if file exists locally
+				try {
+					await localApi.readFile(path);
+					// File exists - update it
+					await localApi.writeFile(path, { content });
+				} catch {
+					// File doesn't exist - create it
+					await localApi.createFile(path, content);
+				}
+				
+				pulled.push(path);
+			} catch (e) {
+				errors.push(`Failed to pull ${path}: ${e}`);
+			}
+		}
+		
+		return { pulled, errors };
+	} catch (e) {
+		errors.push(`Pull failed: ${e}`);
+		return { pulled, errors };
+	}
+}
+
+/**
+ * Push files to remote store
+ */
+export async function pushToRemote(
+	remoteStore: RemoteStore,
+	localApi: {
+		readFile: (path: string) => Promise<{ content: string; sha256: string }>;
+	},
+	filesToPush: string[],
+	onProgress?: (current: number, total: number, path: string) => void
+): Promise<{ pushed: string[]; errors: string[] }> {
+	const errors: string[] = [];
+	const pushed: string[] = [];
+	
+	try {
+		for (let i = 0; i < filesToPush.length; i++) {
+			const path = filesToPush[i]!;
+			try {
+				if (onProgress) onProgress(i + 1, filesToPush.length, path);
+				
+				const { content } = await localApi.readFile(path);
+				await remoteStore.writeFile(path, content);
+				pushed.push(path);
+			} catch (e) {
+				errors.push(`Failed to push ${path}: ${e}`);
+			}
+		}
+		
+		return { pushed, errors };
+	} catch (e) {
+		errors.push(`Push failed: ${e}`);
+		return { pushed, errors };
+	}
+}
+
+/**
+ * Full bidirectional sync (single-writer mode)
+ */
+export async function syncVault(
+	remoteStore: RemoteStore,
+	localFiles: Array<{ path: string; hash: string }>,
+	localApi: {
+		createFile: (path: string, content: string) => Promise<any>;
+		writeFile: (path: string, options: { content: string }) => Promise<any>;
+		readFile: (path: string) => Promise<{ content: string; sha256: string }>;
+	},
+	onProgress?: (status: string) => void
+): Promise<SyncResult> {
+	const result: SyncResult = {
+		pulled: [],
+		pushed: [],
+		conflicts: [],
+		errors: []
+	};
+	
+	try {
+		// Get remote index
+		if (onProgress) onProgress('Fetching remote index...');
+		const remoteIndex = await remoteStore.getIndex();
+		
+		// Compute diff
+		const diff = computeSyncDiff(localFiles, remoteIndex.files);
+		
+		if (diff.conflicts.length > 0) {
+			result.conflicts = diff.conflicts;
+			result.errors.push(`Found ${diff.conflicts.length} conflicts (unexpected in single-writer mode)`);
+		}
+		
+		// Pull changes
+		if (diff.toPull.length > 0) {
+			if (onProgress) onProgress(`Pulling ${diff.toPull.length} files...`);
+			const pullResult = await pullFromRemote(remoteStore, localApi, (i, total, path) => {
+				if (onProgress) onProgress(`Pulling ${i}/${total}: ${path}`);
+			});
+			result.pulled = pullResult.pulled;
+			result.errors.push(...pullResult.errors);
+		}
+		
+		// Push changes
+		if (diff.toPush.length > 0) {
+			if (onProgress) onProgress(`Pushing ${diff.toPush.length} files...`);
+			const pushResult = await pushToRemote(remoteStore, localApi, diff.toPush, (i, total, path) => {
+				if (onProgress) onProgress(`Pushing ${i}/${total}: ${path}`);
+			});
+			result.pushed = pushResult.pushed;
+			result.errors.push(...pushResult.errors);
+		}
+		
+		// Update remote index
+		if (result.pushed.length > 0 || result.pulled.length > 0) {
+			if (onProgress) onProgress('Updating remote index...');
+			const updatedIndex: RemoteIndex = {
+				vaultId: remoteIndex.vaultId,
+				updated: new Date().toISOString(),
+				files: localFiles.map(f => ({
+					path: f.path,
+					hash: f.hash,
+					size: 0, // Would need actual size
+					modified: new Date().toISOString()
+				}))
+			};
+			await remoteStore.pushIndex(updatedIndex);
+		}
+		
+		if (onProgress) onProgress('Sync complete');
+		
+		return result;
+	} catch (e) {
+		result.errors.push(`Sync failed: ${e}`);
+		return result;
+	}
+}
+
+/* =======================
+   Conflict Detection & Resolution
+======================= */
+
+export interface FileConflict {
+	path: string;
+	localContent: string;
+	localHash: string;
+	remoteContent: string;
+	remoteHash: string;
+	detectedAt: string; // ISO8601 timestamp
+}
+
+export type ConflictResolution = 'keep-local' | 'keep-remote' | 'manual';
+
+/**
+ * Detect conflicts when a file has diverged on both sides
+ */
+export async function detectConflict(
+	path: string,
+	localHash: string,
+	remoteHash: string,
+	localApi: { readFile: (path: string) => Promise<{ content: string; sha256: string }> },
+	remoteStore: RemoteStore
+): Promise<FileConflict | null> {
+	if (localHash === remoteHash) return null;
+	
+	try {
+		const [local, remote] = await Promise.all([
+			localApi.readFile(path),
+			remoteStore.readFile(path)
+		]);
+		
+		return {
+			path,
+			localContent: local.content,
+			localHash: local.sha256,
+			remoteContent: remote.content,
+			remoteHash: remote.hash,
+			detectedAt: new Date().toISOString()
+		};
+	} catch (e) {
+		console.error(`Failed to detect conflict for ${path}:`, e);
+		return null;
+	}
+}
+
+/**
+ * Save conflict file to disk
+ */
+export async function saveConflictCopy(
+	conflict: FileConflict,
+	localApi: { createFile: (path: string, content: string) => Promise<any> }
+): Promise<string> {
+	const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+	const conflictPath = conflict.path.replace(/\.md$/, `.conflict-${timestamp}.md`);
+	
+	const conflictContent = `---
+conflict_detected: ${conflict.detectedAt}
+original_file: ${conflict.path}
+local_hash: ${conflict.localHash}
+remote_hash: ${conflict.remoteHash}
+---
+
+# CONFLICT: ${conflict.path}
+
+This file has diverged on both local and remote.
+
+## Local Version
+
+\`\`\`markdown
+${conflict.localContent}
+\`\`\`
+
+## Remote Version
+
+\`\`\`markdown
+${conflict.remoteContent}
+\`\`\`
+
+---
+Choose one version or manually merge, then delete this conflict file.
+`;
+	
+	await localApi.createFile(conflictPath, conflictContent);
+	return conflictPath;
+}
+
+/**
+ * Resolve a conflict by choosing a version
+ */
+export async function resolveConflict(
+	conflict: FileConflict,
+	resolution: ConflictResolution,
+	localApi: {
+		writeFile: (path: string, options: { content: string; ifMatch?: string }) => Promise<any>;
+	},
+	remoteStore?: RemoteStore
+): Promise<void> {
+	switch (resolution) {
+		case 'keep-local':
+			// Local wins - push to remote
+			if (remoteStore) {
+				await remoteStore.writeFile(conflict.path, conflict.localContent, conflict.remoteHash);
+			}
+			break;
+			
+		case 'keep-remote':
+			// Remote wins - overwrite local
+			await localApi.writeFile(conflict.path, {
+				content: conflict.remoteContent,
+				ifMatch: conflict.localHash
+			});
+			break;
+			
+		case 'manual':
+			// User will manually merge - save conflict file
+			// Resolution happens when user edits and saves
+			break;
+	}
+}
+
+/* =======================
+   Offline-First Operation Log
+======================= */
+
+export type OperationType = 'create' | 'write' | 'rename' | 'move' | 'delete';
+
+export interface Operation {
+	id: string; // Unique operation ID
+	type: OperationType;
+	timestamp: string; // ISO8601
+	path: string;
+	data?: {
+		content?: string;
+		oldPath?: string; // For rename/move
+		newPath?: string;
+		hash?: string;
+	};
+	synced: boolean; // Whether this op has been pushed to remote
+}
+
+export interface OperationLog {
+	operations: Operation[];
+	lastSync?: string; // ISO8601 timestamp of last sync
+}
+
+/**
+ * Append-only operation log
+ * Persisted to localStorage for offline resilience
+ */
+export class VaultOperationLog {
+	private static readonly STORAGE_KEY = 'deez_operation_log';
+	private log: OperationLog;
+	
+	constructor() {
+		this.log = this.load();
+	}
+	
+	private load(): OperationLog {
+		try {
+			const stored = localStorage.getItem(VaultOperationLog.STORAGE_KEY);
+			if (stored) {
+				return JSON.parse(stored);
+			}
+		} catch (e) {
+			console.error('Failed to load operation log:', e);
+		}
+		
+		return { operations: [] };
+	}
+	
+	private save(): void {
+		try {
+			localStorage.setItem(
+				VaultOperationLog.STORAGE_KEY,
+				JSON.stringify(this.log)
+			);
+		} catch (e) {
+			console.error('Failed to save operation log:', e);
+		}
+	}
+	
+	/**
+	 * Append a new operation to the log
+	 */
+	append(type: OperationType, path: string, data?: Operation['data']): Operation {
+		const op: Operation = {
+			id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+			type,
+			timestamp: new Date().toISOString(),
+			path,
+			data,
+			synced: false
+		};
+		
+		this.log.operations.push(op);
+		this.save();
+		
+		return op;
+	}
+	
+	/**
+	 * Get all unsynced operations
+	 */
+	getUnsynced(): Operation[] {
+		return this.log.operations.filter(op => !op.synced);
+	}
+	
+	/**
+	 * Mark operations as synced
+	 */
+	markSynced(operationIds: string[]): void {
+		const idSet = new Set(operationIds);
+		for (const op of this.log.operations) {
+			if (idSet.has(op.id)) {
+				op.synced = true;
+			}
+		}
+		this.save();
+	}
+	
+	/**
+	 * Get all operations (for debugging/review)
+	 */
+	getAll(): Operation[] {
+		return [...this.log.operations];
+	}
+	
+	/**
+	 * Prune old synced operations to prevent log from growing unbounded
+	 */
+	prune(olderThan: Date): void {
+		const cutoff = olderThan.toISOString();
+		this.log.operations = this.log.operations.filter(
+			op => !op.synced || op.timestamp > cutoff
+		);
+		this.save();
+	}
+	
+	/**
+	 * Clear the entire log (dangerous!)
+	 */
+	clear(): void {
+		this.log = { operations: [] };
+		this.save();
+	}
+	
+	/**
+	 * Replay operations to reconstruct vault state
+	 */
+	async replay(
+		api: {
+			createFile: (path: string, content: string) => Promise<any>;
+			writeFile: (path: string, options: { content: string }) => Promise<any>;
+			rename: (oldPath: string, newPath: string) => Promise<void>;
+			deleteFile: (path: string) => Promise<void>;
+		},
+		onProgress?: (current: number, total: number, op: Operation) => void
+	): Promise<{ success: number; errors: string[] }> {
+		const errors: string[] = [];
+		let success = 0;
+		
+		const ops = this.getUnsynced();
+		
+		for (let i = 0; i < ops.length; i++) {
+			const op = ops[i]!;
+			
+			if (onProgress) onProgress(i + 1, ops.length, op);
+			
+			try {
+				switch (op.type) {
+					case 'create':
+						if (op.data?.content) {
+							await api.createFile(op.path, op.data.content);
+						}
+						break;
+						
+					case 'write':
+						if (op.data?.content) {
+							await api.writeFile(op.path, { content: op.data.content });
+						}
+						break;
+						
+					case 'rename':
+					case 'move':
+						if (op.data?.oldPath && op.data?.newPath) {
+							await api.rename(op.data.oldPath, op.data.newPath);
+						}
+						break;
+						
+					case 'delete':
+						await api.deleteFile(op.path);
+						break;
+				}
+				
+				success++;
+			} catch (e) {
+				errors.push(`Failed to replay ${op.type} ${op.path}: ${e}`);
+			}
+		}
+		
+		return { success, errors };
+	}
+}
+
+/* =======================
+   Embeddable Widget Interface
+======================= */
+
+/**
+ * Minimal file provider interface for embeddable mode
+ * Allows hosting applications to provide custom storage backends
+ */
+export interface FileProvider {
+	// Read operations
+	listFiles(): Promise<Entry[]>;
+	readFile(path: string): Promise<{ content: string; sha256: string }>;
+	
+	// Write operations
+	createFile(path: string, content: string): Promise<{ sha256: string }>;
+	writeFile(path: string, options: { content: string; ifMatch?: string }): Promise<{ sha256: string }>;
+	deleteFile(path: string): Promise<void>;
+	
+	// Directory operations
+	createFolder(path: string): Promise<void>;
+	deleteFolder(path: string): Promise<void>;
+	rename(oldPath: string, newPath: string): Promise<void>;
+	
+	// Optional: Tree view for performance
+	listTree?(): Promise<Entry[]>;
+}
+
+/**
+ * Embeddable widget configuration
+ */
+export interface DeezConfig {
+	// File provider (required)
+	provider: FileProvider;
+	
+	// Theme customization
+	theme?: {
+		primaryColor?: string;
+		backgroundColor?: string;
+		textColor?: string;
+		borderColor?: string;
+	};
+	
+	// Initial state
+	initialRoute?: string; // Initial file to open
+	initialFolder?: string; // Initial folder to expand
+	
+	// Feature flags
+	features?: {
+		zettelkasten?: boolean;
+		encryption?: boolean;
+		sync?: boolean;
+		graph?: boolean;
+		search?: boolean;
+	};
+	
+	// Plugins to load
+	plugins?: Plugin[];
+	
+	// Remote sync (optional)
+	remoteStore?: RemoteStore;
+	
+	// Callbacks
+	onFileOpen?: (path: string) => void;
+	onFileSave?: (path: string, content: string) => void;
+	onFileDelete?: (path: string) => void;
+}
+
+/**
+ * Create embeddable DEEZ instance
+ * 
+ * Example usage:
+ * ```tsx
+ * const myProvider: FileProvider = {
+ *   listFiles: async () => [...],
+ *   readFile: async (path) => ({ content: '...', sha256: '...' }),
+ *   createFile: async (path, content) => ({ sha256: '...' }),
+ *   // ... implement other methods
+ * };
+ * 
+ * // In your host application:
+ * import { createDeezWidget } from 'deez';
+ * 
+ * const widget = createDeezWidget({
+ *   provider: myProvider,
+ *   theme: { primaryColor: '#007acc' },
+ *   initialRoute: "README.md",
+ *   features: { zettelkasten: true, graph: true }
+ * });
+ * 
+ * // Mount widget to DOM
+ * widget.mount(document.getElementById('deez-container'));
+ * ```
+ */
+export interface DeezWidget {
+	mount(container: HTMLElement): void;
+	unmount(): void;
+	openFile(path: string): void;
+	saveFile(path: string, content: string): Promise<void>;
+	getState(): { currentFile: string | null; openFiles: string[] };
+}
+
+/**
+ * Factory function to create embeddable widget (to be implemented)
+ * This is the public API for embedding DEEZ into other applications
+ */
+export function createDeezWidget(_config: DeezConfig): DeezWidget {
+	throw new Error('Widget mode not yet implemented - use <Home /> component directly for now');
+}
+
+/**
+ * Props for the Home component (now supports custom configuration)
+ */
+interface HomeProps {
+	apiOverride?: typeof api;
+	config?: DeezConfig;
+}
+
+/* =======================
+   VaultProvider Implementations
+======================= */
+
+/**
+ * LocalStorage-based vault provider (for demos/testing)
+ */
+export class LocalStorageProvider implements FileProvider {
+	private prefix = 'deez_vault_';
+	
+	async listFiles(): Promise<Entry[]> {
+		const entries: Entry[] = [];
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key?.startsWith(this.prefix)) {
+				const path = key.slice(this.prefix.length);
+				entries.push({ kind: 'file', path, name: path.split('/').pop() || path, size: 0, mtime: new Date().toISOString() });
+			}
+		}
+		return entries;
+	}
+	
+	async readFile(path: string): Promise<{ content: string; sha256: string }> {
+		const content = localStorage.getItem(this.prefix + path);
+		if (!content) throw new Error(`File not found: ${path}`);
+		const hash = `hash-${Date.now()}`;
+		return { content, sha256: hash };
+	}
+	
+	async createFile(path: string, content: string): Promise<{ sha256: string }> {
+		localStorage.setItem(this.prefix + path, content);
+		return { sha256: `hash-${Date.now()}` };
+	}
+	
+	async writeFile(path: string, options: { content: string }): Promise<{ sha256: string }> {
+		localStorage.setItem(this.prefix + path, options.content);
+		return { sha256: `hash-${Date.now()}` };
+	}
+	
+	async deleteFile(path: string): Promise<void> {
+		localStorage.removeItem(this.prefix + path);
+	}
+	
+	async createFolder(_path: string): Promise<void> {
+		// LocalStorage doesn't have folders
+	}
+	
+	async deleteFolder(_path: string): Promise<void> {
+		// LocalStorage doesn't have folders
+	}
+	
+	async rename(oldPath: string, newPath: string): Promise<void> {
+		const content = localStorage.getItem(this.prefix + oldPath);
+		if (content) {
+			localStorage.setItem(this.prefix + newPath, content);
+			localStorage.removeItem(this.prefix + oldPath);
+		}
+	}
+	
+	async listTree(): Promise<Entry[]> {
+		return this.listFiles();
+	}
+}
+
+/**
+ * IndexedDB-based vault provider (for offline-first web apps)
+ */
+export class IndexedDBProvider implements FileProvider {
+	private dbName = 'deez_vault';
+	private storeName = 'files';
+	private db: IDBDatabase | null = null;
+	
+	async init(): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open(this.dbName, 1);
+			
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => {
+				this.db = request.result;
+				resolve();
+			};
+			
+			request.onupgradeneeded = (event) => {
+				const db = (event.target as IDBOpenDBRequest).result;
+				if (!db.objectStoreNames.contains(this.storeName)) {
+					db.createObjectStore(this.storeName, { keyPath: 'path' });
+				}
+			};
+		});
+	}
+	
+	private async getStore(mode: IDBTransactionMode): Promise<IDBObjectStore> {
+		if (!this.db) await this.init();
+		const tx = this.db!.transaction(this.storeName, mode);
+		return tx.objectStore(this.storeName);
+	}
+	
+	async listFiles(): Promise<Entry[]> {
+		const store = await this.getStore('readonly');
+		return new Promise((resolve, reject) => {
+			const request = store.getAll();
+			request.onsuccess = () => {
+				const files = request.result.map((f: any) => ({
+					kind: 'file' as const,
+					path: f.path,
+					name: f.path.split('/').pop() || f.path,
+					size: f.content?.length || 0,
+					mtime: new Date().toISOString()
+				}));
+				resolve(files);
+			};
+			request.onerror = () => reject(request.error);
+		});
+	}
+	
+	async readFile(path: string): Promise<{ content: string; sha256: string }> {
+		const store = await this.getStore('readonly');
+		return new Promise((resolve, reject) => {
+			const request = store.get(path);
+			request.onsuccess = () => {
+				const file = request.result;
+				if (!file) reject(new Error(`File not found: ${path}`));
+				else resolve({ content: file.content, sha256: file.hash || `hash-${Date.now()}` });
+			};
+			request.onerror = () => reject(request.error);
+		});
+	}
+	
+	async createFile(path: string, content: string): Promise<{ sha256: string }> {
+		const hash = `hash-${Date.now()}`;
+		const store = await this.getStore('readwrite');
+		return new Promise((resolve, reject) => {
+			const request = store.put({ path, content, hash });
+			request.onsuccess = () => resolve({ sha256: hash });
+			request.onerror = () => reject(request.error);
+		});
+	}
+	
+	async writeFile(path: string, options: { content: string }): Promise<{ sha256: string }> {
+		return this.createFile(path, options.content);
+	}
+	
+	async deleteFile(path: string): Promise<void> {
+		const store = await this.getStore('readwrite');
+		return new Promise((resolve, reject) => {
+			const request = store.delete(path);
+			request.onsuccess = () => resolve();
+			request.onerror = () => reject(request.error);
+		});
+	}
+	
+	async createFolder(_path: string): Promise<void> {
+		// IndexedDB doesn't have folders
+	}
+	
+	async deleteFolder(_path: string): Promise<void> {
+		// IndexedDB doesn't have folders
+	}
+	
+	async rename(oldPath: string, newPath: string): Promise<void> {
+		const file = await this.readFile(oldPath);
+		await this.createFile(newPath, file.content);
+		await this.deleteFile(oldPath);
+	}
+	
+	async listTree(): Promise<Entry[]> {
+		return this.listFiles();
+	}
+}
+
+/* =======================
+   Vault Encryption
+======================= */
+
+export interface VaultKey {
+	keyData: Uint8Array;
+	salt: Uint8Array;
+	algorithm: 'AES-GCM';
+}
+
+/**
+ * Encryption utilities using Web Crypto API
+ */
+export class VaultEncryption {
+	private static readonly PBKDF2_ITERATIONS = 100000;
+	private static readonly KEY_LENGTH = 256;
+	private static readonly SALT_LENGTH = 16;
+	private static readonly IV_LENGTH = 12;
+	
+	/**
+	 * Derive encryption key from password
+	 */
+	static async deriveKey(password: string, salt?: Uint8Array): Promise<VaultKey> {
+		const encoder = new TextEncoder();
+		const passwordBuffer = encoder.encode(password);
+		
+		// Generate or use provided salt
+		const keySalt = salt || crypto.getRandomValues(new Uint8Array(this.SALT_LENGTH));
+		
+		// Import password as key material
+		const keyMaterial = await crypto.subtle.importKey(
+			'raw',
+			passwordBuffer,
+			'PBKDF2',
+			false,
+			['deriveBits', 'deriveKey']
+		);
+		
+		// Derive AES-GCM key
+		const key = await crypto.subtle.deriveKey(
+			{
+				name: 'PBKDF2',
+				salt: keySalt.buffer as ArrayBuffer,
+				iterations: this.PBKDF2_ITERATIONS,
+				hash: 'SHA-256'
+			},
+			keyMaterial,
+			{ name: 'AES-GCM', length: this.KEY_LENGTH },
+			true,
+			['encrypt', 'decrypt']
+		);
+		
+		// Export key data
+		const keyData = new Uint8Array(await crypto.subtle.exportKey('raw', key));
+		
+		return {
+			keyData,
+			salt: keySalt,
+			algorithm: 'AES-GCM'
+		};
+	}
+	
+	/**
+	 * Encrypt content with vault key
+	 */
+	static async encrypt(content: string, vaultKey: VaultKey): Promise<string> {
+		const encoder = new TextEncoder();
+		const data = encoder.encode(content);
+		
+		// Generate random IV
+		const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
+		
+		// Import key
+		const key = await crypto.subtle.importKey(
+			'raw',
+			vaultKey.keyData.buffer as ArrayBuffer,
+			'AES-GCM',
+			false,
+			['encrypt']
+		);
+		
+		// Encrypt
+		const encrypted = await crypto.subtle.encrypt(
+			{ name: 'AES-GCM', iv },
+			key,
+			data
+		);
+		
+		// Combine IV + encrypted data
+		const combined = new Uint8Array(iv.length + encrypted.byteLength);
+		combined.set(iv, 0);
+		combined.set(new Uint8Array(encrypted), iv.length);
+		
+		// Return as base64
+		return btoa(String.fromCharCode(...combined));
+	}
+	
+	/**
+	 * Decrypt content with vault key
+	 */
+	static async decrypt(encryptedBase64: string, vaultKey: VaultKey): Promise<string> {
+		// Decode base64
+		const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+		
+		// Extract IV and encrypted data
+		const iv = combined.slice(0, this.IV_LENGTH);
+		const encrypted = combined.slice(this.IV_LENGTH);
+		
+		// Import key
+		const key = await crypto.subtle.importKey(
+			'raw',
+			vaultKey.keyData.buffer as ArrayBuffer,
+			'AES-GCM',
+			false,
+			['decrypt']
+		);
+		
+		// Decrypt
+		const decrypted = await crypto.subtle.decrypt(
+			{ name: 'AES-GCM', iv },
+			key,
+			encrypted
+		);
+		
+		// Decode as UTF-8
+		const decoder = new TextDecoder();
+		return decoder.decode(decrypted);
+	}
+	
+	/**
+	 * Serialize vault key for storage
+	 */
+	static serializeKey(vaultKey: VaultKey): string {
+		const combined = new Uint8Array(vaultKey.salt.length + vaultKey.keyData.length);
+		combined.set(vaultKey.salt, 0);
+		combined.set(vaultKey.keyData, vaultKey.salt.length);
+		return btoa(String.fromCharCode(...combined));
+	}
+	
+	/**
+	 * Deserialize vault key from storage
+	 */
+	static deserializeKey(serialized: string): VaultKey {
+		const combined = Uint8Array.from(atob(serialized), c => c.charCodeAt(0));
+		const salt = combined.slice(0, this.SALT_LENGTH);
+		const keyData = combined.slice(this.SALT_LENGTH);
+		
+		return {
+			keyData,
+			salt,
+			algorithm: 'AES-GCM'
+		};
+	}
+}
+
+/**
+ * Encrypted vault state manager
+ */
+export class EncryptedVault {
+	private key: VaultKey | null = null;
+	private locked = true;
+	
+	/**
+	 * Unlock vault with password
+	 */
+	async unlock(password: string, salt?: Uint8Array): Promise<boolean> {
+		try {
+			this.key = await VaultEncryption.deriveKey(password, salt);
+			this.locked = false;
+			return true;
+		} catch (e) {
+			console.error('Failed to unlock vault:', e);
+			return false;
+		}
+	}
+	
+	/**
+	 * Lock vault (clear key from memory)
+	 */
+	lock(): void {
+		this.key = null;
+		this.locked = true;
+	}
+	
+	/**
+	 * Check if vault is locked
+	 */
+	isLocked(): boolean {
+		return this.locked;
+	}
+	
+	/**
+	 * Encrypt file content
+	 */
+	async encryptFile(_path: string, content: string): Promise<string> {
+		if (!this.key) throw new Error('Vault is locked');
+		return await VaultEncryption.encrypt(content, this.key);
+	}
+	
+	/**
+	 * Decrypt file content
+	 */
+	async decryptFile(_path: string, encryptedContent: string): Promise<string> {
+		if (!this.key) throw new Error('Vault is locked');
+		return await VaultEncryption.decrypt(encryptedContent, this.key);
+	}
+	
+	/**
+	 * Get vault key for export/storage
+	 */
+	getKey(): VaultKey | null {
+		return this.key;
+	}
+}
+
+interface Plugin {
+	id: string;
+	name: string;
+	version: string;
+	hooks: PluginHooks;
+}
+
 function joinPath(parent: string, name: string) {
 	if (!parent) return name;
 	return `${parent.replace(/\/+$/, "")}/${name.replace(/^\/+/, "")}`;
@@ -1338,6 +2886,180 @@ type PaletteFile = {
 };
 
 type PaletteItem = PaletteAction | PaletteFile;
+
+/* =======================
+   Conflict Resolution Dialog
+======================= */
+
+const conflictDialog = css`
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.8);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 10000;
+`;
+
+const conflictPanel = css`
+	background: #1e1e1e;
+	border: 1px solid #444;
+	border-radius: 6px;
+	width: 90%;
+	max-width: 1200px;
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+`;
+
+const conflictHeader = css`
+	padding: 16px 20px;
+	border-bottom: 1px solid #444;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	
+	h3 {
+		margin: 0;
+		font-size: 16px;
+		color: #fff;
+	}
+`;
+
+const conflictBody = css`
+	flex: 1;
+	overflow-y: auto;
+	padding: 20px;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 20px;
+`;
+
+const conflictVersion = css`
+	border: 1px solid #444;
+	border-radius: 4px;
+	overflow: hidden;
+	
+	h4 {
+		margin: 0;
+		padding: 12px;
+		background: #2d2d2d;
+		font-size: 14px;
+		font-weight: 600;
+		color: #fff;
+		border-bottom: 1px solid #444;
+	}
+	
+	pre {
+		margin: 0;
+		padding: 16px;
+		font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+		font-size: 13px;
+		line-height: 1.5;
+		color: #d4d4d4;
+		background: #1e1e1e;
+		overflow-x: auto;
+		max-height: 500px;
+	}
+`;
+
+const conflictActions = css`
+	padding: 16px 20px;
+	border-top: 1px solid #444;
+	display: flex;
+	gap: 12px;
+	justify-content: flex-end;
+`;
+
+const conflictBtn = css`
+	padding: 8px 16px;
+	border: 1px solid #444;
+	border-radius: 4px;
+	background: #2d2d2d;
+	color: #fff;
+	font-size: 13px;
+	cursor: pointer;
+	transition: all 0.15s;
+	
+	&:hover {
+		background: #3d3d3d;
+		border-color: #555;
+	}
+	
+	&.primary {
+		background: #0e639c;
+		border-color: #0e639c;
+		
+		&:hover {
+			background: #1177bb;
+		}
+	}
+	
+	&.danger {
+		background: #c72e0f;
+		border-color: #c72e0f;
+		
+		&:hover {
+			background: #e03e1f;
+		}
+	}
+`;
+
+export function ConflictResolutionDialog(props: {
+	conflict: FileConflict;
+	onResolve: (resolution: ConflictResolution) => void;
+	onCancel: () => void;
+}) {
+	return (
+		<div class={conflictDialog} onClick={props.onCancel}>
+			<div class={conflictPanel} onClick={(e) => e.stopPropagation()}>
+				<div class={conflictHeader}>
+					<h3>⚠️ Conflict Detected: {props.conflict.path}</h3>
+					<button class={conflictBtn} onClick={props.onCancel}>
+						✕
+					</button>
+				</div>
+				
+				<div class={conflictBody}>
+					<div class={conflictVersion}>
+						<h4>Local Version (Hash: {props.conflict.localHash.slice(0, 8)})</h4>
+						<pre>{props.conflict.localContent}</pre>
+					</div>
+					
+					<div class={conflictVersion}>
+						<h4>Remote Version (Hash: {props.conflict.remoteHash.slice(0, 8)})</h4>
+						<pre>{props.conflict.remoteContent}</pre>
+					</div>
+				</div>
+				
+				<div class={conflictActions}>
+					<button 
+						class={conflictBtn} 
+						onClick={() => props.onResolve('manual')}
+					>
+						Save Conflict File (Manual Merge)
+					</button>
+					<button 
+						class={`${conflictBtn} danger`}
+						onClick={() => props.onResolve('keep-remote')}
+					>
+						Keep Remote (Overwrite Local)
+					</button>
+					<button 
+						class={`${conflictBtn} primary`}
+						onClick={() => props.onResolve('keep-local')}
+					>
+						Keep Local (Overwrite Remote)
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
 
 function CommandPalette(props: {
 	isOpen: boolean;
@@ -2090,9 +3812,12 @@ function TreeView(props: {
    Home
 ======================= */
 
-export const Home = () => {
+export const Home = (props?: HomeProps) => {
+	// Use provided API or default to global api
+	const activeApi = props?.apiOverride ?? api;
+	
 	// IMPORTANT: listTree (not listFiles) so empty folders show
-	const [entries, { refetch: refetchTree }] = createResource(api.listTree);
+	const [entries, { refetch: refetchTree }] = createResource(activeApi.listTree);
 
 	// stub “zettelkasten plugin enabled” for now
 	const [zettelkastenEnabled] = createSignal(true);
@@ -2450,6 +4175,62 @@ export const Home = () => {
 	};
 
 	const collapseAll = () => setOpenFolders(new Set<string>());
+
+	const handleExportVault = async () => {
+		try {
+			const vaultName = prompt("Vault name:", "deez-vault") || "deez-vault";
+			const blob = await exportVault(vaultName, entries() ?? [], api, notesIndex);
+			
+			// Trigger download
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${vaultName}-${new Date().toISOString().split('T')[0]}.zip`;
+			a.click();
+			URL.revokeObjectURL(url);
+			
+			console.log(`Exported vault: ${vaultName}`);
+		} catch (e) {
+			console.error("Export failed:", e);
+			alert(`Export failed: ${e}`);
+		}
+	};
+
+	const handleImportVault = async () => {
+		try {
+			// Create file input
+			const input = document.createElement('input');
+			input.type = 'file';
+			input.accept = '.zip';
+			
+			input.onchange = async (e) => {
+				const file = (e.target as HTMLInputElement).files?.[0];
+				if (!file) return;
+				
+				const confirmed = confirm(
+					`Import vault from "${file.name}"?\n\nThis will add all files from the archive to your current vault.`
+				);
+				if (!confirmed) return;
+				
+				const result = await importVault(file, api);
+				
+				if (result.success) {
+					alert(`Successfully imported vault: ${result.manifest?.name}\n\nReloading...`);
+					await refetchTree();
+					triggerIndexRebuild();
+				} else {
+					alert(`Import completed with errors:\n\n${result.errors.join('\n')}`);
+					await refetchTree();
+					triggerIndexRebuild();
+				}
+			};
+			
+			input.click();
+		} catch (e) {
+			console.error("Import failed:", e);
+			alert(`Import failed: ${e}`);
+		}
+	};
 
 	// Helper to initialize a new file's content in the store
 	const initializeFile = (filePath: string, content: string = "") => {
@@ -3141,6 +4922,12 @@ export const Home = () => {
 						</button>
 						<button class={tinyBtn} title="New folder" onClick={onNewFolder}>
 							📁
+						</button>
+						<button class={tinyBtn} title="Export vault" onClick={handleExportVault}>
+							📦
+						</button>
+						<button class={tinyBtn} title="Import vault" onClick={handleImportVault}>
+							📥
 						</button>
 						<button class={tinyBtn} title="Sort" onClick={() => console.log("Sort")}>
 							⇅
