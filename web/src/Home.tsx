@@ -830,6 +830,7 @@ interface Frontmatter {
 interface NoteLink {
 	raw: string;        // The full match text
 	target: string;     // The link target (id/title/path)
+	heading?: string;   // Optional heading anchor (#heading)
 	displayText?: string; // Optional display text (for markdown links)
 	kind: 'wiki' | 'markdown'; // [[wiki]] or [text](path)
 	position: number;   // Character position in the text
@@ -2576,19 +2577,31 @@ function createDefaultFrontmatter(filePath: string): Frontmatter {
 function extractLinks(body: string): NoteLink[] {
 	const links: NoteLink[] = [];
 	
-	// Extract [[Wiki Links]] - simple format [[target]] or [[target|display]]
+	// Extract [[Wiki Links]] with support for:
+	// [[target]] - simple link
+	// [[target|alias]] - link with custom display text
+	// [[target#heading]] - link to heading
+	// [[target#heading|alias]] - link to heading with custom display
 	const wikiRegex = /\[\[([^\]]+)\]\]/g;
 	let match: RegExpExecArray | null;
 	
 	while ((match = wikiRegex.exec(body)) !== null) {
 		const content = match[1];
+		
+		// Split by | for alias
 		const parts = content.split('|');
-		const target = parts[0].trim();
+		const linkPart = parts[0].trim();
 		const displayText = parts[1]?.trim();
+		
+		// Split by # for heading
+		const headingParts = linkPart.split('#');
+		const target = headingParts[0].trim();
+		const heading = headingParts[1]?.trim();
 		
 		links.push({
 			raw: match[0],
 			target,
+			heading,
 			displayText,
 			kind: 'wiki',
 			position: match.index
@@ -2596,12 +2609,19 @@ function extractLinks(body: string): NoteLink[] {
 	}
 	
 	// Extract [Markdown](links.md) - only .md files
-	const mdRegex = /\[([^\]]+)\]\(([^)]+\.md)\)/g;
+	// Also support [text](path.md#heading)
+	const mdRegex = /\[([^\]]+)\]\(([^)]+\.md(?:#[^)]*)?)\)/g;
 	
 	while ((match = mdRegex.exec(body)) !== null) {
+		const fullPath = match[2];
+		const hashIndex = fullPath.indexOf('#');
+		const target = hashIndex > 0 ? fullPath.slice(0, hashIndex) : fullPath;
+		const heading = hashIndex > 0 ? fullPath.slice(hashIndex + 1) : undefined;
+		
 		links.push({
 			raw: match[0],
-			target: match[2],
+			target,
+			heading,
 			displayText: match[1],
 			kind: 'markdown',
 			position: match.index
@@ -3067,11 +3087,16 @@ function CommandPalette(props: {
 	files: Entry[];
 	onOpenFile: (path: string) => void;
 	onNewNote: () => void;
+	onNewZettel?: () => void;
+	onNewDailyNote?: () => void;
+	onCapture?: () => void;
 	onNewFolder: () => void;
 	onTogglePreview: () => void;
 	onCollapseAll: () => void;
 	notesIndex?: Record<string, NoteMetadata>;
 	fileStore?: Record<string, FileState>;
+	linkMode?: boolean;
+	onInsertLink?: (path: string) => void;
 }) {
 	const [query, setQuery] = createSignal("");
 	const [selectedIndex, setSelectedIndex] = createSignal(0);
@@ -3088,6 +3113,69 @@ function CommandPalette(props: {
 	const items = createMemo((): PaletteItem[] => {
 		const searchQuery = query().toLowerCase();
 
+		// Parse query for special operators
+		const parseQuery = (q: string): {
+			text: string;
+			filters: { type?: string; status?: string; tag?: string; hasLinks?: boolean; hasBacklinks?: boolean; linkTo?: string; linkedBy?: string };
+		} => {
+			const filters: { type?: string; status?: string; tag?: string; hasLinks?: boolean; hasBacklinks?: boolean; linkTo?: string; linkedBy?: string } = {};
+			let text = q;
+
+			// Extract type: operator
+			const typeMatch = q.match(/type:(\S+)/);
+			if (typeMatch) {
+				filters.type = typeMatch[1].toLowerCase();
+				text = text.replace(/type:\S+\s*/g, '').trim();
+			}
+
+			// Extract status: operator
+			const statusMatch = q.match(/status:(\S+)/);
+			if (statusMatch) {
+				filters.status = statusMatch[1].toLowerCase();
+				text = text.replace(/status:\S+\s*/g, '').trim();
+			}
+
+			// Extract tag: operator
+			const tagMatch = q.match(/tag:(\S+)/);
+			if (tagMatch) {
+				filters.tag = tagMatch[1].replace(/^#/, '').toLowerCase();
+				text = text.replace(/tag:\S+\s*/g, '').trim();
+			}
+
+			// Extract links: operator (notes that have outgoing links)
+			if (/links:/.test(q)) {
+				filters.hasLinks = true;
+				text = text.replace(/links:\s*/g, '').trim();
+			}
+
+			// Extract backlinks: operator (notes that have incoming links)
+			if (/backlinks:/.test(q)) {
+				filters.hasBacklinks = true;
+				text = text.replace(/backlinks:\s*/g, '').trim();
+			}
+
+			// Extract linkto: operator (notes that link to a specific note)
+			const linkToMatch = q.match(/linkto:(\S+)/);
+			if (linkToMatch) {
+				filters.linkTo = linkToMatch[1].toLowerCase();
+				text = text.replace(/linkto:\S+\s*/g, '').trim();
+			}
+
+			// Extract linkedby: operator (notes linked by a specific note)
+			const linkedByMatch = q.match(/linkedby:(\S+)/);
+			if (linkedByMatch) {
+				filters.linkedBy = linkedByMatch[1].toLowerCase();
+				text = text.replace(/linkedby:\S+\s*/g, '').trim();
+			}
+
+			return { text: text.toLowerCase(), filters };
+		};
+
+		const { text: searchText, filters } = parseQuery(searchQuery);
+		
+		// Check if we have any active filters
+		const hasActiveFilters = !!(filters.type || filters.status || filters.tag || filters.hasLinks || filters.hasBacklinks || filters.linkTo || filters.linkedBy);
+
 		// Actions (always shown at top)
 		const actions: PaletteAction[] = [
 			{
@@ -3100,6 +3188,36 @@ function CommandPalette(props: {
 					props.onNewNote();
 				}
 			},
+			...(props.onNewZettel ? [{
+				type: 'action' as const,
+				id: 'new-zettel',
+				label: 'New Zettel',
+				icon: '🗒',
+				onSelect: () => {
+					props.onClose();
+					props.onNewZettel!();
+				}
+			}] : []),
+			...(props.onNewDailyNote ? [{
+				type: 'action' as const,
+				id: 'daily-note',
+				label: 'Daily Note',
+				icon: '📅',
+				onSelect: () => {
+					props.onClose();
+					props.onNewDailyNote!();
+				}
+			}] : []),
+			...(props.onCapture ? [{
+				type: 'action' as const,
+				id: 'capture',
+				label: 'Quick Capture',
+				icon: '📥',
+				onSelect: () => {
+					props.onClose();
+					props.onCapture!();
+				}
+			}] : []),
 			{
 				type: 'action',
 				id: 'new-folder',
@@ -3143,61 +3261,173 @@ function CommandPalette(props: {
 			}))
 		];
 
-		// Filter files by query
-		const files: PaletteFile[] = props.files
+		// Filter files by query with ranking
+		const filesWithScores: PaletteFile[] = props.files
 			.filter(e => e.kind === 'file')
-			.filter(e => {
-				if (!searchQuery) return true;
-				
-				// Match by filename/path
-				if (e.path.toLowerCase().includes(searchQuery) || e.name.toLowerCase().includes(searchQuery)) {
-					return true;
+			.map(e => {
+				let score = 0;
+				let matches = false;
+
+				if (!props.notesIndex || !props.fileStore) {
+					// Fallback: simple filename matching
+					if (!searchText || e.path.toLowerCase().includes(searchText) || e.name.toLowerCase().includes(searchText)) {
+						matches = true;
+						score = e.name.toLowerCase().includes(searchText) ? 10 : 5;
+					}
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: matches ? score : -1 };
 				}
 
-				// Enhanced search: check frontmatter and content
-				if (props.notesIndex && props.fileStore) {
-					const noteData = props.notesIndex[e.path];
+				const noteData = props.notesIndex[e.path];
+				const fileData = props.fileStore[e.path];
+				
+				// If no search text and no filters, include all files
+				if (!searchText && !hasActiveFilters) {
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 1 };
+				}
+				
+				// For files without fileData, we can still search by filename/path
+				// but can't apply filters that require frontmatter
+				if (!fileData) {
+					// If filters are active, exclude files without data
+					if (hasActiveFilters) {
+						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+					}
 					
-					// Search in title
-					if (noteData?.title?.toLowerCase().includes(searchQuery)) return true;
+					// Otherwise, do basic filename/path search
+					if (!searchText) {
+						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 1 };
+					}
 					
-					// Search in ID
-					if (noteData?.id?.toLowerCase().includes(searchQuery)) return true;
+					if (e.name.toLowerCase() === searchText) {
+						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 100 };
+					} else if (e.name.toLowerCase().includes(searchText)) {
+						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 50 };
+					} else if (e.path.toLowerCase().includes(searchText)) {
+						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 40 };
+					}
 					
-					// Search in aliases
-					if (noteData?.aliases?.some(a => a.toLowerCase().includes(searchQuery))) return true;
-					
-					// Search in frontmatter tags
-					const fileData = props.fileStore[e.path];
-					if (fileData) {
-						const content = fileData.draftContent || fileData.savedContent;
-						const parsed = parseFrontmatter(content);
-						
-						// Search in frontmatter tags
-						if (parsed.frontmatter?.tags?.some(t => t.toLowerCase().includes(searchQuery))) {
-							return true;
-						}
-						
-						// Search in body content (simple full-text)
-						if (parsed.body.toLowerCase().includes(searchQuery)) {
-							return true;
-						}
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+				}
+
+				const content = fileData.draftContent || fileData.savedContent;
+				const parsed = parseFrontmatter(content);
+				const fm = parsed.frontmatter;
+
+				// Apply filters first
+				if (filters.type && fm?.type !== filters.type) {
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+				}
+
+				if (filters.status && fm?.status !== filters.status) {
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+				}
+
+				if (filters.tag && !fm?.tags?.some(t => t.toLowerCase() === filters.tag)) {
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+				}
+
+				if (filters.hasLinks && (!noteData || noteData.outgoingLinks.length === 0)) {
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+				}
+
+				if (filters.hasBacklinks && (!noteData || noteData.backlinks.length === 0)) {
+					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+				}
+
+				if (filters.linkTo && noteData) {
+					const linksToTarget = noteData.outgoingLinks.some(link => {
+						const target = link.target.toLowerCase();
+						return target === filters.linkTo || target.replace(/\.md$/, '') === filters.linkTo;
+					});
+					if (!linksToTarget) {
+						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
 					}
 				}
-				
-				return false;
-			})
-			.map(e => ({
-				type: 'file' as const,
-				path: e.path,
-				name: e.name
-			}));
 
-		// If there's a query, show only matching files; otherwise show actions + all files
-		if (searchQuery) {
-			return files;
+				if (filters.linkedBy && noteData) {
+					const linkedByTarget = noteData.backlinks.some(backlink => {
+						const backlinkLower = backlink.toLowerCase();
+						return backlinkLower.includes(filters.linkedBy!) || 
+							   backlinkLower.replace(/\.md$/, '') === filters.linkedBy;
+					});
+					if (!linkedByTarget) {
+						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
+					}
+				}
+
+				// If no text query, include all files that passed filters
+				if (!searchText) {
+					matches = true;
+					score = 1;
+				} else {
+					// Ranked text search
+					// Exact filename match (highest priority)
+					if (e.name.toLowerCase() === searchText) {
+						matches = true;
+						score += 100;
+					} else if (e.name.toLowerCase().includes(searchText)) {
+						matches = true;
+						score += 50;
+					} else if (e.path.toLowerCase().includes(searchText)) {
+						matches = true;
+						score += 40;
+					}
+
+					// Title match (high priority)
+					if (noteData?.title) {
+						if (noteData.title.toLowerCase() === searchText) {
+							matches = true;
+							score += 90;
+						} else if (noteData.title.toLowerCase().includes(searchText)) {
+							matches = true;
+							score += 45;
+						}
+					}
+
+					// ID match
+					if (noteData?.id?.toLowerCase().includes(searchText)) {
+						matches = true;
+						score += 60;
+					}
+
+					// Aliases match
+					if (noteData?.aliases?.some(a => a.toLowerCase().includes(searchText))) {
+						matches = true;
+						score += 30;
+					}
+
+					// Tag match
+					if (fm?.tags?.some(t => t.toLowerCase().includes(searchText))) {
+						matches = true;
+						score += 20;
+					}
+
+					// Body content match (lowest priority)
+					if (parsed.body.toLowerCase().includes(searchText)) {
+						matches = true;
+						score += 5;
+					}
+				}
+
+				return {
+					file: { type: 'file' as const, path: e.path, name: e.name },
+					score: matches ? score : -1
+				};
+			})
+			.filter(item => item.score > 0)
+			.sort((a, b) => b.score - a.score)
+			.map(item => item.file);
+
+		// In link mode, only show files (no actions)
+		if (props.linkMode) {
+			return filesWithScores;
 		}
-		return [...actions, ...files];
+
+		// If there's a query, show ranked files; otherwise show actions + files
+		if (searchQuery) {
+			return filesWithScores;
+		}
+		return [...actions, ...filesWithScores];
 	});
 
 	// Reset selected index when items change
@@ -3231,8 +3461,13 @@ function CommandPalette(props: {
 				if (item.type === 'action') {
 					item.onSelect();
 				} else {
-					props.onClose();
-					props.onOpenFile(item.path);
+					if (props.linkMode && props.onInsertLink) {
+						props.onInsertLink(item.path);
+						props.onClose();
+					} else {
+						props.onClose();
+						props.onOpenFile(item.path);
+					}
 				}
 			}
 		} else if (e.key === 'Escape') {
@@ -3249,11 +3484,21 @@ function CommandPalette(props: {
 						ref={inputRef}
 						class={paletteInput}
 						type="text"
-						placeholder="Type to search files or choose an action..."
+						placeholder={props.linkMode ? "Search for a note to link..." : "Type to search files or choose an action..."}
 						value={query()}
 						onInput={(e) => setQuery(e.currentTarget.value)}
 						onKeyDown={handleKeyDown}
 					/>
+					<Show when={!query() && !props.linkMode}>
+						<div style={{
+							"padding": "8px 12px",
+							"font-size": "11px",
+							"color": "#888",
+							"border-bottom": "1px solid #333"
+						}}>
+							Query operators: <code>type:</code> <code>status:</code> <code>tag:</code> <code>linkto:</code> <code>linkedby:</code> <code>links:</code> <code>backlinks:</code>
+						</div>
+					</Show>
 					<div class={paletteResults}>
 						<Show
 							when={items().length > 0}
@@ -3272,8 +3517,13 @@ function CommandPalette(props: {
 											if (item.type === 'action') {
 												item.onSelect();
 											} else {
-												props.onClose();
-												props.onOpenFile(item.path);
+												if (props.linkMode && props.onInsertLink) {
+													props.onInsertLink(item.path);
+													props.onClose();
+												} else {
+													props.onClose();
+													props.onOpenFile(item.path);
+												}
 											}
 										}}
 										onMouseEnter={() => setSelectedIndex(index())}
@@ -3307,9 +3557,70 @@ function LocalGraphView(props: {
 	onClose: () => void;
 	currentPath: string | null;
 	notesIndex: Record<string, NoteMetadata>;
+	fileStore: Record<string, FileState>;
 	onOpenFile: (path: string) => void;
 }) {
 	let svgRef: SVGSVGElement | undefined;
+
+	// Filter state
+	const [filterTag, setFilterTag] = createSignal<string>("");
+	const [filterType, setFilterType] = createSignal<string>("");
+	const [filterStatus, setFilterStatus] = createSignal<string>("");
+	const [hopDistance, setHopDistance] = createSignal<number>(1); // 1-hop or 2-hop
+
+	// Helper to get frontmatter for a path
+	const getFrontmatter = (path: string): Frontmatter | null => {
+		const state = props.fileStore[path];
+		if (!state) return null;
+		const content = state.draftContent || state.savedContent;
+		return parseFrontmatter(content).frontmatter;
+	};
+
+	// Collect all unique tags, types, statuses from notes
+	const availableTags = createMemo(() => {
+		const tags = new Set<string>();
+		Object.keys(props.notesIndex).forEach(path => {
+			const fm = getFrontmatter(path);
+			if (fm?.tags) {
+				fm.tags.forEach((tag: string) => tags.add(tag));
+			}
+		});
+		return Array.from(tags).sort();
+	});
+
+	const availableTypes = createMemo(() => {
+		const types = new Set<string>();
+		Object.keys(props.notesIndex).forEach(path => {
+			const fm = getFrontmatter(path);
+			if (fm?.type) types.add(fm.type);
+		});
+		return Array.from(types).sort();
+	});
+
+	const availableStatuses = createMemo(() => {
+		const statuses = new Set<string>();
+		Object.keys(props.notesIndex).forEach(path => {
+			const fm = getFrontmatter(path);
+			if (fm?.status) statuses.add(fm.status);
+		});
+		return Array.from(statuses).sort();
+	});
+
+	// Filter predicate for a note path
+	const matchesFilter = (path: string): boolean => {
+		const tag = filterTag();
+		const type = filterType();
+		const status = filterStatus();
+
+		const fm = getFrontmatter(path);
+		if (!fm) return true; // Include notes without frontmatter
+
+		if (tag && !(fm.tags || []).includes(tag)) return false;
+		if (type && fm.type !== type) return false;
+		if (status && fm.status !== status) return false;
+
+		return true;
+	};
 
 	createEffect(() => {
 		if (!props.isOpen || !svgRef || !props.currentPath) return;
@@ -3317,50 +3628,70 @@ function LocalGraphView(props: {
 		const current = props.notesIndex[props.currentPath];
 		if (!current) return;
 
-		// Build simple graph: current note + neighbors
-		const nodes: Array<{id: string; label: string; isCurrent: boolean}> = [];
+		const hops = hopDistance();
+
+		// Build graph with hop-based expansion
+		const nodes: Array<{id: string; label: string; isCurrent: boolean; distance: number}> = [];
 		const links: Array<{source: string; target: string}> = [];
+		const visited = new Set<string>();
 
-		// Add current note
-		nodes.push({
-			id: props.currentPath,
-			label: current.title || props.currentPath.split('/').pop() || '',
-			isCurrent: true
-		});
+		// BFS to expand nodes up to N hops
+		const queue: Array<{id: string; distance: number}> = [{ id: props.currentPath, distance: 0 }];
+		visited.add(props.currentPath);
 
-		// Add outgoing links as nodes
-		for (const link of current.outgoingLinks) {
-			const targetPath = Object.keys(props.notesIndex).find(p => {
-				const note = props.notesIndex[p];
-				return note.id === link.target || 
-					note.title === link.target || 
-					p === link.target ||
-					(note.aliases || []).includes(link.target);
-			});
+		while (queue.length > 0) {
+			const item = queue.shift()!;
+			const note = props.notesIndex[item.id];
+			if (!note) continue;
 
-			if (targetPath && !nodes.find(n => n.id === targetPath)) {
-				const targetNote = props.notesIndex[targetPath];
+			// Add node if it matches filter (or is the current note)
+			if (item.distance === 0 || matchesFilter(item.id)) {
 				nodes.push({
-					id: targetPath,
-					label: targetNote?.title || targetPath.split('/').pop() || '',
-					isCurrent: false
+					id: item.id,
+					label: note.title || item.id.split('/').pop() || '',
+					isCurrent: item.distance === 0,
+					distance: item.distance
 				});
-				links.push({ source: props.currentPath, target: targetPath });
+			}
+
+			// Expand neighbors if within hop distance
+			if (item.distance < hops) {
+				// Outgoing links
+				for (const link of note.outgoingLinks) {
+					const targetPath = Object.keys(props.notesIndex).find(p => {
+						const n = props.notesIndex[p];
+						return n.id === link.target || 
+							n.title === link.target || 
+							p === link.target ||
+							(n.aliases || []).includes(link.target);
+					});
+
+					if (targetPath && !visited.has(targetPath)) {
+						visited.add(targetPath);
+						queue.push({ id: targetPath, distance: item.distance + 1 });
+						
+						// Add link if target passes filter
+						if (matchesFilter(targetPath)) {
+							links.push({ source: item.id, target: targetPath });
+						}
+					}
+				}
+
+				// Backlinks
+				for (const backlink of note.backlinks) {
+					if (!visited.has(backlink)) {
+						visited.add(backlink);
+						queue.push({ id: backlink, distance: item.distance + 1 });
+
+						// Add link if backlink passes filter
+						if (matchesFilter(backlink)) {
+							links.push({ source: backlink, target: item.id });
+						}
+					}
+				}
 			}
 		}
 
-		// Add backlinks as nodes
-		for (const backlink of current.backlinks) {
-			if (!nodes.find(n => n.id === backlink)) {
-				const backlinkNote = props.notesIndex[backlink];
-				nodes.push({
-					id: backlink,
-					label: backlinkNote?.title || backlink.split('/').pop() || '',
-					isCurrent: false
-				});
-			}
-			links.push({ source: backlink, target: props.currentPath });
-		}
 
 		// Simple SVG rendering (no force simulation for simplicity)
 		const width = svgRef.clientWidth;
@@ -3380,9 +3711,10 @@ function LocalGraphView(props: {
 				positions.set(node.id, { x: centerX, y: centerY });
 			} else {
 				const angle = angleStep * (i - 1);
+				const nodeRadius = radius * (1 + node.distance * 0.3); // Further nodes slightly farther out
 				positions.set(node.id, {
-					x: centerX + radius * Math.cos(angle),
-					y: centerY + radius * Math.sin(angle)
+					x: centerX + nodeRadius * Math.cos(angle),
+					y: centerY + nodeRadius * Math.sin(angle)
 				});
 			}
 		});
@@ -3416,7 +3748,7 @@ function LocalGraphView(props: {
 			circle.setAttribute('cx', String(pos.x));
 			circle.setAttribute('cy', String(pos.y));
 			circle.setAttribute('r', node.isCurrent ? '12' : '8');
-			circle.setAttribute('fill', node.isCurrent ? '#60a5fa' : '#3c3c3c');
+			circle.setAttribute('fill', node.isCurrent ? '#60a5fa' : node.distance === 1 ? '#3c3c3c' : '#2a2a2a');
 			circle.setAttribute('stroke', node.isCurrent ? '#60a5fa' : '#666');
 			circle.setAttribute('stroke-width', '2');
 
@@ -3444,6 +3776,112 @@ function LocalGraphView(props: {
 						</div>
 						<button class={graphClose} onClick={props.onClose}>×</button>
 					</div>
+					
+					{/* Filters */}
+					<div style={{
+						display: "flex",
+						gap: "8px",
+						padding: "8px 12px",
+						background: "rgba(0, 0, 0, 0.3)",
+						"border-bottom": "1px solid rgba(255, 255, 255, 0.1)",
+						"flex-wrap": "wrap",
+						"align-items": "center"
+					}}>
+						<label style={{ "font-size": "12px", color: "#aaa" }}>Filters:</label>
+						
+						<select 
+							value={filterTag()} 
+							onChange={(e) => setFilterTag(e.currentTarget.value)}
+							style={{
+								padding: "4px 8px",
+								background: "#1a1a1a",
+								border: "1px solid #333",
+								"border-radius": "4px",
+								color: "#fff",
+								"font-size": "12px"
+							}}
+						>
+							<option value="">All Tags</option>
+							<For each={availableTags()}>
+								{(tag) => <option value={tag}>#{tag}</option>}
+							</For>
+						</select>
+
+						<select 
+							value={filterType()} 
+							onChange={(e) => setFilterType(e.currentTarget.value)}
+							style={{
+								padding: "4px 8px",
+								background: "#1a1a1a",
+								border: "1px solid #333",
+								"border-radius": "4px",
+								color: "#fff",
+								"font-size": "12px"
+							}}
+						>
+							<option value="">All Types</option>
+							<For each={availableTypes()}>
+								{(type) => <option value={type}>{type}</option>}
+							</For>
+						</select>
+
+						<select 
+							value={filterStatus()} 
+							onChange={(e) => setFilterStatus(e.currentTarget.value)}
+							style={{
+								padding: "4px 8px",
+								background: "#1a1a1a",
+								border: "1px solid #333",
+								"border-radius": "4px",
+								color: "#fff",
+								"font-size": "12px"
+							}}
+						>
+							<option value="">All Statuses</option>
+							<For each={availableStatuses()}>
+								{(status) => <option value={status}>{status}</option>}
+							</For>
+						</select>
+
+						<label style={{ "font-size": "12px", color: "#aaa", "margin-left": "12px" }}>Distance:</label>
+						<select 
+							value={hopDistance()} 
+							onChange={(e) => setHopDistance(Number(e.currentTarget.value))}
+							style={{
+								padding: "4px 8px",
+								background: "#1a1a1a",
+								border: "1px solid #333",
+								"border-radius": "4px",
+								color: "#fff",
+								"font-size": "12px"
+							}}
+						>
+							<option value={1}>1-hop</option>
+							<option value={2}>2-hop</option>
+						</select>
+
+						<button
+							onClick={() => {
+								setFilterTag("");
+								setFilterType("");
+								setFilterStatus("");
+								setHopDistance(1);
+							}}
+							style={{
+								padding: "4px 8px",
+								background: "#333",
+								border: "1px solid #555",
+								"border-radius": "4px",
+								color: "#fff",
+								"font-size": "12px",
+								cursor: "pointer",
+								"margin-left": "auto"
+							}}
+						>
+							Clear Filters
+						</button>
+					</div>
+
 					<svg ref={svgRef} class={graphCanvas} />
 				</div>
 			</div>
@@ -3857,6 +4295,7 @@ export const Home = (props?: HomeProps) => {
 
 	// Command palette state
 	const [paletteOpen, setPaletteOpen] = createSignal(false);
+	const [paletteLinkMode, setPaletteLinkMode] = createSignal(false);
 
 	// Active folder for context (used when creating new files)
 	const [activeFolder, setActiveFolder] = createSignal<string>("");
@@ -3873,6 +4312,13 @@ export const Home = (props?: HomeProps) => {
 
 	// Graph view state
 	const [graphOpen, setGraphOpen] = createSignal(false);
+
+	// Rename propagation state
+	const [renamePreview, setRenamePreview] = createSignal<{
+		oldPath: string;
+		newName: string;
+		affectedNotes: Array<{ path: string; title: string; linkCount: number }>;
+	} | null>(null);
 
 	// Zettelkasten: Backlinks index (note path -> metadata)
 	const [notesIndex, setNotesIndex] = createStore<Record<string, NoteMetadata>>({});
@@ -4285,14 +4731,201 @@ export const Home = (props?: HomeProps) => {
 			setNewlyCreatedFile(filePath);
 			setTimeout(() => setNewlyCreatedFile(""), 2000);
 
-			// Open in tab and initialize store with content
+			// Open in tab (file will be loaded automatically)
 			openInTab(filePath);
-			initializeFile(filePath, initialContent);
 			if (parentDir) {
 				const next = new Set(openFolders());
 				next.add(parentDir);
 				setOpenFolders(next);
 			}
+		} catch (e) {
+			console.error(e);
+		}
+	};
+
+	const onNewZettel = async () => {
+		const parentDir = currentDir();
+		const zettelId = generateZettelId();
+		const fileName = `${zettelId}.md`;
+		const filePath = joinPath(parentDir, fileName);
+
+		// Prompt for title
+		const title = prompt("Zettel title (optional):");
+		
+		// Prompt for tags
+		const tagsInput = prompt("Tags (comma-separated, optional):");
+		const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+		// Create frontmatter
+		const frontmatter: Record<string, any> = {
+			id: zettelId,
+			created: new Date().toISOString(),
+			type: "note"
+		};
+		
+		if (title) {
+			frontmatter.title = title;
+		}
+		
+		if (tags.length > 0) {
+			frontmatter.tags = tags;
+		}
+
+		const frontmatterStr = serializeFrontmatter(frontmatter, "");
+		const initialContent = `${frontmatterStr}\n`;
+
+		try {
+			// Execute plugin hooks
+			const pluginContent = await pluginRegistry.executeOnCreateNote(filePath);
+			const finalContent = pluginContent || initialContent;
+			
+			// Create the file with initial content
+			await api.createFile(filePath, finalContent);
+			await refetchTree();
+
+			// Mark as newly created and clear after 2 seconds
+			setNewlyCreatedFile(filePath);
+			setTimeout(() => setNewlyCreatedFile(""), 2000);
+
+			// Open in tab (file will be loaded automatically)
+			openInTab(filePath);
+			if (parentDir) {
+				const next = new Set(openFolders());
+				next.add(parentDir);
+				setOpenFolders(next);
+			}
+		} catch (e) {
+			console.error(e);
+		}
+	};
+
+	const onNewDailyNote = async () => {
+		const parentDir = currentDir();
+		
+		// Format: YYYY-MM-DD
+		const today = new Date();
+		const yyyy = today.getFullYear();
+		const mm = String(today.getMonth() + 1).padStart(2, '0');
+		const dd = String(today.getDate()).padStart(2, '0');
+		const dateStr = `${yyyy}-${mm}-${dd}`;
+		
+		const fileName = `${dateStr}.md`;
+		const filePath = joinPath(parentDir, fileName);
+
+		// Check if file already exists
+		const existingFile = entries()?.find(e => e.path === filePath);
+		if (existingFile) {
+			// File exists, just open it
+			openInTab(filePath);
+			if (parentDir) {
+				const next = new Set(openFolders());
+				next.add(parentDir);
+				setOpenFolders(next);
+			}
+			return;
+		}
+
+		// Create frontmatter for daily note
+		const frontmatter: Record<string, any> = {
+			date: dateStr,
+			created: new Date().toISOString(),
+			type: "daily-note",
+			tags: ["daily"]
+		};
+
+		const frontmatterStr = serializeFrontmatter(frontmatter, "");
+		
+		// Add template sections
+		const template = `
+## Tasks
+- [ ] 
+
+## Notes
+
+## Log
+
+`;
+		const initialContent = `${frontmatterStr}${template}`;
+
+		try {
+			// Execute plugin hooks
+			const pluginContent = await pluginRegistry.executeOnCreateNote(filePath);
+			const finalContent = pluginContent || initialContent;
+			
+			// Create the file with initial content
+			await api.createFile(filePath, finalContent);
+			await refetchTree();
+
+			// Mark as newly created and clear after 2 seconds
+			setNewlyCreatedFile(filePath);
+			setTimeout(() => setNewlyCreatedFile(""), 2000);
+
+			// Open in tab (file will be loaded automatically)
+			openInTab(filePath);
+			if (parentDir) {
+				const next = new Set(openFolders());
+				next.add(parentDir);
+				setOpenFolders(next);
+			}
+		} catch (e) {
+			console.error(e);
+		}
+	};
+
+	const onCapture = async () => {
+		const inboxDir = "Inbox";
+		
+		// Ensure Inbox folder exists
+		const inboxExists = entries()?.some(e => e.path === inboxDir && e.kind === 'folder');
+		if (!inboxExists) {
+			try {
+				await api.createFolder(inboxDir);
+				await refetchTree();
+			} catch (e) {
+				console.error("Failed to create Inbox folder:", e);
+			}
+		}
+
+		// Prompt for quick note content
+		const content = prompt("Quick capture:");
+		if (!content) return;
+
+		// Generate filename
+		const zettelId = generateZettelId();
+		const fileName = `${zettelId}.md`;
+		const filePath = joinPath(inboxDir, fileName);
+
+		// Create minimal frontmatter
+		const frontmatter: Record<string, any> = {
+			id: zettelId,
+			created: new Date().toISOString(),
+			type: "capture",
+			tags: ["inbox"]
+		};
+
+		const frontmatterStr = serializeFrontmatter(frontmatter, "");
+		const initialContent = `${frontmatterStr}\n${content}\n`;
+
+		try {
+			// Execute plugin hooks
+			const pluginContent = await pluginRegistry.executeOnCreateNote(filePath);
+			const finalContent = pluginContent || initialContent;
+			
+			// Create the file with initial content
+			await api.createFile(filePath, finalContent);
+			await refetchTree();
+
+			// Mark as newly created and clear after 2 seconds
+			setNewlyCreatedFile(filePath);
+			setTimeout(() => setNewlyCreatedFile(""), 2000);
+
+			// Open in tab (file will be loaded automatically)
+			openInTab(filePath);
+			
+			// Open the Inbox folder
+			const next = new Set(openFolders());
+			next.add(inboxDir);
+			setOpenFolders(next);
 		} catch (e) {
 			console.error(e);
 		}
@@ -4522,6 +5155,49 @@ export const Home = (props?: HomeProps) => {
 		}, 0);
 	};
 
+	const insertLink = (filePath: string) => {
+		const file = selectedFile();
+		
+		if (!file) {
+			return;
+		}
+
+		// Remove .md extension and get just the filename
+		const linkTarget = filePath.replace(/\.md$/, '');
+		
+		const currentDraft = draft();
+		
+		const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+		
+		if (textarea) {
+			// Insert at cursor position if textarea is available
+			const start = textarea.selectionStart;
+			const end = textarea.selectionEnd;
+			const selectedText = currentDraft.substring(start, end);
+			
+			// If text is selected, use it as the alias
+			const linkText = selectedText ? `[[${linkTarget}|${selectedText}]]` : `[[${linkTarget}]]`;
+			const newText = currentDraft.substring(0, start) + linkText + currentDraft.substring(end);
+
+			// Update draft using setDraft helper
+			setDraft(newText);
+
+			// Restore cursor position after the link
+			setTimeout(() => {
+				const newCursorPos = start + linkText.length;
+				textarea.selectionStart = newCursorPos;
+				textarea.selectionEnd = newCursorPos;
+				textarea.focus();
+			}, 0);
+		} else {
+			console.log('Textarea not found, using fallback');
+			// Fallback: append to end of content
+			const linkText = `[[${linkTarget}]]`;
+			const newText = currentDraft + (currentDraft.endsWith('\n') ? '' : '\n') + linkText + '\n';
+			setDraft(newText);
+		}
+	};
+
 	// Sidebar resize handlers
 	const handleResizeStart = (e: MouseEvent) => {
 		e.preventDefault();
@@ -4599,6 +5275,16 @@ export const Home = (props?: HomeProps) => {
 		if (mod && e.key === 'p') {
 			e.preventDefault();
 			e.stopPropagation();
+			setPaletteLinkMode(false);
+			setPaletteOpen(true);
+			return false;
+		}
+
+		// Cmd/Ctrl+K: Link to note
+		if (mod && e.key === 'k') {
+			e.preventDefault();
+			e.stopPropagation();
+			setPaletteLinkMode(true);
 			setPaletteOpen(true);
 			return false;
 		}
@@ -4609,8 +5295,151 @@ export const Home = (props?: HomeProps) => {
 		onCleanup(() => window.removeEventListener("keydown", handleKeyDown, { capture: true } as any));
 	});
 
+	/**
+	 * Find all notes that link to the target and would be affected by renaming it
+	 */
+	const findAffectedNotes = (targetPath: string): Array<{ path: string; title: string; linkCount: number }> => {
+		const affected: Array<{ path: string; title: string; linkCount: number }> = [];
+		const targetMeta = notesIndex[targetPath];
+		if (!targetMeta) return affected;
+
+		// Find all notes that have links pointing to this note
+		for (const path in notesIndex) {
+			if (path === targetPath) continue;
+
+			const note = notesIndex[path];
+			let linkCount = 0;
+
+			// Count links that resolve to the target
+			for (const link of note.outgoingLinks) {
+				const resolved = resolveLinkTarget(link.target, notesIndex);
+				if (resolved === targetPath) {
+					linkCount++;
+				}
+			}
+
+			if (linkCount > 0) {
+				affected.push({
+					path,
+					title: note.title || path.split('/').pop() || path,
+					linkCount
+				});
+			}
+		}
+
+		return affected;
+	};
+
+	/**
+	 * Update all links in a note's content to point to the new target
+	 */
+	const updateLinksInContent = (content: string, oldTarget: string, newTarget: string): string => {
+		const parsed = parseFrontmatter(content);
+		let body = parsed.body;
+
+		// Match wiki links: [[target]], [[target|alias]], [[target#heading]], [[target#heading|alias]]
+		const wikiLinkRegex = /\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g;
+
+		body = body.replace(wikiLinkRegex, (match, target, heading, alias) => {
+			const trimmedTarget = target.trim();
+			
+			// Check if this link resolves to the old target
+			if (trimmedTarget === oldTarget || 
+				trimmedTarget === oldTarget.replace(/\.md$/, '') ||
+				trimmedTarget.toLowerCase() === oldTarget.toLowerCase()) {
+				
+				// Rebuild the link with new target
+				const newLink = `[[${newTarget}${heading ? '#' + heading : ''}${alias ? '|' + alias : ''}]]`;
+				return newLink;
+			}
+
+			return match;
+		});
+
+		return serializeFrontmatter(parsed.frontmatter ||{}, body);
+	};
+
+	/**
+	 * Propagate rename across all affected notes
+	 */
+	const propagateRename = async (oldPath: string, newPath: string) => {
+		const oldMeta = notesIndex[oldPath];
+		if (!oldMeta) return;
+
+		// Determine what to use as the new link target
+		// Prefer ID if available, otherwise use filename without extension
+		const oldTarget = oldMeta.id || oldMeta.title || oldPath.replace(/\.md$/, '');
+		const newMeta = notesIndex[newPath];
+		const newTarget = newMeta?.id || newPath.split('/').pop()!.replace(/\.md$/, '');
+
+		// Find all affected notes
+		const affected = findAffectedNotes(oldPath);
+
+		// Update each affected note
+		for (const { path } of affected) {
+			const state = fileStore[path];
+			if (!state) continue;
+
+			const currentContent = state.draftContent || state.savedContent;
+			const updatedContent = updateLinksInContent(currentContent, oldTarget, newTarget);
+
+			// Update file store
+			setFileStore(produce((store) => {
+				if (store[path]) {
+					store[path].draftContent = updatedContent;
+				} else {
+					store[path] = {
+						savedContent: currentContent,
+						draftContent: updatedContent,
+						hash: ''
+					};
+				}
+			}));
+
+			// Auto-save the updated content
+			try {
+				const res = await api.writeFile(path, {
+					content: updatedContent,
+					ifMatch: state.hash
+				});
+
+				setFileStore(produce((store) => {
+					if (store[path]) {
+						store[path].savedContent = updatedContent;
+						store[path].hash = res.sha256;
+					}
+				}));
+			} catch (e) {
+				console.error(`Failed to update links in ${path}:`, e);
+			}
+		}
+
+		// Rebuild index after all updates
+		triggerIndexRebuild();
+	};
+
 	const onRename = async (oldPath: string, newName: string) => {
 		console.log('onRename called:', { oldPath, newName });
+
+		// Check if this is a markdown file and show preview if links would be affected
+		if (oldPath.endsWith('.md')) {
+			const affected = findAffectedNotes(oldPath);
+			if (affected.length > 0) {
+				// Show preview modal
+				setRenamePreview({
+					oldPath,
+					newName,
+					affectedNotes: affected
+				});
+				return; // Wait for user confirmation
+			}
+		}
+
+		// Execute rename
+		await executeRename(oldPath, newName);
+	};
+
+	const executeRename = async (oldPath: string, newName: string, updateLinks: boolean = false) => {
 		try {
 			const dir = oldPath.lastIndexOf("/") === -1 ? "" : oldPath.slice(0, oldPath.lastIndexOf("/"));
 			
@@ -4650,6 +5479,11 @@ export const Home = (props?: HomeProps) => {
 			// If the renamed file was selected, update selection
 			if (selectedFile() === oldPath) {
 				setSelectedFile(newPath);
+			}
+
+			// Propagate link updates if requested
+			if (updateLinks && oldPath.endsWith('.md')) {
+				await propagateRename(oldPath, newPath);
 			}
 		} catch (e) {
 			console.error("Rename failed:", e);
@@ -4695,8 +5529,19 @@ export const Home = (props?: HomeProps) => {
 				
 				// Execute plugin hooks on delete
 				await pluginRegistry.executeOnDelete(path);
+				
+				// Close the tab if it's open
+				if (openTabs().includes(path)) {
+					closeTab(path);
+				}
 			} else {
 				await api.deleteFolder(path);
+				
+				// Close all tabs for files in the deleted folder
+				const tabsToClose = openTabs().filter(tab => tab.startsWith(path + "/"));
+				for (const tab of tabsToClose) {
+					closeTab(tab);
+				}
 			}
 
 			await refetchTree();
@@ -4836,6 +5681,137 @@ export const Home = (props?: HomeProps) => {
 
 	const [tagInput, setTagInput] = createSignal("");
 	const [showTagInput, setShowTagInput] = createSignal(false);
+
+	// Rename Preview Modal Component
+	const RenamePreviewModal = () => {
+		const preview = renamePreview();
+		if (!preview) return null;
+
+		return (
+			<div
+				style={{
+					position: "fixed",
+					top: 0,
+					left: 0,
+					right: 0,
+					bottom: 0,
+					background: "rgba(0, 0, 0, 0.8)",
+					display: "flex",
+					"align-items": "center",
+					"justify-content": "center",
+					"z-index": 10000
+				}}
+				onClick={() => setRenamePreview(null)}
+			>
+				<div
+					style={{
+						background: "#1a1a1a",
+						border: "1px solid #333",
+						"border-radius": "8px",
+						padding: "24px",
+						"max-width": "600px",
+						width: "90%",
+						"max-height": "80vh",
+						overflow: "auto"
+					}}
+					onClick={(e) => e.stopPropagation()}
+				>
+					<h2 style={{ margin: "0 0 16px 0", "font-size": "18px", color: "#fff" }}>
+						Update Links?
+					</h2>
+					<p style={{ margin: "0 0 16px 0", color: "#aaa", "font-size": "14px" }}>
+						Renaming "<strong>{preview.oldPath.split('/').pop()}</strong>" to "<strong>{preview.newName}</strong>" will affect {preview.affectedNotes.length} {preview.affectedNotes.length === 1 ? 'note' : 'notes'}:
+					</p>
+					<div
+						style={{
+							background: "#0a0a0a",
+							border: "1px solid #222",
+							"border-radius": "4px",
+							padding: "12px",
+							"margin-bottom": "20px",
+							"max-height": "300px",
+							overflow: "auto"
+						}}
+					>
+						<For each={preview.affectedNotes}>
+							{(note) => (
+								<div
+									style={{
+										padding: "8px",
+										"border-bottom": "1px solid #222",
+										"font-size": "13px"
+									}}
+								>
+									<div style={{ color: "#fff", "margin-bottom": "4px" }}>
+										{note.title}
+									</div>
+									<div style={{ color: "#666", "font-size": "12px" }}>
+										{note.linkCount} {note.linkCount === 1 ? 'link' : 'links'} will be updated
+									</div>
+								</div>
+							)}
+						</For>
+					</div>
+					<div style={{ display: "flex", gap: "12px", "justify-content": "flex-end" }}>
+						<button
+							onClick={() => setRenamePreview(null)}
+							style={{
+								padding: "8px 16px",
+								background: "#333",
+								border: "1px solid #555",
+								"border-radius": "4px",
+								color: "#fff",
+								cursor: "pointer",
+								"font-size": "14px"
+							}}
+						>
+							Cancel
+						</button>
+						<button
+							onClick={async () => {
+								const p = renamePreview();
+								if (p) {
+									setRenamePreview(null);
+									await executeRename(p.oldPath, p.newName, false);
+								}
+							}}
+							style={{
+								padding: "8px 16px",
+								background: "#444",
+								border: "1px solid #666",
+								"border-radius": "4px",
+								color: "#fff",
+								cursor: "pointer",
+								"font-size": "14px"
+							}}
+						>
+							Rename Only
+						</button>
+						<button
+							onClick={async () => {
+								const p = renamePreview();
+								if (p) {
+									setRenamePreview(null);
+									await executeRename(p.oldPath, p.newName, true);
+								}
+							}}
+							style={{
+								padding: "8px 16px",
+								background: "#4fa8ff",
+								border: "1px solid #60a5fa",
+								"border-radius": "4px",
+								color: "#fff",
+								cursor: "pointer",
+								"font-size": "14px"
+							}}
+						>
+							Update Links
+						</button>
+					</div>
+				</div>
+			</div>
+		);
+	};
 
 	return (
 		<div class={shell} style={{ "--sidebar-width": `${sidebarWidth()}px` }}>
@@ -5250,42 +6226,115 @@ export const Home = (props?: HomeProps) => {
 							</div>
 						</Show>
 
-						{/* Unlinked Mentions */}
-						<Show when={unlinkedMentions().length > 0}>
-							<div class={linksHeader} style={{ "margin-top": "12px" }}>
-								Unlinked Mentions ({unlinkedMentions().length})
-							</div>
-							<div class={linksList}>
-								<For each={unlinkedMentions()}>
-									{(mention) => (
-										<div
-											class={linkItem}
-											onClick={() => openInTab(mention.path, false)}
-											title={`Click to open and link\n${mention.context}`}
-											style={{ "flex-direction": "column", "align-items": "flex-start" }}
-										>
-											<div style={{ display: "flex", "align-items": "center", gap: "8px", width: "100%" }}>
-												<span class={linkIcon}>⋯</span>
-												<span class={linkText}>{mention.title}</span>
-											</div>
-											<div style={{ 
-												"font-size": "11px", 
-												color: "#888", 
-												"padding-left": "22px",
-												overflow: "hidden",
-												"text-overflow": "ellipsis",
-												"white-space": "nowrap",
-												width: "100%"
-											}}>
-												{mention.context}
-											</div>
-										</div>
-									)}
-								</For>
-							</div>
-						</Show>
+					{/* Unlinked Mentions */}
+					<Show when={unlinkedMentions().length > 0}>
+						<div class={linksHeader} style={{ "margin-top": "12px" }}>
+							Unlinked Mentions ({unlinkedMentions().length})
+						</div>
+						<div class={linksList}>
+							<For each={unlinkedMentions()}>
+								{(mention) => (
+									<div
+										class={linkItem}
+										style={{ "flex-direction": "column", "align-items": "flex-start" }}
+									>
+										<div style={{ display: "flex", "align-items": "center", gap: "8px", width: "100%" }}>
+											<span class={linkIcon}>⋯</span>
+											<span 
+												class={linkText}
+												onClick={() => openInTab(mention.path, false)}
+												style={{ flex: 1, cursor: "pointer" }}
+												title={`Click to open\n${mention.context}`}
+											>
+												{mention.title}
+											</span>
+											<button
+												onClick={(e) => {
+													e.stopPropagation();
+													const current = currentNoteMetadata();
+													if (!current) return;
 
-						{/* Empty state */}
+													// Get the note to convert the mention in
+													const targetContent = fileStore[mention.path]?.draftContent || fileStore[mention.path]?.savedContent;
+													if (!targetContent) return;
+
+													const parsed = parseFrontmatter(targetContent);
+													if (!parsed.frontmatter) return; // Need frontmatter for safe update
+
+													// Create wiki link using ID (most specific) or title
+													const linkTarget = current.id || current.title;
+													const wikiLink = `[[${linkTarget}]]`;
+
+													// Find all search terms that could match
+													const searchTerms = [
+														current.title,
+														...(current.aliases || [])
+													].filter(Boolean).map(t => t!);
+
+													// Replace first occurrence of any search term
+													let newBody = parsed.body;
+													let replaced = false;
+													for (const term of searchTerms) {
+														if (!term) continue;
+														// Use word boundary regex for more precise replacement
+														const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+														if (regex.test(newBody)) {
+															newBody = newBody.replace(regex, wikiLink);
+															replaced = true;
+															break;
+														}
+													}
+
+													if (!replaced) return;
+
+													// Update the file content using the proper pattern
+													const newContent = serializeFrontmatter(parsed.frontmatter, newBody);
+													setFileStore(produce((store) => {
+														if (!store[mention.path]) {
+															store[mention.path] = {
+																savedContent: targetContent,
+																draftContent: newContent,
+																hash: ""
+															};
+														} else {
+															store[mention.path].draftContent = newContent;
+														}
+													}));
+
+													// Rebuild index after link conversion
+													triggerIndexRebuild();
+												}}
+												title="Convert to wiki link"
+												style={{
+													padding: "2px 6px",
+													"font-size": "11px",
+													background: "rgba(79, 168, 255, 0.15)",
+													border: "1px solid rgba(79, 168, 255, 0.3)",
+													"border-radius": "4px",
+													color: "#4fa8ff",
+													cursor: "pointer",
+													"font-family": "system-ui, sans-serif"
+												}}
+											>
+												Link
+											</button>
+										</div>
+										<div style={{ 
+											"font-size": "11px", 
+											color: "#888", 
+											"padding-left": "22px",
+											overflow: "hidden",
+											"text-overflow": "ellipsis",
+											"white-space": "nowrap",
+											width: "100%"
+										}}>
+											{mention.context}
+										</div>
+									</div>
+								)}
+							</For>
+						</div>
+					</Show>						{/* Empty state */}
 						<Show when={(currentNoteMetadata()?.outgoingLinks.length || 0) === 0 && (currentNoteMetadata()?.backlinks.length || 0) === 0 && unlinkedMentions().length === 0}>
 							<div style={{ color: "#666", "font-size": "12px", "font-style": "italic" }}>
 								No links or backlinks yet. Use [[note-id]] or [[note-title]] to link notes.
@@ -5395,15 +6444,23 @@ export const Home = (props?: HomeProps) => {
 			{/* Command Palette */}
 			<CommandPalette
 				isOpen={paletteOpen()}
-				onClose={() => setPaletteOpen(false)}
+				onClose={() => {
+					setPaletteOpen(false);
+					setPaletteLinkMode(false);
+				}}
 				files={entries() ?? []}
 				onOpenFile={openInTab}
 				onNewNote={onNewNote}
+				onNewZettel={onNewZettel}
+				onNewDailyNote={onNewDailyNote}
+				onCapture={onCapture}
 				onNewFolder={onNewFolder}
 				onTogglePreview={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
 				onCollapseAll={collapseAll}
 				notesIndex={notesIndex}
 				fileStore={fileStore}
+				linkMode={paletteLinkMode()}
+				onInsertLink={insertLink}
 			/>
 
 			{/* Local Graph View */}
@@ -5412,11 +6469,15 @@ export const Home = (props?: HomeProps) => {
 				onClose={() => setGraphOpen(false)}
 				currentPath={selectedFile()}
 				notesIndex={notesIndex}
+				fileStore={fileStore}
 				onOpenFile={(path) => {
 					openInTab(path, false);
 					setGraphOpen(false);
 				}}
 			/>
+
+			{/* Rename Preview Modal */}
+			<RenamePreviewModal />
 		</div>
 	);
 };
