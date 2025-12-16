@@ -223,6 +223,22 @@ func (v *Vault) WriteFile(ctx context.Context, rel string, req WriteRequest) (*W
 	}, nil
 }
 
+// CreateFolder creates a new directory in the vault
+func (v *Vault) CreateFolder(ctx context.Context, vaultPath string) error {
+	absPath, err := v.resolve(vaultPath)
+	if err != nil {
+		return err
+	}
+
+	// Check if it already exists
+	if _, err := os.Stat(absPath); err == nil {
+		return errors.New("folder already exists")
+	}
+
+	// Create the directory with parent directories
+	return os.MkdirAll(absPath, 0755)
+}
+
 func (v *Vault) ListEntries(ctx context.Context) ([]Entry, error) {
 	var out []Entry
 

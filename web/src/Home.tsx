@@ -492,6 +492,22 @@ const rowWithActions = css`
   }
 `;
 
+const rowDragging = css`
+  opacity: 0.4;
+  cursor: grabbing;
+`;
+
+const rowDropTarget = css`
+  background: rgba(96, 165, 250, 0.2) !important;
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  border-radius: 4px;
+`;
+
+const rowActiveFolder = css`
+  background: rgba(96, 165, 250, 0.15);
+  font-weight: 500;
+`;
+
 const editor = css`
   width: 100%;
   min-height: 100%;
@@ -720,6 +736,14 @@ function CommandPalette(props: {
 }) {
 	const [query, setQuery] = createSignal("");
 	const [selectedIndex, setSelectedIndex] = createSignal(0);
+	let inputRef: HTMLInputElement | undefined;
+
+	// Focus input when palette opens
+	createEffect(() => {
+		if (props.isOpen && inputRef) {
+			setTimeout(() => inputRef?.focus(), 0);
+		}
+	});
 
 	// Build combined list of actions + files
 	const items = createMemo((): PaletteItem[] => {
@@ -792,6 +816,15 @@ function CommandPalette(props: {
 		setSelectedIndex(0);
 	});
 
+	// Scroll selected item into view
+	createEffect(() => {
+		const idx = selectedIndex();
+		const element = document.querySelector(`[data-palette-index="${idx}"]`);
+		if (element) {
+			element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		}
+	});
+
 	const handleKeyDown = (e: KeyboardEvent) => {
 		const itemsCount = items().length;
 		
@@ -823,13 +856,13 @@ function CommandPalette(props: {
 			<div class={paletteOverlay} onClick={props.onClose}>
 				<div class={paletteModal} onClick={(e) => e.stopPropagation()}>
 					<input
+						ref={inputRef}
 						class={paletteInput}
 						type="text"
 						placeholder="Type to search files or choose an action..."
 						value={query()}
 						onInput={(e) => setQuery(e.currentTarget.value)}
 						onKeyDown={handleKeyDown}
-						autofocus
 					/>
 					<div class={paletteResults}>
 						<Show
@@ -843,6 +876,7 @@ function CommandPalette(props: {
 							<For each={items()}>
 								{(item, index) => (
 									<div
+										data-palette-index={index()}
 										class={`${paletteItem} ${selectedIndex() === index() ? paletteItemActive : ""}`}
 										onClick={() => {
 											if (item.type === 'action') {
@@ -927,9 +961,24 @@ function TreeView(props: {
 
 	onRename: (oldPath: string, newName: string) => void;
 	onDelete: (path: string, kind: "file" | "folder") => void;
+
+	activeFolder: string;
+	draggedFile: string;
+	setDraggedFile: (path: string) => void;
+	dropTarget: string;
+	setDropTarget: (path: string) => void;
+	onMove: (filePath: string, targetFolder: string) => void;
 }) {
 	const [renamingPath, setRenamingPath] = createSignal<string>("");
 	const [renameValue, setRenameValue] = createSignal<string>("");
+	let pendingInputRef: HTMLInputElement | undefined;
+
+	// Auto-focus pending input when it appears
+	createEffect(() => {
+		if (props.pending && pendingInputRef) {
+			setTimeout(() => pendingInputRef?.focus(), 0);
+		}
+	});
 
 	const startRename = (path: string, currentName: string) => {
 		setRenamingPath(path);
@@ -967,13 +1016,24 @@ function TreeView(props: {
 								when={renamingPath() === n.path}
 								fallback={
 									<div
-										class={`${row} ${rowWithActions} ${props.newlyCreatedFile === n.path
+										class={`${row} ${rowWithActions} ${
+											props.draggedFile === n.path ? rowDragging : ""
+										} ${props.newlyCreatedFile === n.path
 											? rowNew
 											: props.selectedFile === n.path
 												? rowActive
 												: ""
 											}`}
 										style={{ "padding-left": `${10 + depth * 14}px`, display: "flex", "justify-content": "space-between" }}
+										draggable={true}
+										onDragStart={(e) => {
+											props.setDraggedFile(n.path);
+											e.dataTransfer!.effectAllowed = "move";
+										}}
+										onDragEnd={() => {
+											props.setDraggedFile("");
+											props.setDropTarget("");
+										}}
 										onClick={() => props.onOpenFile(n.path)}
 										onKeyDown={(e) => {
 											if (e.key === "F2") {
@@ -1046,31 +1106,51 @@ function TreeView(props: {
 							return (
 								<>
 									<div
-										class={row}
+										class={`${row} ${
+											props.dropTarget === folder.path ? rowDropTarget : ""
+										} ${
+											props.activeFolder === folder.path ? rowActiveFolder : ""
+										}`}
 										style={{ "padding-left": `${10 + depth * 14}px` }}
 										onClick={() => props.toggleFolder(folder.path)}
+										onDragOver={(e) => {
+											if (props.draggedFile && props.draggedFile !== folder.path) {
+												e.preventDefault();
+												e.dataTransfer!.dropEffect = "move";
+												props.setDropTarget(folder.path);
+											}
+										}}
+										onDragLeave={() => {
+											props.setDropTarget("");
+										}}
+										onDrop={(e) => {
+											e.preventDefault();
+											if (props.draggedFile) {
+												props.onMove(props.draggedFile, folder.path);
+												props.setDraggedFile("");
+												props.setDropTarget("");
+											}
+										}}
 										title={folder.path}
 									>
 										<span class={caret}>{isOpen ? "▾" : ">"}</span>
 										<strong>{folder.name}</strong>
 									</div>
 
-									<Show when={isPendingHere}>
-										<div style={{ "padding-left": `${10 + (depth + 1) * 14}px`, padding: "6px 8px" }}>
-											<input
-												class={nameInput}
-												value={props.pendingName}
-												onInput={(e) => props.setPendingName(e.currentTarget.value)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") props.commitPending();
-													if (e.key === "Escape") props.cancelPending();
-												}}
-												autofocus
-											/>
-										</div>
-									</Show>
-
-									<Show when={isOpen}>{renderNodes(folder.children, depth + 1)}</Show>
+					<Show when={isPendingHere}>
+						<div style={{ "padding-left": `${10 + (depth + 1) * 14}px`, padding: "6px 8px" }}>
+							<input
+								ref={pendingInputRef}
+								class={nameInput}
+								value={props.pendingName}
+								onInput={(e) => props.setPendingName(e.currentTarget.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") props.commitPending();
+									if (e.key === "Escape") props.cancelPending();
+								}}
+							/>
+						</div>
+					</Show>									<Show when={isOpen}>{renderNodes(folder.children, depth + 1)}</Show>
 								</>
 							);
 						})()}
@@ -1080,27 +1160,44 @@ function TreeView(props: {
 		</For>
 	);
 
-	const showPendingInRoot = props.pending && props.pending.parentDir === "";
+	const showPendingInRoot = createMemo(() => props.pending && props.pending.parentDir === "");
 
 	return (
 		<>
-			<Show when={showPendingInRoot}>
-				<div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.08)", "border-radius": "8px", "margin-bottom": "8px" }}>
-					<input
-						class={nameInput}
-						value={props.pendingName}
-						onInput={(e) => props.setPendingName(e.currentTarget.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") props.commitPending();
-							if (e.key === "Escape") props.cancelPending();
-						}}
-						autofocus
-						placeholder={props.pending?.kind === "folder" ? "Folder name..." : "Note name..."}
-					/>
-				</div>
-			</Show>
-
+		<Show when={showPendingInRoot()}>
+			<div style={{ padding: "8px", background: "rgba(255, 255, 255, 0.08)", "border-radius": "8px", "margin-bottom": "8px" }}>
+				<input
+					ref={pendingInputRef}
+					class={nameInput}
+					value={props.pendingName}
+					onInput={(e) => props.setPendingName(e.currentTarget.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") props.commitPending();
+						if (e.key === "Escape") props.cancelPending();
+					}}
+					placeholder={props.pending?.kind === "folder" ? "Folder name..." : "Note name..."}
+				/>
+			</div>
+		</Show>
+		<div
+			onDragOver={(e) => {
+				if (props.draggedFile) {
+					e.preventDefault();
+					e.dataTransfer!.dropEffect = "move";
+				}
+			}}
+			onDrop={(e) => {
+				e.preventDefault();
+				if (props.draggedFile) {
+					// Drop to root level
+					props.onMove(props.draggedFile, "");
+					props.setDraggedFile("");
+					props.setDropTarget("");
+				}
+			}}
+		>
 			{renderNodes(props.nodes, 0)}
+		</div>
 		</>
 	);
 }
@@ -1151,6 +1248,13 @@ export const Home = () => {
 
 	// Command palette state
 	const [paletteOpen, setPaletteOpen] = createSignal(false);
+
+	// Active folder for context (used when creating new files)
+	const [activeFolder, setActiveFolder] = createSignal<string>("");
+
+	// Drag and drop state
+	const [draggedFile, setDraggedFile] = createSignal<string>("");
+	const [dropTarget, setDropTarget] = createSignal<string>("");
 
 	// Persist UI state to localStorage
 	createEffect(() => {
@@ -1236,8 +1340,13 @@ export const Home = () => {
 
 	const toggleFolder = (p: string) => {
 		const next = new Set(openFolders());
-		if (next.has(p)) next.delete(p);
-		else next.add(p);
+		if (next.has(p)) {
+			next.delete(p);
+			if (activeFolder() === p) setActiveFolder("");
+		} else {
+			next.add(p);
+			setActiveFolder(p); // Set as active when expanding
+		}
 		setOpenFolders(next);
 	};
 
@@ -1254,8 +1363,11 @@ export const Home = () => {
 		}));
 	};
 
-	// v1 parent dir: directory of selected file, else root
+	// Parent dir: use activeFolder if set, else directory of selected file, else root
 	const currentDir = () => {
+		const active = activeFolder();
+		if (active) return active;
+		
 		const p = selectedFile();
 		if (!p) return "";
 		const idx = p.lastIndexOf("/");
@@ -1483,78 +1595,74 @@ export const Home = () => {
 		document.addEventListener('mouseup', handleResizeEnd);
 	};
 
-	// Keyboard shortcuts
-	createEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-			const mod = isMac ? e.metaKey : e.ctrlKey;
+	// Keyboard shortcuts - setup once on mount
+	const handleKeyDown = (e: KeyboardEvent) => {
+		const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+		const mod = isMac ? e.metaKey : e.ctrlKey;
 
-			// Cmd/Ctrl+Shift+N: New folder (check this first before regular N)
-			if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
-				console.log('Cmd+Shift+N triggered');
-				e.preventDefault();
-				e.stopPropagation();
-				e.stopImmediatePropagation();
-				onNewFolder();
-				return false;
-			}
+		// Cmd/Ctrl+Shift+N: New folder (check this first before regular N)
+		if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
+			e.preventDefault();
+			e.stopPropagation();
+			e.stopImmediatePropagation();
+			onNewFolder();
+			return false;
+		}
 
-			// Cmd/Ctrl+N: New note
-			if (mod && e.key.toLowerCase() === 'n' && !e.shiftKey) {
-				console.log('Cmd+N triggered');
-				e.preventDefault();
-				e.stopPropagation();
-				e.stopImmediatePropagation();
-				onNewNote();
-				return false;
-			}
+		// Cmd/Ctrl+N: New note
+		if (mod && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+			e.preventDefault();
+			e.stopPropagation();
+			e.stopImmediatePropagation();
+			onNewNote();
+			return false;
+		}
 
-			// Cmd/Ctrl+S: Save
-			if (mod && e.key === 's') {
-				console.log('Cmd+S triggered');
-				e.preventDefault();
-				e.stopPropagation();
-				save();
-				return false;
-			}
+		// Cmd/Ctrl+S: Save
+		if (mod && e.key === 's') {
+			e.preventDefault();
+			e.stopPropagation();
+			save();
+			return false;
+		}
 
-			// Cmd/Ctrl+B: Bold
-			if (mod && e.key === 'b' && selectedFile()) {
-				e.preventDefault();
-				e.stopPropagation();
-				insertMarkdown("**", "**");
-				return false;
-			}
+		// Cmd/Ctrl+B: Bold
+		if (mod && e.key === 'b' && selectedFile()) {
+			e.preventDefault();
+			e.stopPropagation();
+			insertMarkdown("**", "**");
+			return false;
+		}
 
-			// Cmd/Ctrl+I: Italic
-			if (mod && e.key === 'i' && selectedFile()) {
-				e.preventDefault();
-				e.stopPropagation();
-				insertMarkdown("*", "*");
-				return false;
-			}
+		// Cmd/Ctrl+I: Italic
+		if (mod && e.key === 'i' && selectedFile()) {
+			e.preventDefault();
+			e.stopPropagation();
+			insertMarkdown("*", "*");
+			return false;
+		}
 
-			// Cmd/Ctrl+E: Toggle preview
-			if (mod && e.key === 'e' && selectedFile()) {
-				e.preventDefault();
-				e.stopPropagation();
-				setViewMode(viewMode() === "edit" ? "preview" : "edit");
-				return false;
-			}
+		// Cmd/Ctrl+E: Toggle preview
+		if (mod && e.key === 'e' && selectedFile()) {
+			e.preventDefault();
+			e.stopPropagation();
+			setViewMode(viewMode() === "edit" ? "preview" : "edit");
+			return false;
+		}
 
-			// Cmd/Ctrl+P: Command palette
-			if (mod && e.key === 'p') {
-				e.preventDefault();
-				e.stopPropagation();
-				setPaletteOpen(true);
-				return false;
-			}
-		};
+		// Cmd/Ctrl+P: Command palette
+		if (mod && e.key === 'p') {
+			e.preventDefault();
+			e.stopPropagation();
+			setPaletteOpen(true);
+			return false;
+		}
+	};
 
-		// Use window instead of document, and capture phase
-		window.addEventListener('keydown', handleKeyDown, { capture: true });
-		return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-	});
+	// Register keyboard shortcuts once
+	window.addEventListener('keydown', handleKeyDown, { capture: true });
+	// Note: In a real app, you'd use onCleanup() to remove the listener
+	// but for a single-page app that runs for the entire session, this is fine
 
 	const onRename = async (oldPath: string, newName: string) => {
 		console.log('onRename called:', { oldPath, newName });
@@ -1600,6 +1708,48 @@ export const Home = () => {
 		} catch (e) {
 			console.error("Delete failed:", e);
 			alert(`Delete failed: ${e}`);
+		}
+	};
+
+	const onMove = async (filePath: string, targetFolder: string) => {
+		const fileName = filePath.split("/").pop()!;
+		const newPath = joinPath(targetFolder, fileName);
+		
+		if (filePath === newPath) return; // No change
+		
+		try {
+			await api.rename(filePath, newPath);
+			await refetchTree();
+			
+			// Update tabs and selection
+			const tabs = openTabs();
+			const idx = tabs.indexOf(filePath);
+			if (idx !== -1) {
+				const newTabs = [...tabs];
+				newTabs[idx] = newPath;
+				setOpenTabs(newTabs);
+				
+				if (selectedFile() === filePath) {
+					setSelectedFile(newPath);
+				}
+			}
+			
+			// Update file store
+			setFileStore(produce((store) => {
+				if (store[filePath]) {
+					store[newPath] = store[filePath];
+					delete store[filePath];
+				}
+			}));
+			
+			// Ensure target folder is expanded
+			if (targetFolder) {
+				const next = new Set(openFolders());
+				next.add(targetFolder);
+				setOpenFolders(next);
+			}
+		} catch (e) {
+			console.error("Move failed:", e);
 		}
 	};
 
@@ -1714,6 +1864,12 @@ export const Home = () => {
 							cancelPending={cancelPending}
 							onRename={onRename}
 							onDelete={onDelete}
+							activeFolder={activeFolder()}
+							draggedFile={draggedFile()}
+							setDraggedFile={setDraggedFile}
+							dropTarget={dropTarget()}
+							setDropTarget={setDropTarget}
+							onMove={onMove}
 						/>
 					</Show>
 				</div>

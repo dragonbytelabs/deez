@@ -117,6 +117,28 @@ func RegisterApi(mux *http.ServeMux, v *vault.Vault) {
 		writeJSON(w, map[string]bool{"ok": true})
 	})
 
+	mux.HandleFunc("POST /api/folder", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Path string `json:"path"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid json body", 400)
+			return
+		}
+
+		if req.Path == "" {
+			http.Error(w, "path required", 400)
+			return
+		}
+
+		if err := v.CreateFolder(r.Context(), req.Path); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+
 	mux.HandleFunc("DELETE /api/folder", func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Query().Get("path")
 		if p == "" {
