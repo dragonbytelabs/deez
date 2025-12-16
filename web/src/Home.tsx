@@ -597,6 +597,284 @@ function buildTreeFromEntries(entries: Entry[]): TreeNode[] {
 }
 
 /* =======================
+   Command Palette
+======================= */
+
+const paletteOverlay = css`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  z-index: 1000;
+`;
+
+const paletteModal = css`
+  width: 90%;
+  max-width: 600px;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+`;
+
+const paletteInput = css`
+  width: 100%;
+  padding: 16px 20px;
+  background: #1e1e1e;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 16px;
+  outline: none;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+`;
+
+const paletteResults = css`
+  max-height: 400px;
+  overflow-y: auto;
+`;
+
+const paletteItem = css`
+  padding: 12px 20px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.1s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+`;
+
+const paletteItemActive = css`
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+`;
+
+const paletteItemIcon = css`
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+  flex-shrink: 0;
+`;
+
+const paletteItemLabel = css`
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const paletteItemKind = css`
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const paletteEmpty = css`
+  padding: 40px 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+`;
+
+type PaletteAction = {
+	type: 'action';
+	id: string;
+	label: string;
+	icon: string;
+	onSelect: () => void;
+};
+
+type PaletteFile = {
+	type: 'file';
+	path: string;
+	name: string;
+};
+
+type PaletteItem = PaletteAction | PaletteFile;
+
+function CommandPalette(props: {
+	isOpen: boolean;
+	onClose: () => void;
+	files: Entry[];
+	onOpenFile: (path: string) => void;
+	onNewNote: () => void;
+	onNewFolder: () => void;
+	onTogglePreview: () => void;
+	onCollapseAll: () => void;
+}) {
+	const [query, setQuery] = createSignal("");
+	const [selectedIndex, setSelectedIndex] = createSignal(0);
+
+	// Build combined list of actions + files
+	const items = createMemo((): PaletteItem[] => {
+		const q = query().toLowerCase();
+		
+		// Actions (always shown at top)
+		const actions: PaletteAction[] = [
+			{
+				type: 'action',
+				id: 'new-note',
+				label: 'New Note',
+				icon: '📝',
+				onSelect: () => {
+					props.onClose();
+					props.onNewNote();
+				}
+			},
+			{
+				type: 'action',
+				id: 'new-folder',
+				label: 'New Folder',
+				icon: '📁',
+				onSelect: () => {
+					props.onClose();
+					props.onNewFolder();
+				}
+			},
+			{
+				type: 'action',
+				id: 'toggle-preview',
+				label: 'Toggle Preview',
+				icon: '👁',
+				onSelect: () => {
+					props.onClose();
+					props.onTogglePreview();
+				}
+			},
+			{
+				type: 'action',
+				id: 'collapse-all',
+				label: 'Collapse All Folders',
+				icon: '⬆',
+				onSelect: () => {
+					props.onClose();
+					props.onCollapseAll();
+				}
+			}
+		];
+
+		// Filter files by query
+		const files: PaletteFile[] = props.files
+			.filter(e => e.kind === 'file')
+			.filter(e => !q || e.path.toLowerCase().includes(q) || e.name.toLowerCase().includes(q))
+			.map(e => ({
+				type: 'file' as const,
+				path: e.path,
+				name: e.name
+			}));
+
+		// If there's a query, show only matching files; otherwise show actions + all files
+		if (q) {
+			return files;
+		}
+		return [...actions, ...files];
+	});
+
+	// Reset selected index when items change
+	createEffect(() => {
+		items(); // Track dependency
+		setSelectedIndex(0);
+	});
+
+	const handleKeyDown = (e: KeyboardEvent) => {
+		const itemsCount = items().length;
+		
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			setSelectedIndex((selectedIndex() + 1) % itemsCount);
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			setSelectedIndex((selectedIndex() - 1 + itemsCount) % itemsCount);
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			const item = items()[selectedIndex()];
+			if (item) {
+				if (item.type === 'action') {
+					item.onSelect();
+				} else {
+					props.onClose();
+					props.onOpenFile(item.path);
+				}
+			}
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			props.onClose();
+		}
+	};
+
+	return (
+		<Show when={props.isOpen}>
+			<div class={paletteOverlay} onClick={props.onClose}>
+				<div class={paletteModal} onClick={(e) => e.stopPropagation()}>
+					<input
+						class={paletteInput}
+						type="text"
+						placeholder="Type to search files or choose an action..."
+						value={query()}
+						onInput={(e) => setQuery(e.currentTarget.value)}
+						onKeyDown={handleKeyDown}
+						autofocus
+					/>
+					<div class={paletteResults}>
+						<Show
+							when={items().length > 0}
+							fallback={
+								<div class={paletteEmpty}>
+									No results found
+								</div>
+							}
+						>
+							<For each={items()}>
+								{(item, index) => (
+									<div
+										class={`${paletteItem} ${selectedIndex() === index() ? paletteItemActive : ""}`}
+										onClick={() => {
+											if (item.type === 'action') {
+												item.onSelect();
+											} else {
+												props.onClose();
+												props.onOpenFile(item.path);
+											}
+										}}
+										onMouseEnter={() => setSelectedIndex(index())}
+									>
+										<span class={paletteItemIcon}>
+											{item.type === 'action' ? item.icon : '📄'}
+										</span>
+										<span class={paletteItemLabel}>
+											{item.type === 'action' ? item.label : item.name}
+										</span>
+										<span class={paletteItemKind}>
+											{item.type === 'action' ? 'action' : item.type === 'file' ? 'file' : ''}
+										</span>
+									</div>
+								)}
+							</For>
+						</Show>
+					</div>
+				</div>
+			</div>
+		</Show>
+	);
+}
+
+/* =======================
    Icon helpers
 ======================= */
 
@@ -840,8 +1118,25 @@ export const Home = () => {
 
 	const treeNodes = createMemo(() => buildTreeFromEntries(entries() ?? []));
 
-	const [openFolders, setOpenFolders] = createSignal<Set<string>>(new Set());
-	const [selectedFile, setSelectedFile] = createSignal<string>("");
+	// Load persisted state from localStorage
+	const loadPersistedState = () => {
+		try {
+			const stored = localStorage.getItem('deez-ui-state');
+			if (stored) {
+				return JSON.parse(stored);
+			}
+		} catch (e) {
+			console.error('Failed to load persisted state:', e);
+		}
+		return null;
+	};
+
+	const persistedState = loadPersistedState();
+
+	const [openFolders, setOpenFolders] = createSignal<Set<string>>(
+		persistedState?.openFolders ? new Set(persistedState.openFolders) : new Set()
+	);
+	const [selectedFile, setSelectedFile] = createSignal<string>(persistedState?.selectedFile || "");
 	const [newlyCreatedFile, setNewlyCreatedFile] = createSignal<string>("");
 
 	const [isSaving, setIsSaving] = createSignal(false);
@@ -849,10 +1144,28 @@ export const Home = () => {
 	const [pending, setPending] = createSignal<PendingCreate>(null);
 	const [pendingName, setPendingName] = createSignal("");
 
-	const [sidebarWidth, setSidebarWidth] = createSignal(320);
+	const [sidebarWidth, setSidebarWidth] = createSignal(persistedState?.sidebarWidth || 320);
 
-	const [openTabs, setOpenTabs] = createSignal<string[]>([]);
+	const [openTabs, setOpenTabs] = createSignal<string[]>(persistedState?.openTabs || []);
 	const [viewMode, setViewMode] = createSignal<"edit" | "preview">("edit");
+
+	// Command palette state
+	const [paletteOpen, setPaletteOpen] = createSignal(false);
+
+	// Persist UI state to localStorage
+	createEffect(() => {
+		const state = {
+			sidebarWidth: sidebarWidth(),
+			openFolders: Array.from(openFolders()),
+			openTabs: openTabs(),
+			selectedFile: selectedFile()
+		};
+		try {
+			localStorage.setItem('deez-ui-state', JSON.stringify(state));
+		} catch (e) {
+			console.error('Failed to persist state:', e);
+		}
+	});
 
 	// File state store - the single source of truth for all file content
 	const [fileStore, setFileStore] = createStore<FileStore>({});
@@ -1231,10 +1544,9 @@ export const Home = () => {
 
 			// Cmd/Ctrl+P: Command palette
 			if (mod && e.key === 'p') {
-				console.log('Cmd+P triggered');
 				e.preventDefault();
 				e.stopPropagation();
-				console.log('Command palette');
+				setPaletteOpen(true);
 				return false;
 			}
 		};
@@ -1533,6 +1845,18 @@ export const Home = () => {
 					</Show>
 				</div>
 			</div>
+
+			{/* Command Palette */}
+			<CommandPalette
+				isOpen={paletteOpen()}
+				onClose={() => setPaletteOpen(false)}
+				files={entries() ?? []}
+				onOpenFile={openInTab}
+				onNewNote={onNewNote}
+				onNewFolder={onNewFolder}
+				onTogglePreview={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
+				onCollapseAll={collapseAll}
+			/>
 		</div>
 	);
 };
