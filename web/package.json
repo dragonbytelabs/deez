@@ -14,7 +14,14 @@
 	"dependencies": {
 		"@linaria/core": "^6.3.0",
 		"@solidjs/router": "^0.15.3",
+		"@types/js-yaml": "^4.0.9",
 		"@wyw-in-js/vite": "^0.7.0",
+		"d3-drag": "^3.0.0",
+		"d3-force": "^3.0.0",
+		"d3-selection": "^3.0.0",
+		"d3-zoom": "^3.0.0",
+		"highlight.js": "^11.11.1",
+		"js-yaml": "^4.1.1",
 		"marked": "^17.0.1",
 		"solid-js": "^1.9.5"
 	},

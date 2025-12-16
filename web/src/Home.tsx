@@ -2,6 +2,9 @@ import { css } from "@linaria/core";
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { marked } from "marked";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
+import yaml from "js-yaml";
 import { api, type Entry } from "./server/api";
 
 /* =======================
@@ -515,7 +518,7 @@ const rowActiveFolder = css`
 
 const editor = css`
   width: 100%;
-  min-height: 100%;
+  min-height: calc(100% - 60px);
   padding: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
@@ -524,6 +527,275 @@ const editor = css`
   resize: none;
   background: transparent;
   color: #ffffff;
+`;
+
+const tagGutter = css`
+  position: sticky;
+  bottom: 0;
+  background: #1e1e1e;
+  border-top: 1px solid #3c3c3c;
+  padding: 12px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+`;
+
+const tagItem = css`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(96, 165, 250, 0.3);
+    border-color: rgba(96, 165, 250, 0.5);
+  }
+`;
+
+const tagRemove = css`
+  opacity: 0.7;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  
+  &:hover {
+    opacity: 1;
+    color: #ffffff;
+  }
+`;
+
+const tagAddBtn = css`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  border: 1px dashed #3c3c3c;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+`;
+
+const frontmatterPanel = css`
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #cccccc;
+`;
+
+const frontmatterHeader = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  font-weight: 600;
+`;
+
+const frontmatterGrid = css`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+`;
+
+const frontmatterField = css`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const frontmatterLabel = css`
+  font-size: 11px;
+  color: #888;
+  font-weight: 500;
+`;
+
+const frontmatterInput = css`
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #ffffff;
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+
+  &:focus {
+    border-color: #60a5fa;
+  }
+
+  &::placeholder {
+    color: #666;
+  }
+`;
+
+const frontmatterSelect = css`
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #ffffff;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+
+  &:focus {
+    border-color: #60a5fa;
+  }
+`;
+
+const frontmatterBtn = css`
+  background: rgba(96, 165, 250, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: #60a5fa;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(96, 165, 250, 0.25);
+    border-color: rgba(96, 165, 250, 0.5);
+  }
+`;
+
+const linksPanel = css`
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #cccccc;
+  max-height: 200px;
+  overflow-y: auto;
+`;
+
+const linksHeader = css`
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  font-weight: 600;
+  margin-bottom: 8px;
+`;
+
+const linksList = css`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const linkItem = css`
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &:hover {
+    background: rgba(96, 165, 250, 0.15);
+  }
+`;
+
+const linkIcon = css`
+  opacity: 0.5;
+  font-size: 14px;
+`;
+
+const linkText = css`
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const graphOverlay = css`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+`;
+
+const graphContainer = css`
+  width: 90%;
+  height: 90%;
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+`;
+
+const graphHeader = css`
+  padding: 16px;
+  border-bottom: 1px solid #3c3c3c;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #252526;
+`;
+
+const graphTitle = css`
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+`;
+
+const graphClose = css`
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+`;
+
+const graphCanvas = css`
+  width: 100%;
+  height: calc(100% - 64px);
 `;
 
 /* =======================
@@ -543,6 +815,78 @@ type PendingCreate =
 		tempId: string;
 	};
 
+interface Frontmatter {
+	title?: string;
+	id?: string;
+	created?: string;
+	updated?: string;
+	tags?: string[];
+	aliases?: string[];
+	status?: 'draft' | 'active' | 'done' | 'archived';
+	type?: 'note' | 'project' | 'meeting' | 'daily';
+	[key: string]: any;
+}
+
+interface NoteLink {
+	raw: string;        // The full match text
+	target: string;     // The link target (id/title/path)
+	displayText?: string; // Optional display text (for markdown links)
+	kind: 'wiki' | 'markdown'; // [[wiki]] or [text](path)
+	position: number;   // Character position in the text
+}
+
+interface NoteMetadata {
+	path: string;
+	id?: string;
+	title?: string;
+	aliases?: string[];
+	outgoingLinks: NoteLink[];
+	backlinks: string[]; // Paths of notes that link to this one
+}
+
+/* =======================
+   Plugin API
+======================= */
+
+interface ParsedNote {
+	frontmatter: Frontmatter | null;
+	body: string;
+	links: NoteLink[];
+	tags: string[];
+}
+
+interface PluginCommand {
+	id: string;
+	label: string;
+	icon?: string;
+	run: () => void | Promise<void>;
+}
+
+interface PluginPanel {
+	id: string;
+	render: (context: { currentFile: string | null; notesIndex: Record<string, NoteMetadata> }) => any;
+}
+
+interface PluginHooks {
+	// Lifecycle hooks
+	onCreateNote?: (filePath: string) => string | Promise<string>; // Return initial content
+	onParse?: (content: string, filePath: string) => ParsedNote | Promise<ParsedNote>;
+	onSave?: (context: { path: string; content: string; parsed: ParsedNote }) => void | Promise<void>;
+	onRename?: (oldPath: string, newPath: string) => void | Promise<void>;
+	onDelete?: (path: string) => void | Promise<void>;
+	
+	// Extension points
+	commands?: PluginCommand[];
+	panels?: PluginPanel[];
+}
+
+interface Plugin {
+	id: string;
+	name: string;
+	version: string;
+	hooks: PluginHooks;
+}
+
 function joinPath(parent: string, name: string) {
 	if (!parent) return name;
 	return `${parent.replace(/\/+$/, "")}/${name.replace(/^\/+/, "")}`;
@@ -554,19 +898,9 @@ function normalizeMarkdownName(name: string) {
 	return raw.toLowerCase().endsWith(".md") ? raw : `${raw}.md`;
 }
 
-// Zettelkasten default name (stub for plugin behavior)
+// Zettelkasten default name (uses stable ID format)
 function formatZettelDefaultName() {
-	const d = new Date();
-	const pad = (n: number) => String(n).padStart(2, "0");
-	const yyyy = d.getFullYear();
-	const mm = pad(d.getMonth() + 1);
-	const dd = pad(d.getDate());
-	const hh = pad(d.getHours());
-	const mi = pad(d.getMinutes());
-	const ss = pad(d.getSeconds());
-	// Add seconds and a random suffix to prevent collisions
-	const rand = Math.random().toString(36).substring(2, 5);
-	return `${yyyy}${mm}${dd}${hh}${mi}${ss}-${rand}.md`;
+	return `${generateZettelId()}.md`;
 }
 
 function buildTreeFromEntries(entries: Entry[]): TreeNode[] {
@@ -616,6 +950,282 @@ function buildTreeFromEntries(entries: Entry[]): TreeNode[] {
 
 	return finalize(root);
 }
+
+/* =======================
+   Frontmatter Helpers
+======================= */
+
+interface ParsedContent {
+	frontmatter: Frontmatter | null;
+	body: string;
+	raw: string;
+}
+
+function parseFrontmatter(content: string): ParsedContent {
+	const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/;
+	const match = content.match(frontmatterRegex);
+	
+	if (match) {
+		try {
+			const frontmatter = yaml.load(match[1]) as Frontmatter;
+			return {
+				frontmatter,
+				body: match[2],
+				raw: content
+			};
+		} catch (e) {
+			console.error('Failed to parse frontmatter:', e);
+		}
+	}
+	
+	return {
+		frontmatter: null,
+		body: content,
+		raw: content
+	};
+}
+
+function serializeFrontmatter(frontmatter: Frontmatter, body: string): string {
+	if (!frontmatter || Object.keys(frontmatter).length === 0) {
+		return body;
+	}
+	
+	const yamlStr = yaml.dump(frontmatter, {
+		indent: 2,
+		lineWidth: -1,
+		noRefs: true,
+		sortKeys: false
+	}).trim();
+	
+	return `---\n${yamlStr}\n---\n\n${body}`;
+}
+
+function createDefaultFrontmatter(filePath: string): Frontmatter {
+	const fileName = filePath.split('/').pop() || '';
+	const title = fileName.replace(/\.md$/, '').replace(/-/g, ' ');
+	const now = new Date().toISOString();
+	
+	// Extract ID from zettelkasten filename (YYYYMMDDHHMMSS-rand)
+	const zettelMatch = fileName.match(/^(\d{14}-[a-z0-9]+)/);
+	const id = zettelMatch ? zettelMatch[1] : fileName.replace(/\.md$/, '');
+	
+	return {
+		title,
+		id,
+		created: now,
+		updated: now,
+		tags: [],
+		aliases: [],
+		status: 'draft',
+		type: 'note'
+	};
+}
+
+/**
+ * Extract all links from note body content
+ * Supports both [[Wiki Links]] and [Markdown](links.md)
+ */
+function extractLinks(body: string): NoteLink[] {
+	const links: NoteLink[] = [];
+	
+	// Extract [[Wiki Links]] - simple format [[target]] or [[target|display]]
+	const wikiRegex = /\[\[([^\]]+)\]\]/g;
+	let match: RegExpExecArray | null;
+	
+	while ((match = wikiRegex.exec(body)) !== null) {
+		const content = match[1];
+		const parts = content.split('|');
+		const target = parts[0].trim();
+		const displayText = parts[1]?.trim();
+		
+		links.push({
+			raw: match[0],
+			target,
+			displayText,
+			kind: 'wiki',
+			position: match.index
+		});
+	}
+	
+	// Extract [Markdown](links.md) - only .md files
+	const mdRegex = /\[([^\]]+)\]\(([^)]+\.md)\)/g;
+	
+	while ((match = mdRegex.exec(body)) !== null) {
+		links.push({
+			raw: match[0],
+			target: match[2],
+			displayText: match[1],
+			kind: 'markdown',
+			position: match.index
+		});
+	}
+	
+	return links;
+}
+
+/**
+ * Generate a stable zettelkasten ID for a new note
+ */
+function generateZettelId(): string {
+	const d = new Date();
+	const pad = (n: number) => String(n).padStart(2, "0");
+	const yyyy = d.getFullYear();
+	const mm = pad(d.getMonth() + 1);
+	const dd = pad(d.getDate());
+	const hh = pad(d.getHours());
+	const mi = pad(d.getMinutes());
+	const ss = pad(d.getSeconds());
+	const rand = Math.random().toString(36).substring(2, 5);
+	return `${yyyy}${mm}${dd}${hh}${mi}${ss}-${rand}`;
+}
+
+/* =======================
+   Built-in Plugins
+======================= */
+
+/**
+ * Built-in Zettelkasten plugin
+ * Encapsulates ZK-specific behaviors for note creation and parsing
+ */
+const zettelkastenPlugin: Plugin = {
+	id: 'core.zettelkasten',
+	name: 'Zettelkasten',
+	version: '1.0.0',
+	hooks: {
+		onCreateNote: (filePath: string) => {
+			// Generate frontmatter with stable ID
+			const frontmatter = createDefaultFrontmatter(filePath);
+			return serializeFrontmatter(frontmatter, "");
+		},
+		
+		onParse: (content: string, _filePath: string) => {
+			const parsed = parseFrontmatter(content);
+			const links = extractLinks(parsed.body);
+			
+			// Extract hashtags from body
+			const tagRegex = /(?:^|[^#\w])#([a-zA-Z][a-zA-Z0-9_-]*)/g;
+			const matches = Array.from(parsed.body.matchAll(tagRegex));
+			const tags = Array.from(new Set(matches.map(m => m[1]))).sort();
+			
+			return {
+				frontmatter: parsed.frontmatter,
+				body: parsed.body,
+				links,
+				tags
+			};
+		},
+		
+		onSave: async (context) => {
+			// Hook for future enhancements (e.g., update backlink files)
+			console.log(`[Zettelkasten] Saved: ${context.path}`);
+		}
+	}
+};
+
+/**
+ * Plugin registry - plugins can be dynamically registered here
+ */
+class PluginRegistry {
+	private plugins: Map<string, Plugin> = new Map();
+	
+	constructor() {
+		// Register built-in plugins
+		this.register(zettelkastenPlugin);
+	}
+	
+	register(plugin: Plugin) {
+		this.plugins.set(plugin.id, plugin);
+		console.log(`[Plugin] Registered: ${plugin.name} v${plugin.version}`);
+	}
+	
+	unregister(pluginId: string) {
+		this.plugins.delete(pluginId);
+	}
+	
+	getAll(): Plugin[] {
+		return Array.from(this.plugins.values());
+	}
+	
+	get(pluginId: string): Plugin | undefined {
+		return this.plugins.get(pluginId);
+	}
+	
+	// Execute hooks across all plugins
+	async executeOnCreateNote(filePath: string): Promise<string> {
+		let content = "";
+		for (const plugin of this.plugins.values()) {
+			if (plugin.hooks.onCreateNote) {
+				const result = await plugin.hooks.onCreateNote(filePath);
+				if (result) content = result;
+			}
+		}
+		return content;
+	}
+	
+	async executeOnParse(content: string, filePath: string): Promise<ParsedNote> {
+		let result: ParsedNote = {
+			frontmatter: null,
+			body: content,
+			links: [],
+			tags: []
+		};
+		
+		for (const plugin of this.plugins.values()) {
+			if (plugin.hooks.onParse) {
+				result = await plugin.hooks.onParse(content, filePath);
+			}
+		}
+		
+		return result;
+	}
+	
+	async executeOnSave(context: { path: string; content: string; parsed: ParsedNote }) {
+		for (const plugin of this.plugins.values()) {
+			if (plugin.hooks.onSave) {
+				await plugin.hooks.onSave(context);
+			}
+		}
+	}
+	
+	async executeOnRename(oldPath: string, newPath: string) {
+		for (const plugin of this.plugins.values()) {
+			if (plugin.hooks.onRename) {
+				await plugin.hooks.onRename(oldPath, newPath);
+			}
+		}
+	}
+	
+	async executeOnDelete(path: string) {
+		for (const plugin of this.plugins.values()) {
+			if (plugin.hooks.onDelete) {
+				await plugin.hooks.onDelete(path);
+			}
+		}
+	}
+	
+	getAllCommands(): PluginCommand[] {
+		const commands: PluginCommand[] = [];
+		for (const plugin of this.plugins.values()) {
+			if (plugin.hooks.commands) {
+				commands.push(...plugin.hooks.commands);
+			}
+		}
+		return commands;
+	}
+	
+	getAllPanels(): PluginPanel[] {
+		const panels: PluginPanel[] = [];
+		for (const plugin of this.plugins.values()) {
+			if (plugin.hooks.panels) {
+				panels.push(...plugin.hooks.panels);
+			}
+		}
+		return panels;
+	}
+}
+
+// Global plugin registry instance
+const pluginRegistry = new PluginRegistry();
 
 /* =======================
    Command Palette
@@ -738,6 +1348,8 @@ function CommandPalette(props: {
 	onNewFolder: () => void;
 	onTogglePreview: () => void;
 	onCollapseAll: () => void;
+	notesIndex?: Record<string, NoteMetadata>;
+	fileStore?: Record<string, FileState>;
 }) {
 	const [query, setQuery] = createSignal("");
 	const [selectedIndex, setSelectedIndex] = createSignal(0);
@@ -752,7 +1364,7 @@ function CommandPalette(props: {
 
 	// Build combined list of actions + files
 	const items = createMemo((): PaletteItem[] => {
-		const q = query().toLowerCase();
+		const searchQuery = query().toLowerCase();
 
 		// Actions (always shown at top)
 		const actions: PaletteAction[] = [
@@ -795,13 +1407,64 @@ function CommandPalette(props: {
 					props.onClose();
 					props.onCollapseAll();
 				}
-			}
+			},
+			// Add plugin commands
+			...pluginRegistry.getAllCommands().map((cmd): PaletteAction => ({
+				type: 'action',
+				id: cmd.id,
+				label: cmd.label,
+				icon: cmd.icon || '🔌',
+				onSelect: () => {
+					props.onClose();
+					cmd.run();
+				}
+			}))
 		];
 
 		// Filter files by query
 		const files: PaletteFile[] = props.files
 			.filter(e => e.kind === 'file')
-			.filter(e => !q || e.path.toLowerCase().includes(q) || e.name.toLowerCase().includes(q))
+			.filter(e => {
+				if (!searchQuery) return true;
+				
+				// Match by filename/path
+				if (e.path.toLowerCase().includes(searchQuery) || e.name.toLowerCase().includes(searchQuery)) {
+					return true;
+				}
+
+				// Enhanced search: check frontmatter and content
+				if (props.notesIndex && props.fileStore) {
+					const noteData = props.notesIndex[e.path];
+					
+					// Search in title
+					if (noteData?.title?.toLowerCase().includes(searchQuery)) return true;
+					
+					// Search in ID
+					if (noteData?.id?.toLowerCase().includes(searchQuery)) return true;
+					
+					// Search in aliases
+					if (noteData?.aliases?.some(a => a.toLowerCase().includes(searchQuery))) return true;
+					
+					// Search in frontmatter tags
+					const fileData = props.fileStore[e.path];
+					if (fileData) {
+						const content = fileData.draftContent || fileData.savedContent;
+						const parsed = parseFrontmatter(content);
+						
+						// Search in frontmatter tags
+						if (parsed.frontmatter?.tags?.some(t => t.toLowerCase().includes(searchQuery))) {
+							return true;
+						}
+						
+						// Search in body content (simple full-text)
+						if (parsed.body.toLowerCase().includes(searchQuery)) {
+							return true;
+						}
+					}
+				}
+				
+				return false;
+			})
 			.map(e => ({
 				type: 'file' as const,
 				path: e.path,
@@ -809,7 +1472,7 @@ function CommandPalette(props: {
 			}));
 
 		// If there's a query, show only matching files; otherwise show actions + all files
-		if (q) {
+		if (searchQuery) {
 			return files;
 		}
 		return [...actions, ...files];
@@ -907,6 +1570,159 @@ function CommandPalette(props: {
 							</For>
 						</Show>
 					</div>
+				</div>
+			</div>
+		</Show>
+	);
+}
+
+/* =======================
+   Local Graph View
+======================= */
+
+function LocalGraphView(props: {
+	isOpen: boolean;
+	onClose: () => void;
+	currentPath: string | null;
+	notesIndex: Record<string, NoteMetadata>;
+	onOpenFile: (path: string) => void;
+}) {
+	let svgRef: SVGSVGElement | undefined;
+
+	createEffect(() => {
+		if (!props.isOpen || !svgRef || !props.currentPath) return;
+
+		const current = props.notesIndex[props.currentPath];
+		if (!current) return;
+
+		// Build simple graph: current note + neighbors
+		const nodes: Array<{id: string; label: string; isCurrent: boolean}> = [];
+		const links: Array<{source: string; target: string}> = [];
+
+		// Add current note
+		nodes.push({
+			id: props.currentPath,
+			label: current.title || props.currentPath.split('/').pop() || '',
+			isCurrent: true
+		});
+
+		// Add outgoing links as nodes
+		for (const link of current.outgoingLinks) {
+			const targetPath = Object.keys(props.notesIndex).find(p => {
+				const note = props.notesIndex[p];
+				return note.id === link.target || 
+					note.title === link.target || 
+					p === link.target ||
+					(note.aliases || []).includes(link.target);
+			});
+
+			if (targetPath && !nodes.find(n => n.id === targetPath)) {
+				const targetNote = props.notesIndex[targetPath];
+				nodes.push({
+					id: targetPath,
+					label: targetNote?.title || targetPath.split('/').pop() || '',
+					isCurrent: false
+				});
+				links.push({ source: props.currentPath, target: targetPath });
+			}
+		}
+
+		// Add backlinks as nodes
+		for (const backlink of current.backlinks) {
+			if (!nodes.find(n => n.id === backlink)) {
+				const backlinkNote = props.notesIndex[backlink];
+				nodes.push({
+					id: backlink,
+					label: backlinkNote?.title || backlink.split('/').pop() || '',
+					isCurrent: false
+				});
+			}
+			links.push({ source: backlink, target: props.currentPath });
+		}
+
+		// Simple SVG rendering (no force simulation for simplicity)
+		const width = svgRef.clientWidth;
+		const height = svgRef.clientHeight;
+		const centerX = width / 2;
+		const centerY = height / 2;
+		const radius = Math.min(width, height) / 3;
+
+		svgRef.innerHTML = '';
+
+		// Position nodes in a circle around current
+		const angleStep = (2 * Math.PI) / Math.max(1, nodes.length - 1);
+		const positions = new Map<string, {x: number; y: number}>();
+
+		nodes.forEach((node, i) => {
+			if (node.isCurrent) {
+				positions.set(node.id, { x: centerX, y: centerY });
+			} else {
+				const angle = angleStep * (i - 1);
+				positions.set(node.id, {
+					x: centerX + radius * Math.cos(angle),
+					y: centerY + radius * Math.sin(angle)
+				});
+			}
+		});
+
+		// Draw links
+		links.forEach(link => {
+			const source = positions.get(link.source);
+			const target = positions.get(link.target);
+			if (!source || !target) return;
+
+			const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+			line.setAttribute('x1', String(source.x));
+			line.setAttribute('y1', String(source.y));
+			line.setAttribute('x2', String(target.x));
+			line.setAttribute('y2', String(target.y));
+			line.setAttribute('stroke', '#3c3c3c');
+			line.setAttribute('stroke-width', '2');
+			svgRef.appendChild(line);
+		});
+
+		// Draw nodes
+		nodes.forEach(node => {
+			const pos = positions.get(node.id);
+			if (!pos) return;
+
+			const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+			g.style.cursor = 'pointer';
+			g.onclick = () => props.onOpenFile(node.id);
+
+			const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+			circle.setAttribute('cx', String(pos.x));
+			circle.setAttribute('cy', String(pos.y));
+			circle.setAttribute('r', node.isCurrent ? '12' : '8');
+			circle.setAttribute('fill', node.isCurrent ? '#60a5fa' : '#3c3c3c');
+			circle.setAttribute('stroke', node.isCurrent ? '#60a5fa' : '#666');
+			circle.setAttribute('stroke-width', '2');
+
+			const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+			text.setAttribute('x', String(pos.x));
+			text.setAttribute('y', String(pos.y - 20));
+			text.setAttribute('text-anchor', 'middle');
+			text.setAttribute('fill', '#ffffff');
+			text.setAttribute('font-size', '12');
+			text.textContent = node.label.length > 20 ? node.label.substring(0, 20) + '...' : node.label;
+
+			g.appendChild(circle);
+			g.appendChild(text);
+			svgRef.appendChild(g);
+		});
+	});
+
+	return (
+		<Show when={props.isOpen}>
+			<div class={graphOverlay} onClick={props.onClose}>
+				<div class={graphContainer} onClick={(e) => e.stopPropagation()}>
+					<div class={graphHeader}>
+						<div class={graphTitle}>
+							Local Graph: {props.currentPath ? (props.notesIndex[props.currentPath]?.title || props.currentPath.split('/').pop()) : ''}
+						</div>
+						<button class={graphClose} onClick={props.onClose}>×</button>
+					</div>
+					<svg ref={svgRef} class={graphCanvas} />
 				</div>
 			</div>
 		</Show>
@@ -1327,6 +2143,170 @@ export const Home = () => {
 	// Preview tab state (VS Code-style single-click preview)
 	const [previewTab, setPreviewTab] = createSignal<string>("");
 
+	// Frontmatter state
+	const [showFrontmatter, setShowFrontmatter] = createSignal(true);
+
+	// Graph view state
+	const [graphOpen, setGraphOpen] = createSignal(false);
+
+	// Zettelkasten: Backlinks index (note path -> metadata)
+	const [notesIndex, setNotesIndex] = createStore<Record<string, NoteMetadata>>({});
+
+	// Rebuild the backlinks index when files change
+	const rebuildIndex = async () => {
+		const allEntries = entries();
+		if (!allEntries) return;
+
+		const files = allEntries.filter(e => e.kind === "file" && e.path.endsWith('.md'));
+		const newIndex: Record<string, NoteMetadata> = {};
+
+		// First pass: extract all links and metadata
+		for (const file of files) {
+			try {
+				const content = fileStore[file.path]?.draftContent || fileStore[file.path]?.savedContent;
+				if (!content) {
+					// File not loaded yet, skip for now
+					newIndex[file.path] = {
+						path: file.path,
+						outgoingLinks: [],
+						backlinks: []
+					};
+					continue;
+				}
+
+				const parsed = parseFrontmatter(content);
+				const links = extractLinks(parsed.body);
+
+				newIndex[file.path] = {
+					path: file.path,
+					id: parsed.frontmatter?.id,
+					title: parsed.frontmatter?.title,
+					aliases: parsed.frontmatter?.aliases || [],
+					outgoingLinks: links,
+					backlinks: [] // Will populate in second pass
+				};
+			} catch (e) {
+				console.error(`Failed to index ${file.path}:`, e);
+			}
+		}
+
+		// Second pass: build backlinks
+		for (const sourcePath in newIndex) {
+			const sourceNote = newIndex[sourcePath];
+			for (const link of sourceNote.outgoingLinks) {
+				// Resolve link target to actual file path
+				const targetPath = resolveLinkTarget(link.target, newIndex);
+				if (targetPath && newIndex[targetPath]) {
+					if (!newIndex[targetPath].backlinks.includes(sourcePath)) {
+						newIndex[targetPath].backlinks.push(sourcePath);
+					}
+				}
+			}
+		}
+
+		setNotesIndex(newIndex);
+	};
+
+	// Resolve a link target ([[id-or-title]]) to actual file path
+	const resolveLinkTarget = (target: string, index: Record<string, NoteMetadata>): string | null => {
+		// Try exact ID match first
+		for (const path in index) {
+			if (index[path].id === target) return path;
+		}
+
+		// Try exact filename match (with or without .md)
+		const targetWithExt = target.endsWith('.md') ? target : `${target}.md`;
+		if (index[targetWithExt]) return targetWithExt;
+
+		// Try title match
+		for (const path in index) {
+			if (index[path].title?.toLowerCase() === target.toLowerCase()) return path;
+		}
+
+		// Try alias match
+		for (const path in index) {
+			const aliases = index[path].aliases || [];
+			if (aliases.some(a => a.toLowerCase() === target.toLowerCase())) return path;
+		}
+
+		return null;
+	};
+
+	// Rebuild index when tree loads or changes
+	createEffect(() => {
+		const tree = entries();
+		if (tree) {
+			rebuildIndex();
+		}
+	});
+
+	// Rebuild index when current file is saved (its links may have changed)
+	const triggerIndexRebuild = () => {
+		setTimeout(() => rebuildIndex(), 100);
+	};
+
+	// Current note's metadata
+	const currentNoteMetadata = createMemo(() => {
+		const file = selectedFile();
+		return file ? notesIndex[file] : null;
+	});
+
+	// Find unlinked mentions of current note in other notes
+	const unlinkedMentions = createMemo(() => {
+		const current = currentNoteMetadata();
+		if (!current) return [];
+
+		const mentions: Array<{ path: string; title: string; context: string }> = [];
+		const searchTerms = [
+			current.title,
+			...(current.aliases || [])
+		].filter(Boolean).map(t => t!.toLowerCase());
+
+		if (searchTerms.length === 0) return [];
+
+		// Search all other notes for mentions of this note's title/aliases
+		for (const path in notesIndex) {
+			if (path === current.path) continue; // Skip current note
+
+			const note = notesIndex[path];
+			
+			// Check if already linked (skip if it is)
+			const alreadyLinked = note.outgoingLinks.some(link => {
+				const resolved = resolveLinkTarget(link.target, notesIndex);
+				return resolved === current.path;
+			});
+			if (alreadyLinked) continue;
+
+			// Check if the note's body mentions any of our search terms
+			const content = fileStore[path]?.draftContent || fileStore[path]?.savedContent;
+			if (!content) continue;
+
+			const parsed = parseFrontmatter(content);
+			const bodyLower = parsed.body.toLowerCase();
+
+			for (const term of searchTerms) {
+				if (bodyLower.includes(term)) {
+					// Extract context (surrounding text)
+					const index = bodyLower.indexOf(term);
+					const start = Math.max(0, index - 40);
+					const end = Math.min(parsed.body.length, index + term.length + 40);
+					const context = (start > 0 ? '...' : '') + 
+						parsed.body.substring(start, end) + 
+						(end < parsed.body.length ? '...' : '');
+
+					mentions.push({
+						path,
+						title: note.title || path.split('/').pop() || path,
+						context
+					});
+					break; // Only add once per note
+				}
+			}
+		}
+
+		return mentions;
+	});
+
 	// Persist UI state to localStorage
 	createEffect(() => {
 		const state = {
@@ -1352,6 +2332,11 @@ export const Home = () => {
 		return fileStore[file]?.draftContent || "";
 	});
 
+	// Computed: parsed frontmatter from current file
+	const currentParsed = createMemo(() => parseFrontmatter(draft()));
+	const currentFrontmatter = createMemo(() => currentParsed().frontmatter);
+	const currentBody = createMemo(() => currentParsed().body);
+
 	// Update draft content for current file
 	const setDraft = (content: string) => {
 		const file = selectedFile();
@@ -1371,6 +2356,29 @@ export const Home = () => {
 		}));
 	};
 
+	// Update frontmatter and rebuild content
+	const updateFrontmatter = (updates: Partial<Frontmatter>) => {
+		const parsed = currentParsed();
+		const fm = parsed.frontmatter || createDefaultFrontmatter(selectedFile()!);
+		const updated = { ...fm, ...updates, updated: new Date().toISOString() };
+		const newContent = serializeFrontmatter(updated, parsed.body);
+		setDraft(newContent);
+	};
+
+	// Add frontmatter if it doesn't exist
+	const addFrontmatter = () => {
+		if (currentFrontmatter()) return;
+		const fm = createDefaultFrontmatter(selectedFile()!);
+		const newContent = serializeFrontmatter(fm, draft());
+		setDraft(newContent);
+	};
+
+	// Remove frontmatter
+	const removeFrontmatter = () => {
+		if (!currentFrontmatter()) return;
+		setDraft(currentBody());
+	};
+
 	// Check if a file has unsaved changes
 	const isFileDirty = (filePath: string) => {
 		const state = fileStore[filePath];
@@ -1378,13 +2386,28 @@ export const Home = () => {
 		return state.draftContent !== state.savedContent;
 	};
 
+	// Configure marked with syntax highlighting
+	marked.setOptions({
+		breaks: true,
+		gfm: true
+	});
+
 	const previewHtml = createMemo(() => {
 		if (!selectedFile() || viewMode() !== "preview") return "";
-		return marked(draft(), {
-			async: false,
-			breaks: true,
-			gfm: true
-		}) as string;
+		
+		// Render only the body (without frontmatter)
+		const content = currentBody();
+		const renderer = new marked.Renderer();
+		
+		renderer.code = (token: { text: string; lang?: string; escaped?: boolean }) => {
+			const code = token.text;
+			const language = token.lang;
+			const validLanguage = language && hljs.getLanguage(language) ? language : 'plaintext';
+			const highlighted = hljs.highlight(code, { language: validLanguage }).value;
+			return `<pre><code class="hljs language-${validLanguage}">${highlighted}</code></pre>`;
+		};
+
+		return marked(content, { renderer }) as string;
 	});
 
 	const [file] = createResource(
@@ -1468,17 +2491,22 @@ export const Home = () => {
 		const filePath = joinPath(parentDir, fileName);
 
 		try {
-			// Create the file immediately
-			await api.createFile(filePath, "");
+			// Use plugin hooks to generate initial content
+			const initialContent = zettelkastenEnabled() 
+				? await pluginRegistry.executeOnCreateNote(filePath)
+				: "";
+			
+			// Create the file with initial content
+			await api.createFile(filePath, initialContent);
 			await refetchTree();
 
 			// Mark as newly created and clear after 2 seconds
 			setNewlyCreatedFile(filePath);
 			setTimeout(() => setNewlyCreatedFile(""), 2000);
 
-			// Open in tab and initialize store
+			// Open in tab and initialize store with content
 			openInTab(filePath);
-			initializeFile(filePath, "");
+			initializeFile(filePath, initialContent);
 			if (parentDir) {
 				const next = new Set(openFolders());
 				next.add(parentDir);
@@ -1534,8 +2562,24 @@ export const Home = () => {
 
 		try {
 			setIsSaving(true);
+			
+			// Auto-update the 'updated' timestamp in frontmatter if it exists
+			let contentToSave = state.draftContent;
+			const parsed = parseFrontmatter(contentToSave);
+			if (parsed.frontmatter) {
+				const updatedFm = { ...parsed.frontmatter, updated: new Date().toISOString() };
+				contentToSave = serializeFrontmatter(updatedFm, parsed.body);
+				
+				// Update the draft content to reflect the timestamp change
+				setFileStore(produce((store) => {
+					if (store[p]) {
+						store[p].draftContent = contentToSave;
+					}
+				}));
+			}
+			
 			const res = await api.writeFile(p, {
-				content: state.draftContent,
+				content: contentToSave,
 				ifMatch: state.hash
 			});
 
@@ -1548,6 +2592,17 @@ export const Home = () => {
 			}));
 
 			await refetchTree();
+			
+			// Execute plugin hooks on save
+			const parsedNote = await pluginRegistry.executeOnParse(contentToSave, p);
+			await pluginRegistry.executeOnSave({
+				path: p,
+				content: contentToSave,
+				parsed: parsedNote
+			});
+			
+			// Rebuild backlinks index after save (links may have changed)
+			triggerIndexRebuild();
 		} catch (e) {
 			console.error("Save failed:", e);
 		} finally {
@@ -1791,6 +2846,9 @@ export const Home = () => {
 			await api.rename(oldPath, newPath);
 			await refetchTree();
 
+			// Execute plugin hooks on rename
+			await pluginRegistry.executeOnRename(oldPath, newPath);
+
 			// Update tabs if the file is open
 			const tabs = openTabs();
 			const tabIndex = tabs.indexOf(oldPath);
@@ -1853,6 +2911,9 @@ export const Home = () => {
 		try {
 			if (kind === "file") {
 				await api.deleteFile(path);
+				
+				// Execute plugin hooks on delete
+				await pluginRegistry.executeOnDelete(path);
 			} else {
 				await api.deleteFolder(path);
 			}
@@ -1911,6 +2972,90 @@ export const Home = () => {
 		}
 	};
 
+	// Tag extraction and management (from body only, not frontmatter)
+	const extractTags = createMemo(() => {
+		const content = currentBody();
+		if (!content) return [];
+		
+		// Match hashtags: #word (but not ##heading)
+		const tagRegex = /(?:^|[^#\w])#([a-zA-Z][a-zA-Z0-9_-]*)/g;
+		const matches = Array.from(content.matchAll(tagRegex));
+		const uniqueTags = new Set(matches.map(m => m[1]));
+		return Array.from(uniqueTags).sort();
+	});
+
+	const addTag = (tag: string) => {
+		const normalizedTag = tag.replace(/^#+\s*/, '').trim().replace(/\s+/g, '-');
+		if (!normalizedTag) return;
+
+		const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+		if (!textarea) return;
+
+		const parsed = currentParsed();
+		const tagToAdd = `#${normalizedTag}`;
+		
+		// Check if tag already exists in body
+		if (extractTags().includes(normalizedTag)) {
+			// Jump to first occurrence
+			const index = draft().indexOf(tagToAdd);
+			if (index !== -1) {
+				textarea.focus();
+				textarea.setSelectionRange(index, index + tagToAdd.length);
+				textarea.scrollTop = textarea.scrollHeight * (index / draft().length);
+			}
+			return;
+		}
+
+		// Add tag at the end of the body with proper spacing
+		const newBody = parsed.body.trimEnd() + (parsed.body.trim() ? '\n\n' : '') + tagToAdd;
+		const newContent = parsed.frontmatter 
+			? serializeFrontmatter(parsed.frontmatter, newBody)
+			: newBody;
+		setDraft(newContent);
+
+		// Focus and scroll to new tag
+		setTimeout(() => {
+			textarea.focus();
+			textarea.setSelectionRange(newContent.length, newContent.length);
+			textarea.scrollTop = textarea.scrollHeight;
+		}, 0);
+	};
+
+	const removeTag = (tag: string) => {
+		const parsed = currentParsed();
+		const tagPattern = new RegExp(`(?:^|[^#\\w])#${tag}(?![\\w-])`, 'g');
+		const newBody = parsed.body.replace(tagPattern, (match) => {
+			// Keep the leading character if it's not # or word character
+			return match[0] === '#' ? '' : match[0];
+		}).replace(/\n{3,}/g, '\n\n').trim();
+		
+		const newContent = parsed.frontmatter
+			? serializeFrontmatter(parsed.frontmatter, newBody)
+			: newBody;
+		setDraft(newContent);
+	};
+
+	const jumpToTag = (tag: string) => {
+		const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+		if (!textarea) return;
+
+		const currentDraft = draft();
+		const tagToFind = `#${tag}`;
+		const index = currentDraft.indexOf(tagToFind);
+		
+		if (index !== -1) {
+			textarea.focus();
+			textarea.setSelectionRange(index, index + tagToFind.length);
+			// Scroll to make the tag visible
+			const lines = currentDraft.substring(0, index).split('\n').length;
+			const lineHeight = 20; // approximate
+			textarea.scrollTop = Math.max(0, (lines - 10) * lineHeight);
+		}
+	};
+
+	const [tagInput, setTagInput] = createSignal("");
+	const [showTagInput, setShowTagInput] = createSignal(false);
+
 	return (
 		<div class={shell} style={{ "--sidebar-width": `${sidebarWidth()}px` }}>
 			{/* Left icon rail */}
@@ -1923,7 +3068,7 @@ export const Home = () => {
 					</Icon>
 				</RailButton>
 
-				<RailButton title="Graph" onClick={() => console.log("Graph")}>
+				<RailButton title="Graph" onClick={() => setGraphOpen(true)}>
 					<Icon>
 						<circle cx="6" cy="12" r="2" />
 						<circle cx="18" cy="6" r="2" />
@@ -2107,6 +3252,9 @@ export const Home = () => {
 						<button class={toolBtn} onClick={() => insertMarkdown("[", "](url)")} title="Link">
 							🔗
 						</button>
+						<button class={toolBtn} onClick={() => insertMarkdown("[[", "]]")} title="Wiki Link (Zettelkasten)">
+							[[]]
+						</button>
 						<button class={toolBtn} onClick={() => insertMarkdown("`", "`")} title="Code">
 							{"</>"}
 						</button>
@@ -2142,6 +3290,223 @@ export const Home = () => {
 					</div>
 				</Show>
 
+				{/* Frontmatter Panel */}
+				<Show when={selectedFile() && viewMode() === "edit"}>
+					<Show
+						when={currentFrontmatter()}
+						fallback={
+							<div class={frontmatterPanel}>
+								<div class={frontmatterHeader}>
+									<span>No Metadata</span>
+									<button class={frontmatterBtn} onClick={addFrontmatter}>
+										+ Add Frontmatter
+									</button>
+								</div>
+							</div>
+						}
+					>
+						<div class={frontmatterPanel}>
+							<div class={frontmatterHeader}>
+								<span>Metadata</span>
+								<div style={{ display: "flex", gap: "8px" }}>
+									<button 
+										class={frontmatterBtn} 
+										onClick={() => setShowFrontmatter(!showFrontmatter())}
+									>
+										{showFrontmatter() ? "Hide" : "Show"}
+									</button>
+									<button 
+										class={frontmatterBtn}
+										onClick={() => {
+											if (confirm("Remove all frontmatter metadata?")) {
+												removeFrontmatter();
+											}
+										}}
+										style={{ color: "#f87171", "border-color": "rgba(248, 113, 113, 0.3)" }}
+									>
+										Remove
+									</button>
+								</div>
+							</div>
+							<Show when={showFrontmatter()}>
+								<div class={frontmatterGrid}>
+									<div class={frontmatterField}>
+										<label class={frontmatterLabel}>Title</label>
+										<input
+											class={frontmatterInput}
+											type="text"
+											value={currentFrontmatter()?.title || ""}
+											onInput={(e) => updateFrontmatter({ title: e.currentTarget.value })}
+											placeholder="Note title"
+										/>
+									</div>
+									<div class={frontmatterField}>
+										<label class={frontmatterLabel}>Type</label>
+										<select
+											class={frontmatterSelect}
+											value={currentFrontmatter()?.type || "note"}
+											onChange={(e) => updateFrontmatter({ type: e.currentTarget.value as any })}
+										>
+											<option value="note">Note</option>
+											<option value="project">Project</option>
+											<option value="meeting">Meeting</option>
+											<option value="daily">Daily</option>
+										</select>
+									</div>
+									<div class={frontmatterField}>
+										<label class={frontmatterLabel}>Status</label>
+										<select
+											class={frontmatterSelect}
+											value={currentFrontmatter()?.status || "draft"}
+											onChange={(e) => updateFrontmatter({ status: e.currentTarget.value as any })}
+										>
+											<option value="draft">Draft</option>
+											<option value="active">Active</option>
+											<option value="done">Done</option>
+											<option value="archived">Archived</option>
+										</select>
+									</div>
+									<div class={frontmatterField}>
+										<label class={frontmatterLabel}>ID</label>
+										<input
+											class={frontmatterInput}
+											type="text"
+											value={currentFrontmatter()?.id || ""}
+											onInput={(e) => updateFrontmatter({ id: e.currentTarget.value })}
+											placeholder="Unique identifier"
+										/>
+									</div>
+									<div class={frontmatterField}>
+										<label class={frontmatterLabel}>Created</label>
+										<input
+											class={frontmatterInput}
+											type="text"
+											value={currentFrontmatter()?.created || ""}
+											disabled
+											style={{ opacity: 0.6, cursor: "not-allowed" }}
+										/>
+									</div>
+									<div class={frontmatterField}>
+										<label class={frontmatterLabel}>Updated</label>
+										<input
+											class={frontmatterInput}
+											type="text"
+											value={currentFrontmatter()?.updated || ""}
+											disabled
+											style={{ opacity: 0.6, cursor: "not-allowed" }}
+										/>
+									</div>
+								</div>
+							</Show>
+						</div>
+					</Show>
+				</Show>
+
+				{/* Links & Backlinks Panel */}
+				<Show when={selectedFile() && viewMode() === "edit" && currentNoteMetadata()}>
+					<div class={linksPanel}>
+						{/* Outgoing Links */}
+						<Show when={(currentNoteMetadata()?.outgoingLinks.length || 0) > 0}>
+							<div class={linksHeader}>
+								Links ({currentNoteMetadata()?.outgoingLinks.length || 0})
+							</div>
+							<div class={linksList}>
+								<For each={currentNoteMetadata()?.outgoingLinks || []}>
+									{(link) => {
+										const targetPath = resolveLinkTarget(link.target, notesIndex);
+										const targetNote = targetPath ? notesIndex[targetPath] : null;
+										const displayName = targetNote?.title || link.target;
+										
+										return (
+											<div
+												class={linkItem}
+												onClick={() => {
+													if (targetPath) {
+														openInTab(targetPath, false);
+													}
+												}}
+												title={targetPath || `Unresolved: ${link.target}`}
+												style={{ opacity: targetPath ? 1 : 0.5 }}
+											>
+												<span class={linkIcon}>→</span>
+												<span class={linkText}>{displayName}</span>
+											</div>
+										);
+									}}
+								</For>
+							</div>
+						</Show>
+
+						{/* Backlinks */}
+						<Show when={(currentNoteMetadata()?.backlinks.length || 0) > 0}>
+							<div class={linksHeader} style={{ "margin-top": (currentNoteMetadata()?.outgoingLinks.length || 0) > 0 ? "12px" : "0" }}>
+								Backlinks ({currentNoteMetadata()?.backlinks.length || 0})
+							</div>
+							<div class={linksList}>
+								<For each={currentNoteMetadata()?.backlinks || []}>
+									{(backlink) => {
+										const backlinkNote = notesIndex[backlink];
+										const displayName = backlinkNote?.title || backlink.split('/').pop() || backlink;
+										
+										return (
+											<div
+												class={linkItem}
+												onClick={() => openInTab(backlink, false)}
+												title={backlink}
+											>
+												<span class={linkIcon}>←</span>
+												<span class={linkText}>{displayName}</span>
+											</div>
+										);
+									}}
+								</For>
+							</div>
+						</Show>
+
+						{/* Unlinked Mentions */}
+						<Show when={unlinkedMentions().length > 0}>
+							<div class={linksHeader} style={{ "margin-top": "12px" }}>
+								Unlinked Mentions ({unlinkedMentions().length})
+							</div>
+							<div class={linksList}>
+								<For each={unlinkedMentions()}>
+									{(mention) => (
+										<div
+											class={linkItem}
+											onClick={() => openInTab(mention.path, false)}
+											title={`Click to open and link\n${mention.context}`}
+											style={{ "flex-direction": "column", "align-items": "flex-start" }}
+										>
+											<div style={{ display: "flex", "align-items": "center", gap: "8px", width: "100%" }}>
+												<span class={linkIcon}>⋯</span>
+												<span class={linkText}>{mention.title}</span>
+											</div>
+											<div style={{ 
+												"font-size": "11px", 
+												color: "#888", 
+												"padding-left": "22px",
+												overflow: "hidden",
+												"text-overflow": "ellipsis",
+												"white-space": "nowrap",
+												width: "100%"
+											}}>
+												{mention.context}
+											</div>
+										</div>
+									)}
+								</For>
+							</div>
+						</Show>
+
+						{/* Empty state */}
+						<Show when={(currentNoteMetadata()?.outgoingLinks.length || 0) === 0 && (currentNoteMetadata()?.backlinks.length || 0) === 0 && unlinkedMentions().length === 0}>
+							<div style={{ color: "#666", "font-size": "12px", "font-style": "italic" }}>
+								No links or backlinks yet. Use [[note-id]] or [[note-title]] to link notes.
+							</div>
+						</Show>
+					</div>
+				</Show>
+
 				{/* Editor / Preview */}
 				<div class={editorWrapper}>
 					<Show when={selectedFile()} fallback={<p>Select a note from the sidebar or create a new one.</p>}>
@@ -2161,6 +3526,81 @@ export const Home = () => {
 								placeholder="Start writing…"
 							/>
 						</Show>
+
+						{/* Tag Gutter - only show in edit mode */}
+						<Show when={viewMode() === "edit"}>
+							<div class={tagGutter}>
+								<For each={extractTags()}>
+									{(tag) => (
+										<div 
+											class={tagItem}
+											onClick={() => jumpToTag(tag)}
+											title={`Click to jump to #${tag}`}
+										>
+											<span>#{tag}</span>
+											<span 
+												class={tagRemove}
+												onClick={(e) => {
+													e.stopPropagation();
+													if (confirm(`Remove all instances of #${tag}?`)) {
+														removeTag(tag);
+													}
+												}}
+												title="Remove tag"
+											>
+												×
+											</span>
+										</div>
+									)}
+								</For>
+								
+								<Show 
+									when={!showTagInput()}
+									fallback={
+										<input
+											type="text"
+											value={tagInput()}
+											onInput={(e) => setTagInput(e.currentTarget.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													addTag(tagInput());
+													setTagInput("");
+													setShowTagInput(false);
+												}
+												if (e.key === "Escape") {
+													setTagInput("");
+													setShowTagInput(false);
+												}
+											}}
+											onBlur={() => {
+												setTagInput("");
+												setShowTagInput(false);
+											}}
+											placeholder="Enter tag name..."
+											autofocus
+											style={{
+												background: "rgba(255, 255, 255, 0.05)",
+												border: "1px solid #60a5fa",
+												"border-radius": "12px",
+												padding: "4px 10px",
+												color: "#ffffff",
+												outline: "none",
+												"font-size": "12px",
+												width: "150px"
+											}}
+										/>
+									}
+								>
+									<div 
+										class={tagAddBtn}
+										onClick={() => setShowTagInput(true)}
+										title="Add new tag"
+									>
+										<span>+ New tag</span>
+									</div>
+								</Show>
+							</div>
+						</Show>
 					</Show>
 				</div>
 			</div>
@@ -2175,6 +3615,20 @@ export const Home = () => {
 				onNewFolder={onNewFolder}
 				onTogglePreview={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
 				onCollapseAll={collapseAll}
+				notesIndex={notesIndex}
+				fileStore={fileStore}
+			/>
+
+			{/* Local Graph View */}
+			<LocalGraphView
+				isOpen={graphOpen()}
+				onClose={() => setGraphOpen(false)}
+				currentPath={selectedFile()}
+				notesIndex={notesIndex}
+				onOpenFile={(path) => {
+					openInTab(path, false);
+					setGraphOpen(false);
+				}}
 			/>
 		</div>
 	);
