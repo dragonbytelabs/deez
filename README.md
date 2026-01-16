@@ -45,12 +45,22 @@ Distributed Embedable Extensible Zettlekasten note-taking system
 
 #### Plugin System
 - **Plugin Registry**: Extensible architecture for custom functionality
+- **Plugin Commands**: Custom commands registered in command palette
+- **Plugin Panels**: Side panels with custom UI (Tasks, Backlinks)
+- **Plugin Render Hooks**: Custom markdown syntax transformations
+- **Extensible Metadata Schema**: Plugin-defined frontmatter fields
+- **Plugin Management UI**: Enable/disable plugins via settings
 - **Lifecycle Hooks**:
   - `onCreateNote`: Execute when new notes are created
   - `onSave`: Process content before saving
   - `onDelete`: Handle file deletion events
   - `onParse`: Transform markdown during parsing
-- **Active Plugin Management**: Enable/disable plugins via settings
+  - `onActivate/onDeactivate`: Plugin lifecycle events
+- **Built-in Plugins**:
+  - **Zettelkasten**: Core note-taking with ID generation
+  - **Task Manager**: Task tracking across notes
+  - **Backlinks**: Show incoming links to current note
+  - **Markdown Enhancements**: Extended syntax (highlights, callouts)
 
 #### Sync & Storage
 - **Local-first**: All data stored locally by default
@@ -64,12 +74,6 @@ Distributed Embedable Extensible Zettlekasten note-taking system
 - **User Profiles**: Avatars, display names, email management
 
 ### 🚧 Planned Features (Roadmap)
-
-#### Plugin Extensions (Tasks 6-9)
-- [ ] **Plugin Commands**: Custom commands in command palette
-- [ ] **Plugin Panels**: Side widgets and custom UI panels
-- [ ] **Plugin Render Hooks**: Custom markdown transforms and syntax
-- [ ] **Extensible Metadata Schema**: Plugin-defined frontmatter fields
 
 #### Publishing & Sharing (Task 10)
 - [ ] **Export to HTML**: Static site generation from notes
