@@ -3320,6 +3320,66 @@ function LocalGraphView(props: {
 		return true;
 	};
 
+	// Filter state
+	const [filterTag, setFilterTag] = createSignal<string>("");
+	const [filterType, setFilterType] = createSignal<string>("");
+	const [filterStatus, setFilterStatus] = createSignal<string>("");
+	const [hopDistance, setHopDistance] = createSignal<number>(1); // 1-hop or 2-hop
+
+	// Helper to get frontmatter for a path
+	const getFrontmatter = (path: string): Frontmatter | null => {
+		const state = props.fileStore[path];
+		if (!state) return null;
+		const content = state.draftContent || state.savedContent;
+		return parseFrontmatter(content).frontmatter;
+	};
+
+	// Collect all unique tags, types, statuses from notes
+	const availableTags = createMemo(() => {
+		const tags = new Set<string>();
+		Object.keys(props.notesIndex).forEach(path => {
+			const fm = getFrontmatter(path);
+			if (fm?.tags) {
+				fm.tags.forEach((tag: string) => tags.add(tag));
+			}
+		});
+		return Array.from(tags).sort();
+	});
+
+	const availableTypes = createMemo(() => {
+		const types = new Set<string>();
+		Object.keys(props.notesIndex).forEach(path => {
+			const fm = getFrontmatter(path);
+			if (fm?.type) types.add(fm.type);
+		});
+		return Array.from(types).sort();
+	});
+
+	const availableStatuses = createMemo(() => {
+		const statuses = new Set<string>();
+		Object.keys(props.notesIndex).forEach(path => {
+			const fm = getFrontmatter(path);
+			if (fm?.status) statuses.add(fm.status);
+		});
+		return Array.from(statuses).sort();
+	});
+
+	// Filter predicate for a note path
+	const matchesFilter = (path: string): boolean => {
+		const tag = filterTag();
+		const type = filterType();
+		const status = filterStatus();
+
+		const fm = getFrontmatter(path);
+		if (!fm) return true; // Include notes without frontmatter
+
+		if (tag && !(fm.tags || []).includes(tag)) return false;
+		if (type && fm.type !== type) return false;
+		if (status && fm.status !== status) return false;
+
+		return true;
+	};
+
 	createEffect(() => {
 		if (!props.isOpen || !svgRef || !props.currentPath) return;
 
@@ -4640,6 +4700,65 @@ const HomeInner = (props?: HomeProps) => {
 		// Open in tab (file will be loaded automatically)
 		console.log('[DEBUG] Quick Capture - opening in tab:', filePath);
 		openInTab(filePath);			// Open the Inbox folder
+			const next = new Set(openFolders());
+			next.add(inboxDir);
+			setOpenFolders(next);
+		} catch (e) {
+			console.error(e);
+		}
+	};
+
+	const onCapture = async () => {
+		const inboxDir = "Inbox";
+		
+		// Ensure Inbox folder exists
+		const inboxExists = entries()?.some(e => e.path === inboxDir && e.kind === 'folder');
+		if (!inboxExists) {
+			try {
+				await api.createFolder(inboxDir);
+				await refetchTree();
+			} catch (e) {
+				console.error("Failed to create Inbox folder:", e);
+			}
+		}
+
+		// Prompt for quick note content
+		const content = prompt("Quick capture:");
+		if (!content) return;
+
+		// Generate filename
+		const zettelId = generateZettelId();
+		const fileName = `${zettelId}.md`;
+		const filePath = joinPath(inboxDir, fileName);
+
+		// Create minimal frontmatter
+		const frontmatter: Record<string, any> = {
+			id: zettelId,
+			created: new Date().toISOString(),
+			type: "capture",
+			tags: ["inbox"]
+		};
+
+		const frontmatterStr = serializeFrontmatter(frontmatter, "");
+		const initialContent = `${frontmatterStr}\n${content}\n`;
+
+		try {
+			// Execute plugin hooks
+			const pluginContent = await pluginRegistry.executeOnCreateNote(filePath);
+			const finalContent = pluginContent || initialContent;
+			
+			// Create the file with initial content
+			await api.createFile(filePath, finalContent);
+			await refetchTree();
+
+			// Mark as newly created and clear after 2 seconds
+			setNewlyCreatedFile(filePath);
+			setTimeout(() => setNewlyCreatedFile(""), 2000);
+
+			// Open in tab (file will be loaded automatically)
+			openInTab(filePath);
+			
+			// Open the Inbox folder
 			const next = new Set(openFolders());
 			next.add(inboxDir);
 			setOpenFolders(next);
