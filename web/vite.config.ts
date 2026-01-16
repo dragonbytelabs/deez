@@ -15,7 +15,7 @@ export default defineConfig(() => ({
 	server: {
 		proxy: {
 			"/api": {
-				target: "http://localhost:3000", // Replace with your backend server's address
+				target: "http://localhost:3000", 
 			},
 		},
 	},

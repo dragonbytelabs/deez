@@ -1,11 +1,15 @@
 import { css } from "@linaria/core";
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { createStore, produce } from "solid-js/store";
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show, untrack } from "solid-js";
+import { produce } from "solid-js/store";
 import { marked } from "marked";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
 import yaml from "js-yaml";
 import { api, type Entry } from "./server/api";
+import { AppProvider, useApp, type FileStoreEntry } from "./context/AppContext";
+import { TabBar } from "./components/TabBar";
+import { MarkdownToolbar } from "./components/MarkdownToolbar";
+import { CommandPalette } from "./components/CommandPalette";
 
 /* =======================
    Styles
@@ -14,7 +18,7 @@ import { api, type Entry } from "./server/api";
 const shell = css`
   height: 100vh;
   display: grid;
-  grid-template-columns: 56px var(--sidebar-width, 320px) 1fr;
+  grid-template-columns: 56px var(--sidebar-width, 320px) 1fr var(--panels-width, 300px);
 `;
 
 const rail = css`
@@ -225,138 +229,6 @@ const main = css`
   flex-direction: column;
   overflow: hidden;
   color: #ffffff;
-`;
-
-const tabsBar = css`
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
-  overflow-x: auto;
-  flex-shrink: 0;
-`;
-
-const tab = css`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  padding-top: 8px;
-  border-radius: 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid transparent;
-  border-top: 2px solid transparent;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
-  white-space: nowrap;
-  transition: all 0.15s;
-  max-width: 200px;
-  min-width: 120px;
-  position: relative;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.9);
-  }
-  
-  &:hover .tab-close-x {
-    display: flex;
-  }
-  
-  &:hover .tab-dirty-dot {
-    display: none;
-  }
-`;
-
-const tabFileName = css`
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-  padding-right: 24px;
-`;
-
-const tabActions = css`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  position: absolute;
-  right: 8px;
-  background: inherit;
-  padding-left: 8px;
-`;
-
-const tabActive = css`
-  background: rgba(255, 255, 255, 0.15);
-  border-top-color: #007acc;
-  color: #ffffff;
-`;
-
-const tabPreview = css`
-  font-style: italic;
-  opacity: 0.85;
-`;
-
-const tabClose = css`
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  opacity: 0.7;
-  transition: all 0.15s;
-  font-size: 18px;
-  line-height: 1;
-  display: none;
-
-  &:hover {
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.2);
-  }
-`;
-
-const toolbar = css`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
-`;
-
-const toolBtn = css`
-  padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.3);
-  }
-
-  &:active {
-    background: rgba(255, 255, 255, 0.15);
-  }
-`;
-
-const toolSeparator = css`
-  width: 1px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.2);
-  margin: 0 4px;
 `;
 
 const editorWrapper = css`
@@ -798,6 +670,54 @@ const graphCanvas = css`
   height: calc(100% - 64px);
 `;
 
+const panelsSidebar = css`
+  border-left: 1px solid #e6e6e6;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+`;
+
+const panelsHeader = css`
+  padding: 12px 16px;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  background: #ffffff;
+`;
+
+const panelTab = css`
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+  
+  &:hover {
+    background: #f5f5f5;
+    border-color: #60a5fa;
+  }
+`;
+
+const panelTabActive = css`
+  background: #3b82f6 !important;
+  color: white !important;
+  border-color: #3b82f6 !important;
+`;
+
+const panelsBody = css`
+  flex: 1;
+  overflow-y: auto;
+  background: #ffffff;
+`;
+
 /* =======================
    Types + helpers
 ======================= */
@@ -823,7 +743,7 @@ interface Frontmatter {
 	tags?: string[];
 	aliases?: string[];
 	status?: 'draft' | 'active' | 'done' | 'archived';
-	type?: 'note' | 'project' | 'meeting' | 'daily';
+	type?: 'note' | 'project' | 'meeting' | 'daily' | 'capture';
 	[key: string]: any;
 }
 
@@ -841,6 +761,8 @@ interface NoteMetadata {
 	id?: string;
 	title?: string;
 	aliases?: string[];
+	body?: string; // Note content (optional, might not be loaded)
+	links?: NoteLink[]; // Outgoing links from this note
 	outgoingLinks: NoteLink[];
 	backlinks: string[]; // Paths of notes that link to this one
 }
@@ -860,12 +782,51 @@ interface PluginCommand {
 	id: string;
 	label: string;
 	icon?: string;
+	description?: string;
+	keybinding?: string;
 	run: () => void | Promise<void>;
 }
 
 interface PluginPanel {
 	id: string;
-	render: (context: { currentFile: string | null; notesIndex: Record<string, NoteMetadata> }) => any;
+	title: string;
+	icon?: string;
+	position?: 'left' | 'right' | 'bottom';
+	defaultVisible?: boolean;
+	render: (context: PluginPanelContext) => any;
+}
+
+interface PluginPanelContext {
+	currentFile: string | null;
+	notesIndex: Record<string, NoteMetadata>;
+	openFile: (path: string) => void;
+	createNote: () => void;
+}
+
+interface PluginRenderHook {
+	// Transform markdown before parsing
+	transformMarkdown?: (markdown: string, filePath: string) => string | Promise<string>;
+	// Transform parsed HTML
+	transformHTML?: (html: string, filePath: string) => string | Promise<string>;
+	// Custom syntax patterns
+	customSyntax?: {
+		pattern: RegExp;
+		render: (match: RegExpMatchArray) => string;
+	}[];
+}
+
+interface PluginMetadataField {
+	key: string;
+	label: string;
+	type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'select';
+	options?: string[]; // For select type
+	default?: any;
+	required?: boolean;
+	description?: string;
+}
+
+interface PluginSettings {
+	fields: PluginMetadataField[];
 }
 
 interface PluginHooks {
@@ -875,17 +836,25 @@ interface PluginHooks {
 	onSave?: (context: { path: string; content: string; parsed: ParsedNote }) => void | Promise<void>;
 	onRename?: (oldPath: string, newPath: string) => void | Promise<void>;
 	onDelete?: (path: string) => void | Promise<void>;
+	onActivate?: () => void | Promise<void>; // Called when plugin is enabled
+	onDeactivate?: () => void | Promise<void>; // Called when plugin is disabled
 	
 	// Extension points
 	commands?: PluginCommand[];
 	panels?: PluginPanel[];
+	renderHooks?: PluginRenderHook;
+	metadataSchema?: PluginMetadataField[];
 }
 
 interface Plugin {
 	id: string;
 	name: string;
 	version: string;
+	description?: string;
+	author?: string;
+	enabled?: boolean;
 	hooks: PluginHooks;
+	settings?: PluginSettings;
 }
 
 /* =======================
@@ -2659,6 +2628,9 @@ const zettelkastenPlugin: Plugin = {
 	id: 'core.zettelkasten',
 	name: 'Zettelkasten',
 	version: '1.0.0',
+	description: 'Core note-taking functionality with ID generation and link parsing',
+	author: 'DEEZ',
+	enabled: true,
 	hooks: {
 		onCreateNote: (filePath: string) => {
 			// Generate frontmatter with stable ID
@@ -2691,6 +2663,237 @@ const zettelkastenPlugin: Plugin = {
 };
 
 /**
+ * Task Management Plugin
+ * Adds task tracking and visualization
+ */
+const taskPlugin: Plugin = {
+	id: 'core.tasks',
+	name: 'Task Manager',
+	version: '1.0.0',
+	description: 'Track and manage tasks across your notes',
+	author: 'DEEZ',
+	enabled: true,
+	hooks: {
+		metadataSchema: [
+			{
+				key: 'due',
+				label: 'Due Date',
+				type: 'date',
+				description: 'When this task is due'
+			},
+			{
+				key: 'priority',
+				label: 'Priority',
+				type: 'select',
+				options: ['low', 'medium', 'high', 'urgent'],
+				description: 'Task priority level'
+			},
+			{
+				key: 'project',
+				label: 'Project',
+				type: 'string',
+				description: 'Associated project name'
+			}
+		],
+		
+		renderHooks: {
+			customSyntax: [
+				{
+					pattern: /- \[ \] (.+)/g,
+					render: (match) => `<input type="checkbox" disabled> ${match[1]}`
+				},
+				{
+					pattern: /- \[x\] (.+)/gi,
+					render: (match) => `<input type="checkbox" checked disabled> <s>${match[1]}</s>`
+				}
+			]
+		},
+		
+		panels: [
+			{
+				id: 'tasks.overview',
+				title: 'Tasks',
+				icon: '✓',
+				position: 'right',
+				defaultVisible: false,
+				render: (context: PluginPanelContext) => {
+					const tasks: Array<{ path: string; task: string; done: boolean }> = [];
+					
+					// Extract tasks from all notes
+					Object.entries(context.notesIndex).forEach(([path, note]) => {
+						if (!note.body) return;
+						
+						const todoRegex = /- \[ \] (.+)/g;
+						const doneRegex = /- \[x\] (.+)/gi;
+						
+						let match;
+						while ((match = todoRegex.exec(note.body)) !== null) {
+							tasks.push({ path, task: match[1], done: false });
+						}
+						while ((match = doneRegex.exec(note.body)) !== null) {
+							tasks.push({ path, task: match[1], done: true });
+						}
+					});
+					
+					const incompleteTasks = tasks.filter(t => !t.done);
+					
+					return (
+						<div style={{ padding: '1rem' }}>
+							<h3 style={{ margin: '0 0 1rem 0', 'font-size': '0.9rem' }}>
+								Open Tasks ({incompleteTasks.length})
+							</h3>
+							{incompleteTasks.length === 0 ? (
+								<p style={{ color: '#888', 'font-size': '0.85rem' }}>No open tasks</p>
+							) : (
+								<div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem' }}>
+									<For each={incompleteTasks.slice(0, 20)}>{(task) => (
+										<div 
+											style={{ 
+												'font-size': '0.85rem',
+												padding: '0.5rem',
+												background: '#f5f5f5',
+												'border-radius': '4px',
+												cursor: 'pointer'
+											}}
+											onClick={() => context.openFile(task.path)}
+										>
+											<div style={{ 'font-weight': '500' }}>{task.task}</div>
+											<div style={{ 'font-size': '0.75rem', color: '#666', 'margin-top': '0.25rem' }}>
+												{task.path.split('/').pop()?.replace('.md', '')}
+											</div>
+										</div>
+									)}</For>
+								</div>
+							)}
+						</div>
+					);
+				}
+			}
+		],
+		
+		commands: [
+			{
+				id: 'tasks.show-all',
+				label: 'Show All Tasks',
+				icon: '✓',
+				description: 'View all tasks across notes',
+				run: () => {
+					console.log('Show all tasks command');
+				}
+			}
+		]
+	}
+};
+
+/**
+ * Backlinks Plugin
+ * Shows incoming links to the current note
+ */
+const backlinksPlugin: Plugin = {
+	id: 'core.backlinks',
+	name: 'Backlinks',
+	version: '1.0.0',
+	description: 'Display incoming links to current note',
+	author: 'DEEZ',
+	enabled: true,
+	hooks: {
+		panels: [
+			{
+				id: 'backlinks.panel',
+				title: 'Backlinks',
+				icon: '←',
+				position: 'right',
+				defaultVisible: true,
+				render: (context: PluginPanelContext) => {
+					if (!context.currentFile) {
+						return <div style={{ padding: '1rem', color: '#888', 'font-size': '0.85rem' }}>No file selected</div>;
+					}
+					
+					// Get backlinks from the pre-calculated index
+					const currentNote = context.notesIndex[context.currentFile];
+					const backlinks: Array<{ path: string; name: string }> = currentNote?.backlinks?.map(path => ({
+						path,
+						name: path.split('/').pop()?.replace('.md', '') || path
+					})) || [];
+					
+					return (
+						<div style={{ padding: '1rem' }}>
+							<h3 style={{ margin: '0 0 1rem 0', 'font-size': '0.9rem' }}>
+								Linked from ({backlinks.length})
+							</h3>
+							{backlinks.length === 0 ? (
+								<p style={{ color: '#888', 'font-size': '0.85rem' }}>No backlinks</p>
+							) : (
+								<div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.25rem' }}>
+									<For each={backlinks}>{(link) => (
+										<div
+											style={{
+												padding: '0.5rem',
+												'font-size': '0.85rem',
+												cursor: 'pointer',
+												'border-radius': '4px',
+												transition: 'background 0.1s'
+											}}
+											onClick={() => context.openFile(link.path)}
+											onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
+											onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+										>
+											{link.name}
+										</div>
+									)}</For>
+								</div>
+							)}
+						</div>
+					);
+				}
+			}
+		]
+	}
+};
+
+/**
+ * Markdown Enhancements Plugin
+ * Adds custom markdown syntax transformations
+ */
+const markdownEnhancementsPlugin: Plugin = {
+	id: 'core.markdown-enhancements',
+	name: 'Markdown Enhancements',
+	version: '1.0.0',
+	description: 'Extended markdown syntax support',
+	author: 'DEEZ',
+	enabled: true,
+	hooks: {
+		renderHooks: {
+			customSyntax: [
+				// Highlight syntax ==text==
+				{
+					pattern: /==([^=]+)==/g,
+					render: (match) => `<mark>${match[1]}</mark>`
+				},
+				// Callout blocks
+				{
+					pattern: /> \[!(\w+)\]\s*\n((?:> .+\n?)*)/g,
+					render: (match) => {
+						const type = match[1].toLowerCase();
+						const content = match[2].replace(/^> /gm, '');
+						const colors: Record<string, string> = {
+							note: '#3b82f6',
+							warning: '#f59e0b',
+							tip: '#10b981',
+							important: '#ef4444',
+							info: '#06b6d4'
+						};
+						const color = colors[type] || '#6b7280';
+						return `<div style="border-left: 4px solid ${color}; padding: 0.5rem 1rem; margin: 1rem 0; background: ${color}10; border-radius: 4px;"><strong style="color: ${color}; text-transform: uppercase; font-size: 0.8rem;">${type}</strong><div style="margin-top: 0.5rem;">${content}</div></div>`;
+					}
+				}
+			]
+		}
+	}
+};
+
+
+/**
  * Plugin registry - plugins can be dynamically registered here
  */
 class PluginRegistry {
@@ -2699,29 +2902,58 @@ class PluginRegistry {
 	constructor() {
 		// Register built-in plugins
 		this.register(zettelkastenPlugin);
+		this.register(taskPlugin);
+		this.register(backlinksPlugin);
+		this.register(markdownEnhancementsPlugin);
 	}
 	
-	register(plugin: Plugin) {
+	async register(plugin: Plugin) {
 		this.plugins.set(plugin.id, plugin);
 		console.log(`[Plugin] Registered: ${plugin.name} v${plugin.version}`);
+		
+		// Execute onActivate if plugin is enabled
+		if (plugin.enabled !== false && plugin.hooks.onActivate) {
+			await plugin.hooks.onActivate();
+		}
 	}
 	
-	unregister(pluginId: string) {
+	async unregister(pluginId: string) {
+		const plugin = this.plugins.get(pluginId);
+		if (plugin?.hooks.onDeactivate) {
+			await plugin.hooks.onDeactivate();
+		}
 		this.plugins.delete(pluginId);
+	}
+	
+	async togglePlugin(pluginId: string, enabled: boolean) {
+		const plugin = this.plugins.get(pluginId);
+		if (!plugin) return;
+		
+		plugin.enabled = enabled;
+		
+		if (enabled && plugin.hooks.onActivate) {
+			await plugin.hooks.onActivate();
+		} else if (!enabled && plugin.hooks.onDeactivate) {
+			await plugin.hooks.onDeactivate();
+		}
 	}
 	
 	getAll(): Plugin[] {
 		return Array.from(this.plugins.values());
 	}
 	
+	getEnabled(): Plugin[] {
+		return Array.from(this.plugins.values()).filter(p => p.enabled !== false);
+	}
+	
 	get(pluginId: string): Plugin | undefined {
 		return this.plugins.get(pluginId);
 	}
 	
-	// Execute hooks across all plugins
+	// Execute hooks across all enabled plugins
 	async executeOnCreateNote(filePath: string): Promise<string> {
 		let content = "";
-		for (const plugin of this.plugins.values()) {
+		for (const plugin of this.getEnabled()) {
 			if (plugin.hooks.onCreateNote) {
 				const result = await plugin.hooks.onCreateNote(filePath);
 				if (result) content = result;
@@ -2738,7 +2970,7 @@ class PluginRegistry {
 			tags: []
 		};
 		
-		for (const plugin of this.plugins.values()) {
+		for (const plugin of this.getEnabled()) {
 			if (plugin.hooks.onParse) {
 				result = await plugin.hooks.onParse(content, filePath);
 			}
@@ -2748,7 +2980,7 @@ class PluginRegistry {
 	}
 	
 	async executeOnSave(context: { path: string; content: string; parsed: ParsedNote }) {
-		for (const plugin of this.plugins.values()) {
+		for (const plugin of this.getEnabled()) {
 			if (plugin.hooks.onSave) {
 				await plugin.hooks.onSave(context);
 			}
@@ -2756,7 +2988,7 @@ class PluginRegistry {
 	}
 	
 	async executeOnRename(oldPath: string, newPath: string) {
-		for (const plugin of this.plugins.values()) {
+		for (const plugin of this.getEnabled()) {
 			if (plugin.hooks.onRename) {
 				await plugin.hooks.onRename(oldPath, newPath);
 			}
@@ -2764,7 +2996,7 @@ class PluginRegistry {
 	}
 	
 	async executeOnDelete(path: string) {
-		for (const plugin of this.plugins.values()) {
+		for (const plugin of this.getEnabled()) {
 			if (plugin.hooks.onDelete) {
 				await plugin.hooks.onDelete(path);
 			}
@@ -2773,7 +3005,7 @@ class PluginRegistry {
 	
 	getAllCommands(): PluginCommand[] {
 		const commands: PluginCommand[] = [];
-		for (const plugin of this.plugins.values()) {
+		for (const plugin of this.getEnabled()) {
 			if (plugin.hooks.commands) {
 				commands.push(...plugin.hooks.commands);
 			}
@@ -2783,129 +3015,62 @@ class PluginRegistry {
 	
 	getAllPanels(): PluginPanel[] {
 		const panels: PluginPanel[] = [];
-		for (const plugin of this.plugins.values()) {
+		for (const plugin of this.getEnabled()) {
 			if (plugin.hooks.panels) {
 				panels.push(...plugin.hooks.panels);
 			}
 		}
 		return panels;
 	}
+	
+	getAllMetadataFields(): PluginMetadataField[] {
+		const fields: PluginMetadataField[] = [];
+		for (const plugin of this.getEnabled()) {
+			if (plugin.hooks.metadataSchema) {
+				fields.push(...plugin.hooks.metadataSchema);
+			}
+		}
+		return fields;
+	}
+	
+	async transformMarkdown(markdown: string, filePath: string): Promise<string> {
+		let result = markdown;
+		for (const plugin of this.getEnabled()) {
+			if (plugin.hooks.renderHooks?.transformMarkdown) {
+				result = await plugin.hooks.renderHooks.transformMarkdown(result, filePath);
+			}
+		}
+		return result;
+	}
+	
+	async transformHTML(html: string, filePath: string): Promise<string> {
+		let result = html;
+		for (const plugin of this.getEnabled()) {
+			if (plugin.hooks.renderHooks?.transformHTML) {
+				result = await plugin.hooks.renderHooks.transformHTML(result, filePath);
+			}
+		}
+		return result;
+	}
+	
+	applyCustomSyntax(markdown: string): string {
+		let result = markdown;
+		for (const plugin of this.getEnabled()) {
+			if (plugin.hooks.renderHooks?.customSyntax) {
+				for (const syntax of plugin.hooks.renderHooks.customSyntax) {
+					result = result.replace(syntax.pattern, (match, ...args) => {
+						const fullMatch = [match, ...args];
+						return syntax.render(fullMatch as RegExpMatchArray);
+					});
+				}
+			}
+		}
+		return result;
+	}
 }
 
 // Global plugin registry instance
 const pluginRegistry = new PluginRegistry();
-
-/* =======================
-   Command Palette
-======================= */
-
-const paletteOverlay = css`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 15vh;
-  z-index: 1000;
-`;
-
-const paletteModal = css`
-  width: 90%;
-  max-width: 600px;
-  background: #2a2a2a;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-`;
-
-const paletteInput = css`
-  width: 100%;
-  padding: 16px 20px;
-  background: #1e1e1e;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  font-size: 16px;
-  outline: none;
-
-  &::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-  }
-`;
-
-const paletteResults = css`
-  max-height: 400px;
-  overflow-y: auto;
-`;
-
-const paletteItem = css`
-  padding: 12px 20px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.9);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: all 0.1s;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-`;
-
-const paletteItemActive = css`
-  background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
-`;
-
-const paletteItemIcon = css`
-  width: 16px;
-  height: 16px;
-  opacity: 0.7;
-  flex-shrink: 0;
-`;
-
-const paletteItemLabel = css`
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const paletteItemKind = css`
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
-const paletteEmpty = css`
-  padding: 40px 20px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 14px;
-`;
-
-type PaletteAction = {
-	type: 'action';
-	id: string;
-	label: string;
-	icon: string;
-	onSelect: () => void;
-};
-
-type PaletteFile = {
-	type: 'file';
-	path: string;
-	name: string;
-};
-
-type PaletteItem = PaletteAction | PaletteFile;
 
 /* =======================
    Conflict Resolution Dialog
@@ -3081,473 +3246,6 @@ export function ConflictResolutionDialog(props: {
 	);
 }
 
-function CommandPalette(props: {
-	isOpen: boolean;
-	onClose: () => void;
-	files: Entry[];
-	onOpenFile: (path: string) => void;
-	onNewNote: () => void;
-	onNewZettel?: () => void;
-	onNewDailyNote?: () => void;
-	onCapture?: () => void;
-	onNewFolder: () => void;
-	onTogglePreview: () => void;
-	onCollapseAll: () => void;
-	notesIndex?: Record<string, NoteMetadata>;
-	fileStore?: Record<string, FileState>;
-	linkMode?: boolean;
-	onInsertLink?: (path: string) => void;
-}) {
-	const [query, setQuery] = createSignal("");
-	const [selectedIndex, setSelectedIndex] = createSignal(0);
-	let inputRef: HTMLInputElement | undefined;
-
-	// Focus input when palette opens
-	createEffect(() => {
-		if (props.isOpen && inputRef) {
-			setTimeout(() => inputRef?.focus(), 0);
-		}
-	});
-
-	// Build combined list of actions + files
-	const items = createMemo((): PaletteItem[] => {
-		const searchQuery = query().toLowerCase();
-
-		// Parse query for special operators
-		const parseQuery = (q: string): {
-			text: string;
-			filters: { type?: string; status?: string; tag?: string; hasLinks?: boolean; hasBacklinks?: boolean; linkTo?: string; linkedBy?: string };
-		} => {
-			const filters: { type?: string; status?: string; tag?: string; hasLinks?: boolean; hasBacklinks?: boolean; linkTo?: string; linkedBy?: string } = {};
-			let text = q;
-
-			// Extract type: operator
-			const typeMatch = q.match(/type:(\S+)/);
-			if (typeMatch) {
-				filters.type = typeMatch[1].toLowerCase();
-				text = text.replace(/type:\S+\s*/g, '').trim();
-			}
-
-			// Extract status: operator
-			const statusMatch = q.match(/status:(\S+)/);
-			if (statusMatch) {
-				filters.status = statusMatch[1].toLowerCase();
-				text = text.replace(/status:\S+\s*/g, '').trim();
-			}
-
-			// Extract tag: operator
-			const tagMatch = q.match(/tag:(\S+)/);
-			if (tagMatch) {
-				filters.tag = tagMatch[1].replace(/^#/, '').toLowerCase();
-				text = text.replace(/tag:\S+\s*/g, '').trim();
-			}
-
-			// Extract links: operator (notes that have outgoing links)
-			if (/links:/.test(q)) {
-				filters.hasLinks = true;
-				text = text.replace(/links:\s*/g, '').trim();
-			}
-
-			// Extract backlinks: operator (notes that have incoming links)
-			if (/backlinks:/.test(q)) {
-				filters.hasBacklinks = true;
-				text = text.replace(/backlinks:\s*/g, '').trim();
-			}
-
-			// Extract linkto: operator (notes that link to a specific note)
-			const linkToMatch = q.match(/linkto:(\S+)/);
-			if (linkToMatch) {
-				filters.linkTo = linkToMatch[1].toLowerCase();
-				text = text.replace(/linkto:\S+\s*/g, '').trim();
-			}
-
-			// Extract linkedby: operator (notes linked by a specific note)
-			const linkedByMatch = q.match(/linkedby:(\S+)/);
-			if (linkedByMatch) {
-				filters.linkedBy = linkedByMatch[1].toLowerCase();
-				text = text.replace(/linkedby:\S+\s*/g, '').trim();
-			}
-
-			return { text: text.toLowerCase(), filters };
-		};
-
-		const { text: searchText, filters } = parseQuery(searchQuery);
-		
-		// Check if we have any active filters
-		const hasActiveFilters = !!(filters.type || filters.status || filters.tag || filters.hasLinks || filters.hasBacklinks || filters.linkTo || filters.linkedBy);
-
-		// Actions (always shown at top)
-		const actions: PaletteAction[] = [
-			{
-				type: 'action',
-				id: 'new-note',
-				label: 'New Note',
-				icon: '📝',
-				onSelect: () => {
-					props.onClose();
-					props.onNewNote();
-				}
-			},
-			...(props.onNewZettel ? [{
-				type: 'action' as const,
-				id: 'new-zettel',
-				label: 'New Zettel',
-				icon: '🗒',
-				onSelect: () => {
-					props.onClose();
-					props.onNewZettel!();
-				}
-			}] : []),
-			...(props.onNewDailyNote ? [{
-				type: 'action' as const,
-				id: 'daily-note',
-				label: 'Daily Note',
-				icon: '📅',
-				onSelect: () => {
-					props.onClose();
-					props.onNewDailyNote!();
-				}
-			}] : []),
-			...(props.onCapture ? [{
-				type: 'action' as const,
-				id: 'capture',
-				label: 'Quick Capture',
-				icon: '📥',
-				onSelect: () => {
-					props.onClose();
-					props.onCapture!();
-				}
-			}] : []),
-			{
-				type: 'action',
-				id: 'new-folder',
-				label: 'New Folder',
-				icon: '📁',
-				onSelect: () => {
-					props.onClose();
-					props.onNewFolder();
-				}
-			},
-			{
-				type: 'action',
-				id: 'toggle-preview',
-				label: 'Toggle Preview',
-				icon: '👁',
-				onSelect: () => {
-					props.onClose();
-					props.onTogglePreview();
-				}
-			},
-			{
-				type: 'action',
-				id: 'collapse-all',
-				label: 'Collapse All Folders',
-				icon: '⬆',
-				onSelect: () => {
-					props.onClose();
-					props.onCollapseAll();
-				}
-			},
-			// Add plugin commands
-			...pluginRegistry.getAllCommands().map((cmd): PaletteAction => ({
-				type: 'action',
-				id: cmd.id,
-				label: cmd.label,
-				icon: cmd.icon || '🔌',
-				onSelect: () => {
-					props.onClose();
-					cmd.run();
-				}
-			}))
-		];
-
-		// Filter files by query with ranking
-		const filesWithScores: PaletteFile[] = props.files
-			.filter(e => e.kind === 'file')
-			.map(e => {
-				let score = 0;
-				let matches = false;
-
-				if (!props.notesIndex || !props.fileStore) {
-					// Fallback: simple filename matching
-					if (!searchText || e.path.toLowerCase().includes(searchText) || e.name.toLowerCase().includes(searchText)) {
-						matches = true;
-						score = e.name.toLowerCase().includes(searchText) ? 10 : 5;
-					}
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: matches ? score : -1 };
-				}
-
-				const noteData = props.notesIndex[e.path];
-				const fileData = props.fileStore[e.path];
-				
-				// If no search text and no filters, include all files
-				if (!searchText && !hasActiveFilters) {
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 1 };
-				}
-				
-				// For files without fileData, we can still search by filename/path
-				// but can't apply filters that require frontmatter
-				if (!fileData) {
-					// If filters are active, exclude files without data
-					if (hasActiveFilters) {
-						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-					}
-					
-					// Otherwise, do basic filename/path search
-					if (!searchText) {
-						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 1 };
-					}
-					
-					if (e.name.toLowerCase() === searchText) {
-						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 100 };
-					} else if (e.name.toLowerCase().includes(searchText)) {
-						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 50 };
-					} else if (e.path.toLowerCase().includes(searchText)) {
-						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: 40 };
-					}
-					
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-				}
-
-				const content = fileData.draftContent || fileData.savedContent;
-				const parsed = parseFrontmatter(content);
-				const fm = parsed.frontmatter;
-
-				// Apply filters first
-				if (filters.type && fm?.type !== filters.type) {
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-				}
-
-				if (filters.status && fm?.status !== filters.status) {
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-				}
-
-				if (filters.tag && !fm?.tags?.some(t => t.toLowerCase() === filters.tag)) {
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-				}
-
-				if (filters.hasLinks && (!noteData || noteData.outgoingLinks.length === 0)) {
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-				}
-
-				if (filters.hasBacklinks && (!noteData || noteData.backlinks.length === 0)) {
-					return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-				}
-
-				if (filters.linkTo && noteData) {
-					const linksToTarget = noteData.outgoingLinks.some(link => {
-						const target = link.target.toLowerCase();
-						return target === filters.linkTo || target.replace(/\.md$/, '') === filters.linkTo;
-					});
-					if (!linksToTarget) {
-						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-					}
-				}
-
-				if (filters.linkedBy && noteData) {
-					const linkedByTarget = noteData.backlinks.some(backlink => {
-						const backlinkLower = backlink.toLowerCase();
-						return backlinkLower.includes(filters.linkedBy!) || 
-							   backlinkLower.replace(/\.md$/, '') === filters.linkedBy;
-					});
-					if (!linkedByTarget) {
-						return { file: { type: 'file' as const, path: e.path, name: e.name }, score: -1 };
-					}
-				}
-
-				// If no text query, include all files that passed filters
-				if (!searchText) {
-					matches = true;
-					score = 1;
-				} else {
-					// Ranked text search
-					// Exact filename match (highest priority)
-					if (e.name.toLowerCase() === searchText) {
-						matches = true;
-						score += 100;
-					} else if (e.name.toLowerCase().includes(searchText)) {
-						matches = true;
-						score += 50;
-					} else if (e.path.toLowerCase().includes(searchText)) {
-						matches = true;
-						score += 40;
-					}
-
-					// Title match (high priority)
-					if (noteData?.title) {
-						if (noteData.title.toLowerCase() === searchText) {
-							matches = true;
-							score += 90;
-						} else if (noteData.title.toLowerCase().includes(searchText)) {
-							matches = true;
-							score += 45;
-						}
-					}
-
-					// ID match
-					if (noteData?.id?.toLowerCase().includes(searchText)) {
-						matches = true;
-						score += 60;
-					}
-
-					// Aliases match
-					if (noteData?.aliases?.some(a => a.toLowerCase().includes(searchText))) {
-						matches = true;
-						score += 30;
-					}
-
-					// Tag match
-					if (fm?.tags?.some(t => t.toLowerCase().includes(searchText))) {
-						matches = true;
-						score += 20;
-					}
-
-					// Body content match (lowest priority)
-					if (parsed.body.toLowerCase().includes(searchText)) {
-						matches = true;
-						score += 5;
-					}
-				}
-
-				return {
-					file: { type: 'file' as const, path: e.path, name: e.name },
-					score: matches ? score : -1
-				};
-			})
-			.filter(item => item.score > 0)
-			.sort((a, b) => b.score - a.score)
-			.map(item => item.file);
-
-		// In link mode, only show files (no actions)
-		if (props.linkMode) {
-			return filesWithScores;
-		}
-
-		// If there's a query, show ranked files; otherwise show actions + files
-		if (searchQuery) {
-			return filesWithScores;
-		}
-		return [...actions, ...filesWithScores];
-	});
-
-	// Reset selected index when items change
-	createEffect(() => {
-		items(); // Track dependency
-		setSelectedIndex(0);
-	});
-
-	// Scroll selected item into view
-	createEffect(() => {
-		const idx = selectedIndex();
-		const element = document.querySelector(`[data-palette-index="${idx}"]`);
-		if (element) {
-			element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-		}
-	});
-
-	const handleKeyDown = (e: KeyboardEvent) => {
-		const itemsCount = items().length;
-
-		if (e.key === 'ArrowDown') {
-			e.preventDefault();
-			setSelectedIndex((selectedIndex() + 1) % itemsCount);
-		} else if (e.key === 'ArrowUp') {
-			e.preventDefault();
-			setSelectedIndex((selectedIndex() - 1 + itemsCount) % itemsCount);
-		} else if (e.key === 'Enter') {
-			e.preventDefault();
-			const item = items()[selectedIndex()];
-			if (item) {
-				if (item.type === 'action') {
-					item.onSelect();
-				} else {
-					if (props.linkMode && props.onInsertLink) {
-						props.onInsertLink(item.path);
-						props.onClose();
-					} else {
-						props.onClose();
-						props.onOpenFile(item.path);
-					}
-				}
-			}
-		} else if (e.key === 'Escape') {
-			e.preventDefault();
-			props.onClose();
-		}
-	};
-
-	return (
-		<Show when={props.isOpen}>
-			<div class={paletteOverlay} onClick={props.onClose}>
-				<div class={paletteModal} onClick={(e) => e.stopPropagation()}>
-					<input
-						ref={inputRef}
-						class={paletteInput}
-						type="text"
-						placeholder={props.linkMode ? "Search for a note to link..." : "Type to search files or choose an action..."}
-						value={query()}
-						onInput={(e) => setQuery(e.currentTarget.value)}
-						onKeyDown={handleKeyDown}
-					/>
-					<Show when={!query() && !props.linkMode}>
-						<div style={{
-							"padding": "8px 12px",
-							"font-size": "11px",
-							"color": "#888",
-							"border-bottom": "1px solid #333"
-						}}>
-							Query operators: <code>type:</code> <code>status:</code> <code>tag:</code> <code>linkto:</code> <code>linkedby:</code> <code>links:</code> <code>backlinks:</code>
-						</div>
-					</Show>
-					<div class={paletteResults}>
-						<Show
-							when={items().length > 0}
-							fallback={
-								<div class={paletteEmpty}>
-									No results found
-								</div>
-							}
-						>
-							<For each={items()}>
-								{(item, index) => (
-									<div
-										data-palette-index={index()}
-										class={`${paletteItem} ${selectedIndex() === index() ? paletteItemActive : ""}`}
-										onClick={() => {
-											if (item.type === 'action') {
-												item.onSelect();
-											} else {
-												if (props.linkMode && props.onInsertLink) {
-													props.onInsertLink(item.path);
-													props.onClose();
-												} else {
-													props.onClose();
-													props.onOpenFile(item.path);
-												}
-											}
-										}}
-										onMouseEnter={() => setSelectedIndex(index())}
-									>
-										<span class={paletteItemIcon}>
-											{item.type === 'action' ? item.icon : '📄'}
-										</span>
-										<span class={paletteItemLabel}>
-											{item.type === 'action' ? item.label : item.name}
-										</span>
-										<span class={paletteItemKind}>
-											{item.type === 'action' ? 'action' : item.type === 'file' ? 'file' : ''}
-										</span>
-									</div>
-								)}
-							</For>
-						</Show>
-					</div>
-				</div>
-			</div>
-		</Show>
-	);
-}
-
 /* =======================
    Local Graph View
 ======================= */
@@ -3557,7 +3255,7 @@ function LocalGraphView(props: {
 	onClose: () => void;
 	currentPath: string | null;
 	notesIndex: Record<string, NoteMetadata>;
-	fileStore: Record<string, FileState>;
+	fileStore: Record<string, FileStoreEntry>;
 	onOpenFile: (path: string) => void;
 }) {
 	let svgRef: SVGSVGElement | undefined;
@@ -3892,17 +3590,6 @@ function LocalGraphView(props: {
 /* =======================
    Icon helpers
 ======================= */
-
-// File state management types
-type FileState = {
-	savedContent: string;  // Content from server (source of truth)
-	draftContent: string;  // User's current edits
-	hash: string;          // SHA256 hash from server
-};
-
-type FileStore = {
-	[filePath: string]: FileState;
-};
 
 function Icon(props: { children: any }) {
 	return (
@@ -4251,77 +3938,52 @@ function TreeView(props: {
 ======================= */
 
 export const Home = (props?: HomeProps) => {
+	return (
+		<AppProvider>
+			<HomeInner apiOverride={props?.apiOverride} />
+		</AppProvider>
+	);
+};
+
+const HomeInner = (props?: HomeProps) => {
+	// Get all state from context
+	const {
+		openFolders, setOpenFolders,
+		selectedFile, setSelectedFile,
+		newlyCreatedFile, setNewlyCreatedFile,
+		isSaving, setIsSaving,
+		pending, setPending,
+		pendingName, setPendingName,
+		sidebarWidth, setSidebarWidth,
+		viewMode, setViewMode,
+		openTabs, setOpenTabs,
+		previewTab, setPreviewTab,
+		paletteOpen, setPaletteOpen,
+		paletteLinkMode, setPaletteLinkMode,
+		activeFolder, setActiveFolder,
+		draggedFile, setDraggedFile,
+		dropTarget, setDropTarget,
+		showFrontmatter, setShowFrontmatter,
+		graphOpen, setGraphOpen,
+		settingsOpen, setSettingsOpen,
+		renamePreview, setRenamePreview,
+		activePanelId, setActivePanelId,
+		panelsWidth,
+		notesIndex, setNotesIndex,
+		fileStore, setFileStore
+	} = useApp();
+	
 	// Use provided API or default to global api
 	const activeApi = props?.apiOverride ?? api;
 	
 	// IMPORTANT: listTree (not listFiles) so empty folders show
 	const [entries, { refetch: refetchTree }] = createResource(activeApi.listTree);
 
-	// stub “zettelkasten plugin enabled” for now
+	// stub "zettelkasten plugin enabled" for now
 	const [zettelkastenEnabled] = createSignal(true);
 
 	const treeNodes = createMemo(() => buildTreeFromEntries(entries() ?? []));
 
-	// Load persisted state from localStorage
-	const loadPersistedState = () => {
-		try {
-			const stored = localStorage.getItem('deez-ui-state');
-			if (stored) {
-				return JSON.parse(stored);
-			}
-		} catch (e) {
-			console.error('Failed to load persisted state:', e);
-		}
-		return null;
-	};
-
-	const persistedState = loadPersistedState();
-
-	const [openFolders, setOpenFolders] = createSignal<Set<string>>(
-		persistedState?.openFolders ? new Set(persistedState.openFolders) : new Set()
-	);
-	const [selectedFile, setSelectedFile] = createSignal<string>(persistedState?.selectedFile || "");
-	const [newlyCreatedFile, setNewlyCreatedFile] = createSignal<string>("");
-
-	const [isSaving, setIsSaving] = createSignal(false);
-
-	const [pending, setPending] = createSignal<PendingCreate>(null);
-	const [pendingName, setPendingName] = createSignal("");
-
-	const [sidebarWidth, setSidebarWidth] = createSignal(persistedState?.sidebarWidth || 320);
-
-	const [openTabs, setOpenTabs] = createSignal<string[]>(persistedState?.openTabs || []);
-	const [viewMode, setViewMode] = createSignal<"edit" | "preview">("edit");
-
-	// Command palette state
-	const [paletteOpen, setPaletteOpen] = createSignal(false);
-	const [paletteLinkMode, setPaletteLinkMode] = createSignal(false);
-
-	// Active folder for context (used when creating new files)
-	const [activeFolder, setActiveFolder] = createSignal<string>("");
-
-	// Drag and drop state
-	const [draggedFile, setDraggedFile] = createSignal<string>("");
-	const [dropTarget, setDropTarget] = createSignal<string>("");
-
-	// Preview tab state (VS Code-style single-click preview)
-	const [previewTab, setPreviewTab] = createSignal<string>("");
-
-	// Frontmatter state
-	const [showFrontmatter, setShowFrontmatter] = createSignal(true);
-
-	// Graph view state
-	const [graphOpen, setGraphOpen] = createSignal(false);
-
-	// Rename propagation state
-	const [renamePreview, setRenamePreview] = createSignal<{
-		oldPath: string;
-		newName: string;
-		affectedNotes: Array<{ path: string; title: string; linkCount: number }>;
-	} | null>(null);
-
-	// Zettelkasten: Backlinks index (note path -> metadata)
-	const [notesIndex, setNotesIndex] = createStore<Record<string, NoteMetadata>>({});
 
 	// Rebuild the backlinks index when files change
 	const rebuildIndex = async () => {
@@ -4494,7 +4156,6 @@ export const Home = (props?: HomeProps) => {
 	});
 
 	// File state store - the single source of truth for all file content
-	const [fileStore, setFileStore] = createStore<FileStore>({});
 
 	// Computed: current file's draft content
 	const draft = createMemo(() => {
@@ -4550,13 +4211,6 @@ export const Home = (props?: HomeProps) => {
 		setDraft(currentBody());
 	};
 
-	// Check if a file has unsaved changes
-	const isFileDirty = (filePath: string) => {
-		const state = fileStore[filePath];
-		if (!state) return false;
-		return state.draftContent !== state.savedContent;
-	};
-
 	// Configure marked with syntax highlighting
 	marked.setOptions({
 		breaks: true,
@@ -4589,6 +4243,9 @@ export const Home = (props?: HomeProps) => {
 		}
 	);
 
+	// Track newly created files to prevent overwriting content from server
+	const justCreatedFiles = new Set<string>();
+
 	// Load file content from server and update store
 	createEffect(() => {
 		const f = file();
@@ -4597,6 +4254,31 @@ export const Home = (props?: HomeProps) => {
 		const currentFile = selectedFile();
 		if (!currentFile) return;
 
+		console.log('[DEBUG] File loaded from server:', currentFile, 'newlyCreatedFile:', newlyCreatedFile(), 'content length:', f.content.length);
+
+		// Skip overwriting if this file was just created
+		// This prevents losing content when opening a newly created file
+		if (currentFile === newlyCreatedFile()) {
+			console.log('[DEBUG] Skipping overwrite - file is newly created');
+			return;
+		}
+
+		// Skip if we've marked this file as just created
+		if (justCreatedFiles.has(currentFile)) {
+			console.log('[DEBUG] Skipping overwrite - file in justCreated set');
+			justCreatedFiles.delete(currentFile);
+			return;
+		}
+
+		// Skip overwriting if the file has unsaved changes (dirty state)
+		// This prevents losing edits that haven't been saved yet
+		const currentEntry = untrack(() => fileStore[currentFile]);
+		if (currentEntry && currentEntry.draftContent !== currentEntry.savedContent) {
+			console.log('[DEBUG] Skipping overwrite - file has unsaved changes');
+			return;
+		}
+
+		console.log('[DEBUG] Overwriting fileStore with server content');
 		setFileStore(produce((store) => {
 			// Always reset to server content when loading a file
 			// This ensures opening a file doesn't show it as dirty
@@ -4724,12 +4406,20 @@ export const Home = (props?: HomeProps) => {
 				: "";
 			
 			// Create the file with initial content
-			await api.createFile(filePath, initialContent);
+			const result = await api.createFile(filePath, initialContent);
 			await refetchTree();
+
+			// Pre-populate fileStore with the content before opening the tab
+			setFileStore(produce((store) => {
+				store[filePath] = {
+					savedContent: initialContent,
+					draftContent: initialContent,
+					hash: result.sha256 || ""
+				};
+			}));
 
 			// Mark as newly created and clear after 2 seconds
 			setNewlyCreatedFile(filePath);
-			setTimeout(() => setNewlyCreatedFile(""), 2000);
 
 			// Open in tab (file will be loaded automatically)
 			openInTab(filePath);
@@ -4780,12 +4470,20 @@ export const Home = (props?: HomeProps) => {
 			const finalContent = pluginContent || initialContent;
 			
 			// Create the file with initial content
-			await api.createFile(filePath, finalContent);
+			const result = await api.createFile(filePath, finalContent);
 			await refetchTree();
+
+			// Pre-populate fileStore with the content before opening the tab
+			setFileStore(produce((store) => {
+				store[filePath] = {
+					savedContent: finalContent,
+					draftContent: finalContent,
+					hash: result.sha256 || ""
+				};
+			}));
 
 			// Mark as newly created and clear after 2 seconds
 			setNewlyCreatedFile(filePath);
-			setTimeout(() => setNewlyCreatedFile(""), 2000);
 
 			// Open in tab (file will be loaded automatically)
 			openInTab(filePath);
@@ -4853,12 +4551,20 @@ export const Home = (props?: HomeProps) => {
 			const finalContent = pluginContent || initialContent;
 			
 			// Create the file with initial content
-			await api.createFile(filePath, finalContent);
+			const result = await api.createFile(filePath, finalContent);
 			await refetchTree();
+
+			// Pre-populate fileStore with the content before opening the tab
+			setFileStore(produce((store) => {
+				store[filePath] = {
+					savedContent: finalContent,
+					draftContent: finalContent,
+					hash: result.sha256 || ""
+				};
+			}));
 
 			// Mark as newly created and clear after 2 seconds
 			setNewlyCreatedFile(filePath);
-			setTimeout(() => setNewlyCreatedFile(""), 2000);
 
 			// Open in tab (file will be loaded automatically)
 			openInTab(filePath);
@@ -4907,22 +4613,33 @@ export const Home = (props?: HomeProps) => {
 		const initialContent = `${frontmatterStr}\n${content}\n`;
 
 		try {
-			// Execute plugin hooks
-			const pluginContent = await pluginRegistry.executeOnCreateNote(filePath);
-			const finalContent = pluginContent || initialContent;
-			
-			// Create the file with initial content
-			await api.createFile(filePath, finalContent);
-			await refetchTree();
+		// Execute plugin hooks
+		const pluginContent = await pluginRegistry.executeOnCreateNote(filePath);
+		const finalContent = pluginContent || initialContent;
+		
+		// Create the file with initial content
+		const result = await api.createFile(filePath, finalContent);
+		await refetchTree();
 
-			// Mark as newly created and clear after 2 seconds
-			setNewlyCreatedFile(filePath);
-			setTimeout(() => setNewlyCreatedFile(""), 2000);
+		// Pre-populate fileStore with the content before opening the tab
+		// This prevents the file from appearing empty while server loads
+		console.log('[DEBUG] Quick Capture - pre-populating fileStore:', filePath, 'content length:', finalContent.length);
+		setFileStore(produce((store) => {
+			store[filePath] = {
+				savedContent: finalContent,
+				draftContent: finalContent,
+				hash: result.sha256 || ""
+			};
+		}));
 
-			// Open in tab (file will be loaded automatically)
-			openInTab(filePath);
-			
-			// Open the Inbox folder
+		// Mark as newly created and clear after 2 seconds
+		console.log('[DEBUG] Quick Capture - setting newlyCreatedFile:', filePath);
+		setNewlyCreatedFile(filePath);
+		// Don't auto-clear - let it persist until file is saved or switched
+
+		// Open in tab (file will be loaded automatically)
+		console.log('[DEBUG] Quick Capture - opening in tab:', filePath);
+		openInTab(filePath);			// Open the Inbox folder
 			const next = new Set(openFolders());
 			next.add(inboxDir);
 			setOpenFolders(next);
@@ -5005,6 +4722,11 @@ export const Home = (props?: HomeProps) => {
 				}
 			}));
 
+			// Clear newly created flag once file is saved
+			if (newlyCreatedFile() === p) {
+				setNewlyCreatedFile("");
+			}
+
 			await refetchTree();
 			
 			// Execute plugin hooks on save
@@ -5075,40 +4797,8 @@ export const Home = (props?: HomeProps) => {
 		setSelectedFile(filePath);
 	};
 
-	const closeTab = async (filePath: string, e?: MouseEvent) => {
-		e?.stopPropagation();
-
-		// Check if file has unsaved changes
-		const fileIsDirty = isFileDirty(filePath);
-		if (fileIsDirty) {
-			const result = confirm(`"${filePath.split('/').pop()}" has unsaved changes. Do you want to save them?\n\nYour changes will be lost if you don't save them.`);
-
-			if (result) {
-				// User wants to save
-				if (selectedFile() === filePath) {
-					// File is currently selected, save it
-					await save();
-				} else {
-					// File is not selected, we need to switch to it, save, then close
-					setSelectedFile(filePath);
-					// Wait a tick for the file to load
-					await new Promise(resolve => setTimeout(resolve, 100));
-					await save();
-				}
-			} else {
-				// User doesn't want to save (revert changes to saved version)
-				const state = fileStore[filePath];
-				if (state) {
-					setFileStore(produce((store) => {
-						if (store[filePath]) {
-							store[filePath].draftContent = store[filePath].savedContent;
-						}
-					}));
-				}
-			}
-		}
-
-		// Get current index before removing
+	// Programmatic tab close (used when deleting files)
+	const closeTabSilently = (filePath: string) => {
 		const currentIdx = openTabs().indexOf(filePath);
 		const tabs = openTabs().filter(p => p !== filePath);
 		setOpenTabs(tabs);
@@ -5121,7 +4811,6 @@ export const Home = (props?: HomeProps) => {
 		// If closing the selected file, select an appropriate tab
 		if (selectedFile() === filePath) {
 			if (tabs.length > 0) {
-				// Try to select the tab to the right, or the one to the left if at the end
 				const nextIdx = currentIdx >= tabs.length ? tabs.length - 1 : currentIdx;
 				setSelectedFile(tabs[nextIdx]);
 			} else {
@@ -5532,7 +5221,7 @@ export const Home = (props?: HomeProps) => {
 				
 				// Close the tab if it's open
 				if (openTabs().includes(path)) {
-					closeTab(path);
+					closeTabSilently(path);
 				}
 			} else {
 				await api.deleteFolder(path);
@@ -5540,7 +5229,7 @@ export const Home = (props?: HomeProps) => {
 				// Close all tabs for files in the deleted folder
 				const tabsToClose = openTabs().filter(tab => tab.startsWith(path + "/"));
 				for (const tab of tabsToClose) {
-					closeTab(tab);
+					closeTabSilently(tab);
 				}
 			}
 
@@ -5814,7 +5503,7 @@ export const Home = (props?: HomeProps) => {
 	};
 
 	return (
-		<div class={shell} style={{ "--sidebar-width": `${sidebarWidth()}px` }}>
+		<div class={shell} style={{ "--sidebar-width": `${sidebarWidth()}px`, "--panels-width": `${panelsWidth()}px` }}>
 			{/* Left icon rail */}
 			<div class={rail}>
 				<RailButton title="Notes" onClick={() => console.log("Notes")}>
@@ -5880,7 +5569,7 @@ export const Home = (props?: HomeProps) => {
 					</Icon>
 				</RailButton>
 
-				<RailButton title="Settings" onClick={() => console.log("Settings")}>
+				<RailButton title="Settings" onClick={() => setSettingsOpen(true)}>
 					<Icon>
 						<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
 						<path d="M19.4 15a7.8 7.8 0 0 0 .1-2l2-1.2-2-3.4-2.3.7a8 8 0 0 0-1.7-1L15 3h-6l-.5 4.1a8 8 0 0 0-1.7 1L4.5 7.4l-2 3.4L4.5 12l-.1 2-2 1.2 2 3.4 2.3-.7a8 8 0 0 0 1.7 1L9 21h6l.5-4.1a8 8 0 0 0 1.7-1l2.3.7 2-3.4z" />
@@ -5946,112 +5635,10 @@ export const Home = (props?: HomeProps) => {
 			{/* Main */}
 			<div class={main}>
 				{/* Tabs Bar */}
-				<Show when={openTabs().length > 0}>
-					<div class={tabsBar}>
-						<For each={openTabs()}>
-							{(filePath) => {
-								const fileName = filePath.split('/').pop() || filePath;
-								return (
-									<div
-										class={`${tab} ${selectedFile() === filePath ? tabActive : ""} ${previewTab() === filePath ? tabPreview : ""}`}
-										onClick={() => setSelectedFile(filePath)}
-										onDblClick={() => {
-											if (previewTab() === filePath) {
-												setPreviewTab("");
-											}
-										}}
-										title={filePath}
-									>
-										<span class={tabFileName}>{fileName}</span>
-										<div class={tabActions}>
-											<Show when={isFileDirty(filePath)}>
-												<div class="tab-dirty-dot" style={{
-													width: "8px",
-													height: "8px",
-													"border-radius": "50%",
-													background: "#ffffff",
-													opacity: "0.9"
-												}} title="Unsaved changes" />
-											</Show>
-											<div
-												class={`${tabClose} tab-close-x`}
-												style={{ display: isFileDirty(filePath) ? "none" : "flex" }}
-												onClick={(e) => closeTab(filePath, e)}
-												title="Close"
-											>
-												×
-											</div>
-										</div>
-									</div>
-								);
-							}}
-						</For>
-					</div>
-				</Show>
+				<TabBar onSave={save} />
 
 				{/* Markdown Toolbar */}
-				<Show when={selectedFile()}>
-					<div class={toolbar}>
-						<button class={toolBtn} onClick={() => insertMarkdown("**", "**")} title="Bold (Cmd+B)">
-							<strong>B</strong>
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("*", "*")} title="Italic (Cmd+I)">
-							<em>I</em>
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("~~", "~~")} title="Strikethrough">
-							<s>S</s>
-						</button>
-						<div class={toolSeparator} />
-						<button class={toolBtn} onClick={() => insertMarkdown("# ")} title="Heading 1">
-							H1
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("## ")} title="Heading 2">
-							H2
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("### ")} title="Heading 3">
-							H3
-						</button>
-						<div class={toolSeparator} />
-						<button class={toolBtn} onClick={() => insertMarkdown("[", "](url)")} title="Link">
-							🔗
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("[[", "]]")} title="Wiki Link (Zettelkasten)">
-							[[]]
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("`", "`")} title="Code">
-							{"</>"}
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("```\n", "\n```")} title="Code Block">
-							{"{ }"}
-						</button>
-						<div class={toolSeparator} />
-						<button class={toolBtn} onClick={() => insertMarkdown("- ")} title="Bullet List">
-							•
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("1. ")} title="Numbered List">
-							1.
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("- [ ] ")} title="Task List">
-							☑
-						</button>
-						<div class={toolSeparator} />
-						<button class={toolBtn} onClick={() => insertMarkdown("> ")} title="Quote">
-							"
-						</button>
-						<button class={toolBtn} onClick={() => insertMarkdown("---\n")} title="Horizontal Rule">
-							─
-						</button>
-						<div class={toolSeparator} />
-						<button
-							class={toolBtn}
-							onClick={() => setViewMode(viewMode() === "edit" ? "preview" : "edit")}
-							style={{ "background": viewMode() === "preview" ? "rgba(96, 165, 250, 0.2)" : undefined }}
-							title={viewMode() === "edit" ? "Preview" : "Edit"}
-						>
-							{viewMode() === "edit" ? "👁️" : "✎"}
-						</button>
-					</div>
-				</Show>
+				<MarkdownToolbar onInsertMarkdown={insertMarkdown} />
 
 				{/* Frontmatter Panel */}
 				<Show when={selectedFile() && viewMode() === "edit"}>
@@ -6461,6 +6048,8 @@ export const Home = (props?: HomeProps) => {
 				fileStore={fileStore}
 				linkMode={paletteLinkMode()}
 				onInsertLink={insertLink}
+				pluginCommands={pluginRegistry.getAllCommands()}
+				parseFrontmatter={parseFrontmatter}
 			/>
 
 			{/* Local Graph View */}
@@ -6478,6 +6067,135 @@ export const Home = (props?: HomeProps) => {
 
 			{/* Rename Preview Modal */}
 			<RenamePreviewModal />
+
+			{/* Settings Modal */}
+			<Show when={settingsOpen()}>
+				<div class={graphOverlay} onClick={() => setSettingsOpen(false)}>
+					<div class={graphContainer} onClick={(e) => e.stopPropagation()} style={{ width: '600px', height: '500px' }}>
+						<div class={graphHeader}>
+							<div class={graphTitle}>Settings</div>
+							<button class={graphClose} onClick={() => setSettingsOpen(false)}>×</button>
+						</div>
+						<div style={{ padding: '1.5rem', 'overflow-y': 'auto', height: 'calc(100% - 64px)' }}>
+							<h3 style={{ 'margin-top': '0', 'margin-bottom': '1rem', 'font-size': '1rem', color: '#ffffff' }}>
+								Plugins
+							</h3>
+							<div style={{ display: 'flex', 'flex-direction': 'column', gap: '1rem' }}>
+								<For each={pluginRegistry.getAll()}>{(plugin) => (
+									<div style={{
+										padding: '1rem',
+										background: '#2d2d30',
+										'border-radius': '6px',
+										border: '1px solid #3c3c3c'
+									}}>
+										<div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'flex-start', gap: '1rem' }}>
+											<div style={{ flex: 1 }}>
+												<div style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem', 'margin-bottom': '0.5rem' }}>
+													<strong style={{ color: '#ffffff', 'font-size': '0.95rem' }}>{plugin.name}</strong>
+													<span style={{ 
+														'font-size': '0.75rem',
+														color: '#888',
+														padding: '2px 6px',
+														background: '#1e1e1e',
+														'border-radius': '3px'
+													}}>
+														v{plugin.version}
+													</span>
+												</div>
+												{plugin.description && (
+													<p style={{ margin: '0', 'font-size': '0.85rem', color: '#aaa' }}>
+														{plugin.description}
+													</p>
+												)}
+												{plugin.author && (
+													<p style={{ margin: '0.5rem 0 0 0', 'font-size': '0.75rem', color: '#777' }}>
+														by {plugin.author}
+													</p>
+												)}
+												<div style={{ 'margin-top': '0.75rem', display: 'flex', 'flex-wrap': 'wrap', gap: '0.5rem', 'font-size': '0.75rem', color: '#888' }}>
+													{plugin.hooks.commands && plugin.hooks.commands.length > 0 && (
+														<span style={{ padding: '2px 6px', background: '#1e1e1e', 'border-radius': '3px' }}>
+															{plugin.hooks.commands.length} {plugin.hooks.commands.length === 1 ? 'command' : 'commands'}
+														</span>
+													)}
+													{plugin.hooks.panels && plugin.hooks.panels.length > 0 && (
+														<span style={{ padding: '2px 6px', background: '#1e1e1e', 'border-radius': '3px' }}>
+															{plugin.hooks.panels.length} {plugin.hooks.panels.length === 1 ? 'panel' : 'panels'}
+														</span>
+													)}
+													{plugin.hooks.metadataSchema && plugin.hooks.metadataSchema.length > 0 && (
+														<span style={{ padding: '2px 6px', background: '#1e1e1e', 'border-radius': '3px' }}>
+															{plugin.hooks.metadataSchema.length} metadata {plugin.hooks.metadataSchema.length === 1 ? 'field' : 'fields'}
+														</span>
+													)}
+													{plugin.hooks.renderHooks && (
+														<span style={{ padding: '2px 6px', background: '#1e1e1e', 'border-radius': '3px' }}>
+															render hooks
+														</span>
+													)}
+												</div>
+											</div>
+											<label style={{ display: 'flex', 'align-items': 'center', cursor: 'pointer' }}>
+												<input
+													type="checkbox"
+													checked={plugin.enabled !== false}
+													onChange={async (e) => {
+														await pluginRegistry.togglePlugin(plugin.id, e.currentTarget.checked);
+													}}
+													style={{
+														width: '18px',
+														height: '18px',
+														cursor: 'pointer',
+														'accent-color': '#3b82f6'
+													}}
+												/>
+											</label>
+										</div>
+									</div>
+								)}</For>
+							</div>
+						</div>
+					</div>
+				</div>
+			</Show>
+
+			{/* Plugin Panels Sidebar */}
+			<div class={panelsSidebar}>
+				<div class={panelsHeader}>
+					{pluginRegistry.getAllPanels().map((panel) => (
+						<div
+							class={`${panelTab} ${activePanelId() === panel.id ? panelTabActive : ""}`}
+							onClick={() => setActivePanelId(activePanelId() === panel.id ? null : panel.id)}
+						>
+							{panel.icon && <span>{panel.icon}</span>}
+							<span>{panel.title}</span>
+						</div>
+					))}
+				</div>
+				<div class={panelsBody}>
+					{(() => {
+						const activePanel = pluginRegistry.getAllPanels().find(p => p.id === activePanelId());
+						if (!activePanel) {
+							return (
+								<div style={{ padding: '2rem', 'text-align': 'center', color: '#888', 'font-size': '0.9rem' }}>
+									Select a panel from the tabs above
+								</div>
+							);
+						}
+						
+						const context: PluginPanelContext = {
+							currentFile: selectedFile(),
+							notesIndex: notesIndex,
+							openFile: (path: string) => openInTab(path, false),
+							createNote: () => {
+								onNewNote();
+							}
+						};
+						
+						return activePanel.render(context);
+					})()}
+				</div>
+			</div>
 		</div>
 	);
 };
